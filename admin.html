@@ -1,0 +1,3028 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据管理控制台</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", system-ui, sans-serif; }
+body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: center; }
+
+.app {
+    width: 100%;
+    background: #EDEDED;
+    min-height: 100vh;
+    position: relative;
+}
+@media (max-width: 768px) {
+    .app { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
+}
+@media (min-width: 769px) {
+    .app { max-width: 1600px; margin: 0 auto; padding-top: 0; }
+}
+
+/* ============ 登录 ============ */
+.login-box {
+    max-width: 340px; margin: 100px auto; background: white;
+    border-radius: 12px; padding: 28px 24px; text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+.login-box h1 { font-size: 20px; color: #000; margin-bottom: 6px; font-weight: 600; }
+.login-box p { color: #7F7F7F; font-size: 13px; margin-bottom: 20px; }
+.login-box input {
+    width: 100%; padding: 12px 16px;
+    border: 1px solid #E5E5E5; border-radius: 4px;
+    font-size: 15px; outline: none; background: #F7F7F7; margin-bottom: 12px;
+}
+.login-box input:focus { border-color: #07C160; background: white; }
+.login-box button {
+    width: 100%; padding: 12px; background: #07C160; color: white;
+    border: none; border-radius: 4px; font-size: 15px; font-weight: 500; cursor: pointer;
+}
+.login-box button:active { opacity: 0.85; }
+.login-box .error { color: #FA5151; font-size: 13px; margin-top: 10px; min-height: 18px; }
+
+/* ============ 主页面 ============ */
+#mainPage { display: none; }
+
+.navbar {
+    background: #EDEDED; padding: 12px 16px;
+    position: sticky; top: 0; z-index: 100;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+}
+.navbar h1 { font-size: 17px; font-weight: 600; color: #000; flex: 1; text-align: center; }
+.navbar .nav-btn {
+    background: none; border: none; font-size: 14px; color: #07C160;
+    cursor: pointer; padding: 4px 8px; font-weight: 500;
+    white-space: nowrap;
+}
+.navbar .nav-btn:active { opacity: 0.6; }
+@media (min-width: 769px) {
+    .navbar h1 { text-align: left; font-size: 19px; }
+}
+
+.global-status {
+    display: grid;
+    gap: 8px; padding: 12px 16px; background: white;
+    border-bottom: 1px solid #E5E5E5;
+    grid-template-columns: repeat(2, 1fr);
+}
+@media (min-width: 500px) { .global-status { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 900px) { .global-status { grid-template-columns: repeat(6, 1fr); } }
+.gs-card {
+    background: #F7F7F7; border-radius: 4px; padding: 10px 12px;
+    border-left: 3px solid #07C160;
+}
+.gs-card.notes { border-left-color: #07C160; }
+.gs-card.valves { border-left-color: #07C160; }
+.gs-card.status { border-left-color: #5b8def; }
+.gs-card.valve-data { border-left-color: #f59e0b; }
+.gs-card.tails { border-left-color: #FA5151; }
+.gs-card.work { border-left-color: #0891b2; }
+.gs-card .gs-label { font-size: 11px; color: #7F7F7F; margin-bottom: 2px; font-weight: 500; }
+.gs-card .gs-value { font-size: 18px; font-weight: 700; color: #000; }
+.gs-card .gs-value small { font-size: 11px; color: #7F7F7F; font-weight: 400; margin-left: 2px; }
+
+.status-bar {
+    padding: 10px 16px; font-size: 13px; margin: 8px 0; display: none;
+    border-radius: 4px; margin-left: 16px; margin-right: 16px;
+}
+.status-bar.success { background: #d1fae5; color: #065f46; display: block; }
+.status-bar.error { background: #fee2e2; color: #991b1b; display: block; }
+.status-bar.loading { background: #e0f2fe; color: #0369a1; display: block; }
+
+.tab-switch {
+    display: flex; gap: 6px; padding: 10px 16px;
+    overflow-x: auto; background: white;
+    border-bottom: 1px solid #E5E5E5;
+    -webkit-overflow-scrolling: touch;
+}
+.tab-switch::-webkit-scrollbar { display: none; }
+.tab-switch button {
+    padding: 7px 14px; border: none; border-radius: 4px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    background: #F2F2F2; color: #333; white-space: nowrap;
+    flex-shrink: 0;
+}
+.tab-switch button.active { background: #07C160; color: white; }
+
+.toolbar {
+    display: flex; gap: 8px; padding: 10px 16px;
+    flex-wrap: wrap; background: #EDEDED;
+}
+@media (min-width: 769px) {
+    .toolbar { padding: 12px 24px; gap: 10px; }
+    .toolbar button { padding: 9px 16px; font-size: 13px; }
+}
+.toolbar button {
+    padding: 8px 14px; border: none; border-radius: 4px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px;
+    background: white; color: #333; border: 1px solid #E5E5E5;
+}
+.toolbar button:active { transform: scale(0.97); }
+.toolbar button.btn-primary { background: #07C160; color: white; border-color: #07C160; }
+.toolbar button.btn-success { background: #07C160; color: white; border-color: #07C160; }
+.toolbar button.btn-warning { background: #F2F2F2; color: #333; }
+.toolbar button.btn-danger { background: #FA5151; color: white; border-color: #FA5151; }
+.toolbar button.btn-secondary { background: #F2F2F2; color: #333; }
+.toolbar button.btn-purple { background: #5b21b6; color: white; border-color: #5b21b6; }
+.toolbar button.btn-cyan { background: #0891b2; color: white; border-color: #0891b2; }
+.toolbar button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.search-box {
+    display: flex; gap: 8px; padding: 10px 16px;
+    background: white; border-bottom: 1px solid #E5E5E5;
+}
+.search-box input {
+    flex: 1; padding: 10px 14px;
+    border: 1px solid #E5E5E5; border-radius: 4px;
+    font-size: 14px; outline: none; background: #F7F7F7;
+}
+.search-box input:focus { border-color: #07C160; background: white; }
+
+.table-container { background: #EDEDED; }
+
+.card {
+    background: white; margin: 8px 0;
+    padding: 14px 16px;
+    border-top: 1px solid #E5E5E5;
+    border-bottom: 1px solid #E5E5E5;
+}
+
+.card .card-row {
+    display: flex; padding: 6px 0;
+    border-bottom: 1px solid #F2F2F2;
+    font-size: 14px; align-items: flex-start;
+}
+.card .card-row:last-child { border-bottom: none; }
+.card .card-row .label {
+    width: 90px; color: #7F7F7F; flex-shrink: 0; font-size: 13px;
+}
+.card .card-row .value {
+    flex: 1; color: #333; word-break: break-word; font-size: 14px;
+}
+.card .card-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px; padding-bottom: 8px;
+    border-bottom: 1px solid #F2F2F2;
+}
+.card .card-head .title { font-size: 15px; font-weight: 600; color: #000; }
+.card .card-head .index { color: #7F7F7F; font-size: 12px; font-weight: 400; }
+.card .card-actions {
+    display: flex; gap: 8px; margin-top: 10px;
+    padding-top: 10px; border-top: 1px solid #F2F2F2;
+}
+.card .card-actions button {
+    padding: 6px 14px; border: none; border-radius: 4px;
+    font-size: 13px; cursor: pointer;
+}
+.card .card-actions button.del { background: #FA5151; color: white; }
+.card .card-actions button.edit { background: #F2F2F2; color: #333; border: 1px solid #E5E5E5; }
+
+.note-history { display: flex; flex-wrap: wrap; gap: 4px; }
+.note-history span {
+    background: #F2F2F2; color: #333;
+    padding: 3px 10px; border-radius: 4px; font-size: 12px;
+}
+.note-history span small { color: #7F7F7F; margin-left: 4px; }
+.note-history span small.user-tag { color: #5b8def; font-weight: 600; }
+
+.badge-new { background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+.badge-ok { background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+
+.no-data {
+    text-align: center; padding: 50px 20px; color: #7F7F7F;
+    background: white; margin: 8px 0;
+    border-top: 1px solid #E5E5E5; border-bottom: 1px solid #E5E5E5;
+}
+.no-data span { display: block; font-size: 38px; margin-bottom: 10px; }
+
+.pagination {
+    display: flex; justify-content: center; align-items: center;
+    gap: 12px; padding: 14px; background: white;
+    border-top: 1px solid #E5E5E5;
+}
+.pagination button {
+    padding: 7px 18px; border: 1px solid #E5E5E5;
+    background: white; border-radius: 4px;
+    font-size: 13px; cursor: pointer; color: #333;
+}
+.pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+.pagination span { color: #7F7F7F; font-size: 13px; }
+
+.bottom-tabs {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    width: 100%;
+    background: #F7F7F7; display: flex;
+    border-top: 1px solid #E5E5E5;
+    padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+    z-index: 200;
+}
+@media (min-width: 769px) {
+    .bottom-tabs { display: none; }
+    .tab-switch { display: flex !important; }
+}
+.bottom-tabs .tab-item {
+    flex: 1; background: none; border: none;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 3px; padding: 4px 0;
+    cursor: pointer; color: #7F7F7F;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+}
+.bottom-tabs .tab-item svg {
+    width: 22px; height: 22px;
+    stroke: currentColor; fill: none;
+    stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.bottom-tabs .tab-item .tab-label { font-size: 10px; line-height: 1; font-weight: 500; }
+.bottom-tabs .tab-item.active { color: #07C160; }
+.bottom-tabs .tab-item.active .tab-label { font-weight: 600; }
+.bottom-tabs .tab-item:active svg { transform: scale(0.9); }
+
+#workPanel { display: none; padding: 0 0 8px; }
+.work-filters {
+    display: flex; gap: 12px; padding: 12px 16px;
+    background: white; flex-wrap: wrap; align-items: center;
+    border-bottom: 1px solid #E5E5E5;
+}
+.work-filters label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: #333;
+}
+.work-filters input {
+    padding: 8px 12px; border: 1px solid #E5E5E5;
+    border-radius: 4px; font-size: 13px; outline: none; background: #F7F7F7;
+}
+.work-filters input:focus { border-color: #07C160; background: white; }
+.work-total-box {
+    background: #F7F7F7; border-radius: 4px; padding: 10px 14px;
+    display: inline-block; margin: 4px 8px 4px 0; min-width: 100px;
+    vertical-align: top;
+}
+.work-total-box .tlabel { font-size: 11px; color: #7F7F7F; margin-bottom: 2px; }
+.work-total-box .tvalue { font-size: 18px; font-weight: 700; color: #07C160; }
+.work-total-box.people { background: #fef3c7; }
+.work-total-box.people .tvalue { color: #92400e; }
+#workTeamsList {
+    background: white; margin: 8px 0;
+    border-top: 1px solid #E5E5E5; border-bottom: 1px solid #E5E5E5;
+    overflow-x: auto;
+}
+#workTeamsList tbody tr:nth-child(even) { background: #F7F7F7; }
+#workTeamsList tbody tr:nth-child(odd) { background: white; }
+#workTeamsList tbody tr:hover { background: #EEF3FA; }
+#workTeamsList table { font-size: 12px; min-width: 600px; }
+#workTeamsList th, #workTeamsList td { padding: 4px 3px !important; }
+.work-table-input {
+    width: 100%; padding: 4px 6px;
+    border: 1px solid #E5E5E5; border-radius: 3px;
+    font-size: 12px; outline: none; min-width: 0; background: #F7F7F7;
+}
+.work-table-input:focus { border-color: #07C160; background: white; }
+.work-num-input {
+    width: 50px; padding: 4px 2px;
+    border: 1px solid #E5E5E5; border-radius: 3px;
+    font-size: 12px; text-align: center; outline: none;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+.work-num-input::-webkit-outer-spin-button,
+.work-num-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.work-num-input:focus { border-color: #07C160; background: white; }
+.work-col-vert {
+    writing-mode: vertical-lr; text-orientation: upright;
+    letter-spacing: 1px; padding: 6px 2px !important;
+    font-size: 11px; line-height: 1.1;
+    text-align: center; vertical-align: middle;
+    height: 120px; white-space: nowrap;
+}
+.work-col-vert .col-icon-btn {
+    writing-mode: horizontal-tb; display: inline-block;
+    margin: 2px 0; font-size: 10px; text-decoration: none;
+}
+
+.dialog-overlay {
+    display: none; position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%; background: rgba(0,0,0,0.5);
+    z-index: 1000; justify-content: center; align-items: center;
+}
+.dialog-overlay.active { display: flex; }
+.dialog {
+    background: white; border-radius: 8px; padding: 24px 20px;
+    max-width: 420px; width: 88%; max-height: 85vh; overflow-y: auto;
+}
+@media (min-width: 769px) {
+    .dialog { max-width: 600px; padding: 28px 28px; }
+    .dialog textarea { min-height: 200px; }
+}
+.dialog h2 { font-size: 17px; color: #000; margin-bottom: 8px; font-weight: 600; }
+.dialog p { color: #7F7F7F; font-size: 13px; margin-bottom: 14px; }
+.dialog textarea {
+    width: 100%; min-height: 160px; padding: 10px 12px;
+    border: 1px solid #E5E5E5; border-radius: 4px;
+    font-size: 13px; font-family: system-ui, sans-serif;
+    resize: vertical; outline: none; background: #F7F7F7;
+}
+.dialog input {
+    width: 100%; padding: 11px 14px;
+    border: 1px solid #E5E5E5; border-radius: 4px;
+    font-size: 14px; margin-bottom: 10px; outline: none; background: #F7F7F7;
+}
+.dialog input:focus, .dialog textarea:focus { border-color: #07C160; background: white; }
+.dialog-buttons {
+    display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end;
+}
+.dialog-buttons button {
+    padding: 10px 22px; border: none; border-radius: 4px;
+    font-size: 14px; cursor: pointer;
+}
+.dialog-buttons .btn-secondary { background: #F2F2F2; color: #333; }
+.dialog-buttons .btn-primary { background: #07C160; color: white; }
+.dialog-buttons .btn-danger { background: #FA5151; color: white; }
+
+.dialog code { background: #F2F2F2; padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+
+@media (min-width: 769px) {
+    #dataBody {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        padding: 12px 24px;
+        align-items: start;
+    }
+    #dataBody > .card {
+        margin: 0;
+        border-radius: 6px;
+        border: 1px solid #E5E5E5;
+        border-top: 1px solid #E5E5E5;
+        border-bottom: 1px solid #E5E5E5;
+    }
+    #dataBody > .no-data {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (min-width: 1400px) {
+    #dataBody {
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+}
+
+@media (min-width: 769px) {
+    .pagination {
+        background: transparent;
+        border-top: none;
+    }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 登录 ============ -->
+<div class="login-box" id="loginPage">
+    <h1>🔐 控制台</h1>
+    <p>请输入管理密码</p>
+    <input type="password" id="passwordInput" placeholder="管理密码">
+    <button onclick="doLogin()">登 录</button>
+    <div class="error" id="loginError"></div>
+</div>
+
+<!-- ============ 主页面 ============ -->
+<div class="app" id="mainPage">
+
+    <div class="navbar">
+        <button class="nav-btn left" onclick="refreshAllStatus()">🔄</button>
+        <h1 id="navTitle">📋 控制台</h1>
+        <button class="nav-btn right" onclick="logout()">退出</button>
+    </div>
+
+    <div class="global-status">
+        <div class="gs-card status">
+            <div class="gs-label">data1.json</div>
+            <div class="gs-value" id="gsStatus"><small>—</small></div>
+        </div>
+        <div class="gs-card valve-data">
+            <div class="gs-label">data2.json</div>
+            <div class="gs-value" id="gsValveData"><small>—</small></div>
+        </div>
+        <div class="gs-card notes">
+            <div class="gs-label">备注</div>
+            <div class="gs-value" id="gsNotes"><small>—</small></div>
+        </div>
+        <div class="gs-card valves">
+            <div class="gs-label">阀门录入</div>
+            <div class="gs-value" id="gsValves"><small>—</small></div>
+        </div>
+        <div class="gs-card tails">
+            <div class="gs-label">尾项</div>
+            <div class="gs-value" id="gsTails"><small>—</small></div>
+        </div>
+        <div class="gs-card work">
+            <div class="gs-label">工作量</div>
+            <div class="gs-value" id="gsWork"><small>—</small></div>
+        </div>
+    </div>
+
+    <div class="status-bar" id="statusBar"></div>
+	
+	<div class="tab-switch">
+	    <button class="active" id="tabWork" onclick="switchTab('work')">📊 工作量</button>
+	    <button id="tabTotal" onclick="switchTab('total')">📈 总量</button>
+	    <button id="tabTails" onclick="switchTab('tails')">📌 尾项</button>
+	    <button id="tabNotesLive" onclick="switchTab('notesLive')">📝 备注</button>
+	    <button id="tabStatus" onclick="switchTab('status')">📊 状态</button>
+	    <button id="tabValveLive" onclick="switchTab('valveLive')">🚪 阀门录入</button>
+	    <button id="tabValve" onclick="switchTab('valve')">🔧 阀门数据</button>
+	</div>
+	
+    <div class="toolbar" id="notesLiveToolbar">
+        <button class="btn-primary" onclick="refreshNotesLive()">🔄 刷新</button>
+        <button class="btn-success" onclick="exportNotesLiveCSV()">📥 导出</button>
+        <button class="btn-primary" onclick="openAddNoteDialog()">➕ 添加</button>
+        <button class="btn-warning" onclick="openImportNotesDialog()">📤 导入</button>
+        <button class="btn-danger" onclick="openBatchDeleteNotesDialog()">🗑️ 删除</button>
+    </div>
+
+    <div class="toolbar" id="tailsToolbar" style="display: none;">
+        <button class="btn-primary" onclick="refreshTails()">🔄 刷新</button>
+        <button class="btn-success" onclick="exportTailsExcel()">📥 导出</button>
+        <button class="btn-primary" onclick="openAddTailDialog()">➕ 添加</button>
+        <button class="btn-warning" onclick="openImportTailsDialog()">📤 导入</button>
+        <button class="btn-danger" onclick="openBatchDeleteTailsDialog()">🗑️ 删除</button>
+    </div>
+
+    <div class="toolbar" id="workToolbar" style="display: none;">
+        <button class="btn-primary" onclick="refreshWorkAll()">🔄 刷新</button>
+        <button class="btn-cyan" onclick="refreshWorkTeams()">👥 班组</button>
+        <button class="btn-primary" onclick="openAddTeamDialog()">➕ 班组</button>
+        <button class="btn-warning" onclick="openImportTeamsDialog()">📤 导入班组</button>
+        <button class="btn-secondary" onclick="openAddColumnDialog()">➕ 列</button>
+        <button class="btn-success" onclick="saveAllWorkRecords()">💾 保存</button>
+        <button class="btn-warning" onclick="loadWorkRecordsByRange()">📈 汇总</button>
+        <button class="btn-success" onclick="exportWorkExcel()">📥 导出</button>
+        <button class="btn-purple" onclick="copyWorkAsReport()">📋 日报</button>
+        <button class="btn-danger" onclick="deleteWorkRecordsByDate()">🗑️ 删除当天</button>
+    </div>
+
+    <div class="toolbar" id="statusToolbar" style="display: none;">
+        <button class="btn-primary" onclick="loadStatusData(false)">🔄 刷新</button>
+		<button class="btn-success" onclick="exportStatusExcel()">📥 导出 Excel</button>
+        <button class="btn-purple" onclick="exportData1Json()">📦 导出 data1.json</button>
+    </div>
+	
+	<div class="toolbar" id="totalToolbar" style="display: none;">
+	    <button class="btn-primary" onclick="refreshTotal()">🔄 刷新</button>
+	    <button class="btn-success" onclick="copyTotalReport()">📋 一键复制总量</button>
+	    <button class="btn-purple" onclick="exportTotalExcel()">📥 导出 Excel</button>
+	</div>
+
+    <div class="toolbar" id="valveLiveToolbar" style="display: none;">
+        <button class="btn-primary" onclick="refreshValveLive()">🔄 刷新</button>
+        <button class="btn-success" onclick="exportValveLiveCSV()">📥 导出</button>
+        <button class="btn-primary" onclick="openAddValveDialog()">➕ 添加</button>
+        <button class="btn-warning" onclick="openImportValvesDialog()">📤 导入</button>
+    </div>
+
+    <div class="toolbar" id="valveToolbar" style="display: none;">
+        <button class="btn-primary" onclick="loadValveData(false)">🔄 刷新</button>
+        <button class="btn-purple" onclick="exportData2Json()">📦 导出 data2.json</button>
+		<button class="btn-success" onclick="exportValveExcel()">📥 导出 Excel</button>
+        <button class="btn-danger" onclick="deleteAllValves()">🗑️ 清空</button>
+        <button class="btn-danger" onclick="flushWholeDatabase()">☠️ 清空整库</button>
+    </div>
+
+    <div class="search-box" id="searchBox">
+        <input type="text" id="searchInput" placeholder="🔍 搜索..." oninput="filterData()">
+    </div>
+
+    <div id="workPanel">
+        <div class="work-filters">
+            <label>👥 队伍：
+                <input type="text" id="workTeamName" placeholder="如：山东成成" oninput="saveTeamName()" style="width:160px;">
+            </label>
+            <label>📅 日期：
+                <input type="date" id="workDate" onchange="loadWorkRecordsByDate()">
+            </label>
+            <label>📆 范围：
+                <input type="date" id="workFrom">
+                ~
+                <input type="date" id="workTo">
+            </label>
+        </div>
+        <div id="workTeamsList"></div>
+        <div style="padding: 12px 16px;">
+            <div style="font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px;">📊 合计</div>
+            <div id="workTotals"></div>
+        </div>
+    </div>
+
+    <div class="table-container" id="tableContainer">
+        <div id="dataBody">
+            <div class="no-data"><span>⏳</span>加载中...</div>
+        </div>
+        <div class="pagination" id="paginationBar" style="display: none;">
+            <button id="prevBtn" onclick="changePage(-1)">上一页</button>
+            <span id="pageInfo">第 1 页</span>
+            <button id="nextBtn" onclick="changePage(1)">下一页</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 弹窗 ============ -->
+<div class="dialog-overlay" id="addNoteDialog">
+    <div class="dialog">
+        <h2>➕ 添加单条备注</h2>
+        <p>填写以下信息，将上传到 Upstash</p>
+        <input type="text" id="addNoteBracket" placeholder="支架号">
+        <input type="text" id="addNotePipe" placeholder="管线号">
+        <textarea id="addNoteContent" placeholder="备注内容" style="min-height: 80px;"></textarea>
+        <div class="dialog-buttons">
+            <button class="btn-secondary" onclick="closeAddNoteDialog()">取消</button>
+            <button class="btn-primary" onclick="doAddNote()">保存</button>
+        </div>
+    </div>
+</div>
+
+<div class="dialog-overlay" id="editNoteDialog">
+    <div class="dialog">
+        <h2>✏️ 修改备注</h2>
+        <p id="editNoteInfo">支架号：— · 管线号：—</p>
+        <p style="font-size:13px;color:#7F7F7F;margin-bottom:14px;">
+            原录入人：<span id="editNoteUser" style="color:#5b8def;font-weight:600;">—</span>
+        </p>
+        <textarea id="editNoteContent" placeholder="备注内容..." style="min-height:100px;"></textarea>
+        <div class="dialog-buttons">
+            <button class="btn-secondary" onclick="closeEditNoteDialog()">取消</button>
+            <button class="btn-primary" onclick="doEditNote()">保存修改</button>
+        </div>
+    </div>
+</div>
+
+<div class="dialog-overlay" id="importNotesDialog">
+    <div class="dialog">
+        <h2>📤 批量导入备注</h2>
+        <p>每行一条，格式：<code>支架号,管线号,备注内容</code></p>
+        <p style="font-size:12px;color:#f59e0b;">⚠️ 每批 20 条，批间间隔 1 秒</p>
+        <textarea id="importNotesText"></textarea>
+        <div class="dialog-buttons">
+            <button class="btn-secondary" onclick="closeImportNotesDialog()">取消</button>
+            <button class="btn-primary" onclick="doImportNotes()">开始导入</button>
+        </div>
+    </div>
+</div>
+
+<div class="dialog-overlay" id="batchDeleteNotesDialog">
+    <div class="dialog">
+        <h2>🗑️ 批量删除备注</h2>
+        <p>每行一个 <code>支架号,管线号</code></p>
+        <textarea id="batchDeleteNotesText"></textarea>
+        <div class="dialog-buttons">
+            <button class="btn-secondary" onclick="closeBatchDeleteNotesDialog()">取消</button>
+            <button class="btn-danger" onclick="doBatchDeleteNotes()">开始删除</button>
+        </div>
+    </div>
+</div>
+
+<div class="dialog-overlay" id="addValveDialog">
+    <div class="dialog">
+        <h2>➕ 添加单条阀门录入</h2>
+        <input type="text" id="addValveTag" placeholder="阀门位号">
+        <input type="text" id="addValveWeld1" placeholder="焊口号1">
+        <input type="text" id="addValveWeld2" placeholder="焊口号2">
+        <input type="text" id="addValveSerial" placeholder="阀门序列号">
+        <div class="dialog-buttons">
+            <button class="btn-secondary" onclick="closeAddValveDialog()">取消</button>
+            <button class="btn-primary" onclick="doAddValve()">保存</button>
+        </div>
+    </div>
+</div>
+
+<div class="dialog-overlay" id="editValveLiveDialog">
+    <div class="dialog">
+        <h2>✏️ 修改阀门录入</h2>
+        <p id="editValveLiveTag">阀门位号：—</p>
+        <p style="font-size:13px;color:#7F7F7F;margin-bottom:14px;">
+            原录入人：<span id="editValveLiveUser" style="color:#5b8def;font-weight:600;">—</span>
+        </p>
+        <label style="display:block;font-size:13px;color:#7F7F7F;margin-bottom:6px;font-weight:500;">焊口号1</label>
+        <input type="text" id="editValveLiveWeld1" placeholder="如 S02">
+        <label style="display:block;font-size:13px;color:#7F7F7F;margin-bottom:6px;font-weight:500;">焊口号2</label>
+        <input type="text" id="editValveLiveWeld2" placeholder="如 S03">
+        <label style="display:block;font-size:13px;color:#7F7F7F;margin-bottom:6px;font-weight:500;">阀门序列号</label>
+        <input type="text" id="editValveLiveSerial" placeholder="如 B24040030-6-77">
+        <div class="dialog-buttons">
+            <button class="btn-secondary" onclick="closeEditValveLiveDialog()">取消</button>
+            <button class="btn-primary" onclick="doEditValveLive()">保存修改</button>
+        </div>
+    </div>
+</div>
+
+<div class="dialog-overlay" id="importValvesDialog">
+    <div class="dialog">
+        <h2>📤 批量导入阀门录入</h2>
+        <p>每行一条，格式：<code>阀门位号,焊口号1,焊口号2,序列号</code></p>
+        <textarea id="importValvesText"></textarea>
+        <div class="dialog-buttons">
+            <button class="btn-secondary" onclick="closeImportValvesDialog()">取消</button>
+            <button class="btn-primary" onclick="doImportValves()">开始导入</button>
+        </div>
+    </div>
+</div>
+
+<div class="dialog-overlay" id="addTailDialog">
+    <div class="dialog">
+        <h2>➕ 添加尾项</h2>
+        <p>填写以下信息，将上传到 Neon</p>
+        <input type="text" id="addTailSubItem" placeholder="子项号（如 12600）">
+        <input type="text" id="addTailLineNo" placeholder="管线号（如 551-FC-0061）">
+        <textarea id="addTailContent" placeholder="尾项内容..." style="min-height: 80px;"></textarea>
+        <div class="dialog-buttons">
+            <button class="btn-secondary" onclick="closeAddTailDialog()">取消</button>
+            <button class="btn-primary" onclick="doAddTail()">保存</button>
+        </div>
+    </div>
+</div>
+
+<div class="dialog-overlay" id="editTailDialog">
+    <div class="dialog">
+        <h2>✏️ 修改尾项内容</h2>
+        <p id="editTailInfo"></p>
+        <textarea id="editTailContent" placeholder="尾项内容..." style="min-height: 80px;"></textarea>
+        <div class="dialog-buttons">
+            <button class="btn-secondary" onclick="closeEditTailDialog()">取消</button>
+            <button class="btn-primary" onclick="doEditTail()">保存修改</button>
+        </div>
+    </div>
+</div>
+
+<div class="dialog-overlay" id="importTailsDialog">
+    <div class="dialog">
+        <h2>📤 批量导入尾项</h2>
+        <p>每行一条，格式：<code>子项号,管线号,尾项内容</code></p>
+        <textarea id="importTailsText"></textarea>
+        <div class="dialog-buttons">
+            <button class="btn-secondary" onclick="closeImportTailsDialog()">取消</button>
+            <button class="btn-primary" onclick="doImportTails()">开始导入</button>
+        </div>
+    </div>
+</div>
+
+<div class="dialog-overlay" id="batchDeleteTailsDialog">
+    <div class="dialog">
+        <h2>🗑️ 批量删除尾项</h2>
+        <p>每行一个 <code>子项号,管线号</code>（会删除该管线所有尾项）</p>
+        <textarea id="batchDeleteTailsText"></textarea>
+        <div class="dialog-buttons">
+            <button class="btn-secondary" onclick="closeBatchDeleteTailsDialog()">取消</button>
+            <button class="btn-danger" onclick="doBatchDeleteTails()">开始删除</button>
+        </div>
+    </div>
+</div>
+
+<div class="dialog-overlay" id="addTeamDialog">
+    <div class="dialog">
+        <h2>➕ 添加班组</h2>
+        <p>一个班组 = 区域 + 管工 + 焊工 + 普工</p>
+        <input type="text" id="addTeamArea" placeholder="区域（如 004泵房）">
+        <input type="text" id="addTeamFitter" placeholder="管工姓名">
+        <input type="text" id="addTeamWelder" placeholder="焊工姓名">
+        <input type="text" id="addTeamHelper" placeholder="普工姓名">
+        <div class="dialog-buttons">
+            <button class="btn-secondary" onclick="closeAddTeamDialog()">取消</button>
+            <button class="btn-primary" onclick="doAddTeam()">保存</button>
+        </div>
+    </div>
+</div>
+
+<div class="dialog-overlay" id="importTeamsDialog">
+    <div class="dialog">
+        <h2>📤 批量导入班组</h2>
+        <p>每行一个班组，格式：<code>区域,管工,焊工,普工</code></p>
+        <p style="font-size:12px;color:#f59e0b;">⚠️ 逐条上传，每条间隔 200ms</p>
+        <textarea id="importTeamsText" placeholder="004泵房,邵申涛,刘海涛,张宗涛
+004泵房,郑宁宁,夏国冬,李全卫
+2#管廊,赵亭懿,,吴淼平"></textarea>
+        <div class="dialog-buttons">
+            <button class="btn-secondary" onclick="closeImportTeamsDialog()">取消</button>
+            <button class="btn-primary" onclick="doImportTeams()">开始导入</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 底部 Tab ============ -->
+<div class="bottom-tabs" id="bottomTabs">
+    <button class="tab-item active" data-tab="work" onclick="switchTab('work')">
+        <svg viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="6" width="4" height="15" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>
+        <span class="tab-label">工作量</span>
+    </button>
+	<button class="tab-item" data-tab="total" onclick="switchTab('total')">
+	    <svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l3-4 3 3 5-7"/></svg>
+	    <span class="tab-label">总量</span>
+	</button>
+    <button class="tab-item" data-tab="tails" onclick="switchTab('tails')">
+        <svg viewBox="0 0 24 24"><path d="M9 5H5v4"/><path d="M5 5l14 14"/><path d="M15 19h4v-4"/><circle cx="12" cy="12" r="3"/></svg>
+        <span class="tab-label">尾项</span>
+    </button>
+    <button class="tab-item" data-tab="notesLive" onclick="switchTab('notesLive')">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+        <span class="tab-label">备注</span>
+    </button>
+    <button class="tab-item" data-tab="status" onclick="switchTab('status')">
+        <svg viewBox="0 0 24 24"><path d="M4 20V8l8-4 8 4v12"/><path d="M4 14h16"/><path d="M12 4v16"/></svg>
+        <span class="tab-label">状态</span>
+    </button>
+    <button class="tab-item" data-tab="valveLive" onclick="switchTab('valveLive')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        <span class="tab-label">阀门录入</span>
+    </button>
+    <button class="tab-item" data-tab="valve" onclick="switchTab('valve')">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/></svg>
+        <span class="tab-label">阀门数据</span>
+    </button>
+</div>
+
+<script>
+// ============================================================
+//                    配置
+// ============================================================
+var API_BASE = 'https://app-rho-nine-41.vercel.app/api';
+
+var GET_NOTES_API   = API_BASE + '/get-notes';
+var SAVE_NOTE_API   = API_BASE + '/save-note';
+var DELETE_NOTE_API = API_BASE + '/delete-note';
+var GET_VALVES_API  = API_BASE + '/get-valves';
+var SAVE_VALVE_API  = API_BASE + '/save-valve';
+var DELETE_VALVE_API= API_BASE + '/delete-valve';
+var FLUSH_DB_API    = API_BASE + '/flush-db';
+
+var DATA1_URL = 'https://app-rho-nine-41.vercel.app/data1.json';
+var DATA2_URL = 'https://app-rho-nine-41.vercel.app/data2.json';
+var DATA4_URL = 'https://app-rho-nine-41.vercel.app/data4.json';
+var TOTAL_CACHE_KEY = 'totalDataCache';
+
+var TAIL_ITEMS_API  = API_BASE + '/tails?action=get-all';
+var TAIL_SAVE_API   = API_BASE + '/tails?action=save';
+var TAIL_UPDATE_API = API_BASE + '/tails?action=update';
+var TAIL_DELETE_API = API_BASE + '/tails?action=delete';
+
+var WORK_API = API_BASE + '/work';
+var WORK_TEAMS_GET      = WORK_API + '?action=teams-get';
+var WORK_TEAMS_ADD      = WORK_API + '?action=teams-add';
+var WORK_TEAMS_UPDATE   = WORK_API + '?action=teams-update';
+var WORK_TEAMS_DELETE   = WORK_API + '?action=teams-delete';
+var WORK_RECORDS_GET    = WORK_API + '?action=records-get';
+var WORK_RECORDS_BATCH  = WORK_API + '?action=records-batch';
+var WORK_RECORDS_DELETE = WORK_API + '?action=records-delete';
+var WORK_COLUMNS_GET    = WORK_API + '?action=columns-get';
+var WORK_COLUMNS_UPDATE = WORK_API + '?action=columns-update';
+var WORK_COLUMNS_ADD    = WORK_API + '?action=columns-add';
+var WORK_COLUMNS_DELETE = WORK_API + '?action=columns-delete';
+
+var adminPassword = '';
+var currentTab = 'work';
+
+var notesLiveData = [], filteredNotesLive = [];
+var statusData = [], filteredStatusData = [];
+var valveLiveData = [], filteredValveLive = [];
+var valveData = [], filteredValveData = [];
+var tailsData = [], filteredTailsData = [];
+var workTeams = [];
+var workColumns = [];
+var workRecordsMap = {};
+var workPendingChanges = {};
+var workCurrentDate = '';
+var workMode = 'day';
+
+var totalData = null;
+
+var workLocalCache = {};
+var workPendingUpload = {};
+
+var PAGE_SIZE = 100;
+var notesLivePage = 1, notesLivePages = 1;
+var statusPage = 1, statusPages = 1;
+var valveLivePage = 1, valveLivePages = 1;
+var valvePage = 1, valvePages = 1;
+var tailsPage = 1, tailsPages = 1;
+
+// 控制台操作的"录入人"标识
+var CONSOLE_USER = '控制台';
+
+// ============================================================
+//                    登录
+// ============================================================
+function doLogin() {
+    var pwd = document.getElementById('passwordInput').value.trim();
+    if (!pwd) { document.getElementById('loginError').textContent = '请输入密码'; return; }
+    adminPassword = pwd;
+    loadWorkLocalCache();
+
+    fetch(GET_NOTES_API + '?t=' + Date.now())
+        .then(function(res) { return res.json(); })
+        .then(function() {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('mainPage').style.display = 'block';
+			switchTab('work');
+            refreshAllStatus();
+            refreshNotesLive();
+            refreshValveLive();
+            refreshTails();
+            setTimeout(syncPendingWork, 800);
+        })
+        .catch(function(err) {
+            document.getElementById('loginError').textContent = '连接失败：' + err.message;
+        });
+}
+
+function logout() {
+    adminPassword = '';
+    notesLiveData = []; filteredNotesLive = [];
+    statusData = []; filteredStatusData = [];
+    valveLiveData = []; filteredValveLive = [];
+    valveData = []; filteredValveData = [];
+    tailsData = []; filteredTailsData = [];
+    workTeams = []; workColumns = []; workRecordsMap = {}; workPendingChanges = {};
+    document.getElementById('loginPage').style.display = 'block';
+    document.getElementById('mainPage').style.display = 'none';
+    document.getElementById('passwordInput').value = '';
+    document.getElementById('loginError').textContent = '';
+}
+
+// ============================================================
+//                    顶部统计
+// ============================================================
+function refreshAllStatus() {
+    fetch(DATA1_URL + '?t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('gsStatus').innerHTML = Object.keys(data || {}).length + '<small>条</small>';
+        })
+        .catch(function() { document.getElementById('gsStatus').innerHTML = '—'; });
+
+    fetch(DATA2_URL + '?t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('gsValveData').innerHTML = Object.keys(data || {}).length + '<small>条</small>';
+        })
+        .catch(function() { document.getElementById('gsValveData').innerHTML = '—'; });
+
+    fetch(GET_NOTES_API + '?t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('gsNotes').innerHTML = Object.keys(data || {}).length + '<small>条</small>';
+        })
+        .catch(function() { document.getElementById('gsNotes').innerHTML = '—'; });
+
+    fetch(GET_VALVES_API + '?t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var count = (data && data.data) ? data.data.length : 0;
+            document.getElementById('gsValves').innerHTML = count + '<small>条</small>';
+        })
+        .catch(function() { document.getElementById('gsValves').innerHTML = '—'; });
+
+    fetch(TAIL_ITEMS_API + '&t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var total = 0;
+            Object.keys(data || {}).forEach(function(k) {
+                if (Array.isArray(data[k])) total += data[k].length;
+            });
+            document.getElementById('gsTails').innerHTML = total + '<small>条</small>';
+        })
+        .catch(function() { document.getElementById('gsTails').innerHTML = '—'; });
+
+    fetch(WORK_RECORDS_GET + '&t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var count = (data && data.data) ? data.data.length : 0;
+            document.getElementById('gsWork').innerHTML = count + '<small>条</small>';
+        })
+        .catch(function() { document.getElementById('gsWork').innerHTML = '—'; });
+}
+
+// ============================================================
+//                    Tab 切换
+// ============================================================
+function switchTab(tab) {
+    currentTab = tab;
+
+    ['notesLiveToolbar','tailsToolbar','workToolbar','statusToolbar','valveLiveToolbar','valveToolbar','totalToolbar'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
+    document.querySelectorAll('.tab-switch button').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.bottom-tabs .tab-item').forEach(function(b) { b.classList.remove('active'); });
+    var bottomBtn = document.querySelector('.bottom-tabs .tab-item[data-tab="' + tab + '"]');
+    if (bottomBtn) bottomBtn.classList.add('active');
+
+    document.getElementById('searchInput').value = '';
+    document.getElementById('tableContainer').style.display = 'block';
+    document.getElementById('searchBox').style.display = (tab === 'work' || tab === 'total') ? 'none' : 'flex';
+    document.getElementById('workPanel').style.display = 'none';
+
+    if (tab === 'notesLive') {
+        document.getElementById('tabNotesLive').classList.add('active');
+        document.getElementById('notesLiveToolbar').style.display = 'flex';
+        renderNotesLiveTable();
+    } else if (tab === 'tails') {
+        document.getElementById('tabTails').classList.add('active');
+        document.getElementById('tailsToolbar').style.display = 'flex';
+        renderTailsTable();
+    } else if (tab === 'work') {
+        document.getElementById('tabWork').classList.add('active');
+        document.getElementById('workToolbar').style.display = 'flex';
+        document.getElementById('workPanel').style.display = 'block';
+        document.getElementById('tableContainer').style.display = 'none';
+        document.getElementById('searchBox').style.display = 'none';
+        initWorkPanel();
+        refreshWorkColumns().then(function() {
+            refreshWorkTeams();
+            loadWorkRecordsByDate();
+        });
+        setTimeout(syncPendingWork, 500);
+    } else if (tab === 'status') {
+        document.getElementById('tabStatus').classList.add('active');
+        document.getElementById('statusToolbar').style.display = 'flex';
+        if (statusData.length === 0) loadStatusData(false);
+        else renderStatusTable();
+    } else if (tab === 'valveLive') {
+        document.getElementById('tabValveLive').classList.add('active');
+        document.getElementById('valveLiveToolbar').style.display = 'flex';
+        renderValveLiveTable();
+    } else if (tab === 'valve') {
+        document.getElementById('tabValve').classList.add('active');
+        document.getElementById('valveToolbar').style.display = 'flex';
+        if (valveData.length === 0) loadValveData(false);
+        else renderValveTable();
+	} else if (tab === 'total') {
+	    document.getElementById('tabTotal').classList.add('active');
+	    document.getElementById('totalToolbar').style.display = 'flex';
+	    refreshTotal();
+	}
+}
+
+// ============================================================
+//                    分页
+// ============================================================
+function updatePaginationBar(cur, total, count) {
+    var bar = document.getElementById('paginationBar');
+    if (count === 0 || total <= 1) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+    document.getElementById('pageInfo').textContent = '第 ' + cur + ' / ' + total + ' 页';
+    document.getElementById('prevBtn').disabled = cur <= 1;
+    document.getElementById('nextBtn').disabled = cur >= total;
+}
+function changePage(delta) {
+    if (currentTab === 'notesLive') { notesLivePage += delta; renderNotesLiveTable(); }
+    else if (currentTab === 'tails') { tailsPage += delta; renderTailsTable(); }
+    else if (currentTab === 'status') { statusPage += delta; renderStatusTable(); }
+    else if (currentTab === 'valveLive') { valveLivePage += delta; renderValveLiveTable(); }
+    else if (currentTab === 'valve') { valvePage += delta; renderValveTable(); }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ============================================================
+//                    工具（卡片式渲染）
+// ============================================================
+function renderCardList(container, items, renderOne, page, pages, total) {
+    if (items.length === 0) {
+        container.innerHTML = '<div class="no-data"><span>📭</span>暂无数据</div>';
+        updatePaginationBar(0, 0, 0);
+        return;
+    }
+    var start = (page - 1) * PAGE_SIZE;
+    var end = Math.min(start + PAGE_SIZE, items.length);
+    var pageData = items.slice(start, end);
+    var html = '';
+    pageData.forEach(function(item, i) {
+        html += renderOne(item, start + i + 1);
+    });
+    container.innerHTML = html;
+    updatePaginationBar(page, pages, total);
+}
+
+function cardRow(label, value, color) {
+    return '<div class="card-row"><div class="label">' + label + '</div><div class="value"' + (color ? ' style="color:' + color + '"' : '') + '>' + value + '</div></div>';
+}
+
+// 统一渲染录入人
+function renderUserRow(user) {
+    if (!user) return cardRow('录入人', '<span style="color:#7F7F7F;">未记录</span>');
+    return cardRow('录入人', '<span style="color:#5b8def;font-weight:600;">👤 ' + escapeHtml(user) + '</span>');
+}
+
+// ============================================================
+//                    1️⃣ 备注
+// ============================================================
+function refreshNotesLive() {
+    showStatus('🔄 正在刷新...', 'loading');
+    fetch(GET_NOTES_API + '?t=' + Date.now())
+        .then(function(res) { return res.json(); })
+        .then(function(obj) {
+            notesLiveData = [];
+            Object.keys(obj || {}).forEach(function(key) {
+                var item = obj[key];
+                if (!item || !item.notes || item.notes.length === 0) return;
+                var notes = item.notes.slice().sort(function(a, b) {
+                    return (b.time || '').localeCompare(a.time || '');
+                });
+                notesLiveData.push({
+                    key: key, bracketId: item.bracketId || '', pipeNo: item.pipeNo || '',
+                    notes: notes, count: notes.length, latestTime: notes[0].time || ''
+                });
+            });
+            notesLiveData.sort(function(a, b) { return (b.latestTime || '').localeCompare(a.latestTime || ''); });
+            filteredNotesLive = notesLiveData;
+            notesLivePage = 1;
+            renderNotesLiveTable();
+            refreshAllStatus();
+            showStatus('✅ 共 ' + notesLiveData.length + ' 条', 'success');
+        })
+        .catch(function(err) { showStatus('❌ 刷新失败：' + err.message, 'error'); });
+}
+
+function renderNotesLiveTable() {
+    var box = document.getElementById('dataBody');
+    notesLivePages = Math.ceil(filteredNotesLive.length / PAGE_SIZE) || 1;
+    if (notesLivePage > notesLivePages) notesLivePage = notesLivePages;
+    if (notesLivePage < 1) notesLivePage = 1;
+    renderCardList(box, filteredNotesLive, function(item, idx) {
+        var notesHtml = '<div class="note-history">' + item.notes.map(function(n) {
+            var userTag = n.user ? '<small class="user-tag">— ' + escapeHtml(n.user) + '</small>' : '';
+            return '<span>' + escapeHtml(n.note) + ' <small>' + escapeHtml(n.time) + '</small>' + userTag + '</span>';
+        }).join('') + '</div>';
+        return '<div class="card">' +
+            '<div class="card-head">' +
+                '<div class="title">' + escapeHtml(item.bracketId) + '</div>' +
+                '<div class="index">#' + idx + ' · ' + item.count + ' 条</div>' +
+            '</div>' +
+            cardRow('管线号', escapeHtml(item.pipeNo)) +
+            cardRow('备注历史', notesHtml) +
+            '<div class="card-actions">' +
+                '<button class="edit" onclick="openEditNoteDialog(\'' + escapeJs(item.bracketId) + '\', \'' + escapeJs(item.pipeNo) + '\', \'' + escapeJs(item.notes[0] ? (item.notes[0].note || '') : '') + '\', \'' + escapeJs(item.notes[0] ? (item.notes[0].user || '') : '') + '\')">✏️ 修改</button>' +
+                '<button class="del" onclick="deleteNoteItem(\'' + escapeJs(item.bracketId) + '\', \'' + escapeJs(item.pipeNo) + '\')">🗑️ 删除</button>' +
+            '</div>' +
+        '</div>';
+    }, notesLivePage, notesLivePages, filteredNotesLive.length);
+}
+
+function deleteNoteItem(bracketId, pipeNo) {
+    if (!confirm('确认删除该支架所有备注？\n' + bracketId + ' _ ' + pipeNo)) return;
+    showStatus('🗑️ 正在删除...', 'loading');
+    fetch(DELETE_NOTE_API + '?bracketId=' + encodeURIComponent(bracketId) + '&pipeNo=' + encodeURIComponent(pipeNo), { method: 'DELETE' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) { showStatus('✅ ' + (data.message || '已删除'), 'success'); refreshNotesLive(); }
+            else showStatus('❌ ' + (data.message || '删除失败'), 'error');
+        })
+        .catch(function(err) { showStatus('❌ 删除失败：' + err.message, 'error'); });
+}
+
+// ============================================================
+//              修改备注（保留原录入人）
+// ============================================================
+var editNoteData = {};
+
+function openEditNoteDialog(bracketId, pipeNo, note, user) {
+    editNoteData = { bracketId: bracketId, pipeNo: pipeNo, user: user || '' };
+    document.getElementById('editNoteInfo').textContent = '支架号：' + bracketId + ' · 管线号：' + pipeNo;
+    document.getElementById('editNoteUser').textContent = user || '（未记录）';
+    document.getElementById('editNoteContent').value = note || '';
+    document.getElementById('editNoteDialog').classList.add('active');
+}
+
+function closeEditNoteDialog() {
+    document.getElementById('editNoteDialog').classList.remove('active');
+}
+
+function doEditNote() {
+    var d = editNoteData;
+    if (!d.bracketId || !d.pipeNo) return;
+
+    var newNote = document.getElementById('editNoteContent').value.trim();
+    if (!newNote) { alert('备注内容不能为空'); return; }
+
+    showStatus('📤 正在保存修改...', 'loading');
+
+    // 方案 A：先删旧备注 → 再写新备注（保留原 user）
+    fetch(DELETE_NOTE_API + '?bracketId=' + encodeURIComponent(d.bracketId) +
+          '&pipeNo=' + encodeURIComponent(d.pipeNo), { method: 'DELETE' })
+        .then(function(r) { return r.json(); })
+        .then(function(delRes) {
+            if (!delRes || !delRes.success) {
+                throw new Error((delRes && delRes.message) || '删除旧备注失败');
+            }
+            // 写入新备注，user 用原来那个
+            return fetch(SAVE_NOTE_API, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bracketId: d.bracketId,
+                    pipeNo: d.pipeNo,
+                    note: newNote,
+                    user: d.user || '',   // ✅ 原样带回
+                    timestamp: new Date().toLocaleString()
+                })
+            });
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data && data.success) {
+                closeEditNoteDialog();
+                showStatus('✅ 修改成功', 'success');
+                refreshNotesLive();
+            } else {
+                showStatus('❌ ' + ((data && data.message) || '保存失败'), 'error');
+            }
+        })
+        .catch(function(err) { showStatus('❌ 修改失败：' + err.message, 'error'); });
+}
+
+function exportNotesLiveCSV() {
+    if (filteredNotesLive.length === 0) { showStatus('⚠️ 没有数据', 'error'); return; }
+    var csv = '\uFEFF序号,支架号,管线号,备注内容,录入人,时间\n';
+    var idx = 0;
+    filteredNotesLive.forEach(function(item) {
+        item.notes.forEach(function(n) {
+            idx++;
+            csv += idx + ',"' + (item.bracketId || '').replace(/"/g, '""') + '","' +
+                (item.pipeNo || '').replace(/"/g, '""') + '","' +
+                (n.note || '').replace(/"/g, '""') + '","' +
+                (n.user || '').replace(/"/g, '""') + '","' +
+                (n.time || '').replace(/"/g, '""') + '"\n';
+        });
+    });
+    downloadCSV(csv, '备注_' + today() + '.csv');
+    showStatus('✅ 已导出', 'success');
+}
+
+function openAddNoteDialog() {
+    document.getElementById('addNoteBracket').value = '';
+    document.getElementById('addNotePipe').value = '';
+    document.getElementById('addNoteContent').value = '';
+    document.getElementById('addNoteDialog').classList.add('active');
+}
+function closeAddNoteDialog() { document.getElementById('addNoteDialog').classList.remove('active'); }
+function doAddNote() {
+    var bracketId = document.getElementById('addNoteBracket').value.trim();
+    var pipeNo = document.getElementById('addNotePipe').value.trim();
+    var note = document.getElementById('addNoteContent').value.trim();
+    if (!bracketId || !pipeNo || !note) { alert('请填写完整信息'); return; }
+    showStatus('📤 正在保存...', 'loading');
+    fetch(SAVE_NOTE_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bracketId: bracketId, pipeNo: pipeNo, note: note, user: CONSOLE_USER, timestamp: new Date().toLocaleString() })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) { closeAddNoteDialog(); showStatus('✅ 添加成功', 'success'); refreshNotesLive(); }
+        else showStatus('❌ ' + (data.message || '保存失败'), 'error');
+    })
+    .catch(function(err) { showStatus('❌ 保存失败：' + err.message, 'error'); });
+}
+
+function openImportNotesDialog() {
+    document.getElementById('importNotesText').value = '';
+    document.getElementById('importNotesDialog').classList.add('active');
+}
+function closeImportNotesDialog() { document.getElementById('importNotesDialog').classList.remove('active'); }
+async function doImportNotes() {
+    var text = document.getElementById('importNotesText').value.trim();
+    if (!text) { alert('请输入数据'); return; }
+    var items = [];
+    text.split('\n').filter(function(l) { return l.trim(); }).forEach(function(line) {
+        var parts = line.split(',');
+        if (parts.length >= 3) items.push({ bracketId: parts[0].trim(), pipeNo: parts[1].trim(), note: parts.slice(2).join(',').trim() });
+    });
+    if (!items.length) { alert('没有有效数据'); return; }
+    if (!confirm('确认导入 ' + items.length + ' 条备注？')) return;
+    closeImportNotesDialog();
+    var BATCH = 20, DELAY = 1000, success = 0, failed = 0, index = 0;
+    async function nextBatch() {
+        if (index >= items.length) {
+            showStatus('✅ 完成：成功 ' + success + '，失败 ' + failed, 'success');
+            refreshNotesLive(); return;
+        }
+        var batch = items.slice(index, index + BATCH);
+        for (var i = 0; i < batch.length; i++) {
+            try {
+                var res = await fetch(SAVE_NOTE_API, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bracketId: batch[i].bracketId, pipeNo: batch[i].pipeNo, note: batch[i].note, user: CONSOLE_USER, timestamp: new Date().toLocaleString() })
+                });
+                var data = await res.json();
+                if (data.success) success++; else failed++;
+            } catch(e) { failed++; }
+        }
+        index += BATCH;
+        showStatus('📤 已导入 ' + Math.min(index, items.length) + ' / ' + items.length, 'loading');
+        setTimeout(nextBatch, DELAY);
+    }
+    nextBatch();
+}
+
+function openBatchDeleteNotesDialog() {
+    document.getElementById('batchDeleteNotesText').value = '';
+    document.getElementById('batchDeleteNotesDialog').classList.add('active');
+}
+function closeBatchDeleteNotesDialog() { document.getElementById('batchDeleteNotesDialog').classList.remove('active'); }
+async function doBatchDeleteNotes() {
+    var text = document.getElementById('batchDeleteNotesText').value.trim();
+    if (!text) { alert('请输入数据'); return; }
+    var items = [];
+    text.split('\n').filter(function(l) { return l.trim(); }).forEach(function(line) {
+        var parts = line.split(/[,\t]/).map(function(s){ return s.trim(); });
+        if (parts.length >= 2 && parts[0] && parts[1]) items.push({ bracketId: parts[0], pipeNo: parts[1] });
+    });
+    if (!items.length) { alert('没有有效数据'); return; }
+    if (!confirm('确认删除 ' + items.length + ' 条备注？')) return;
+    closeBatchDeleteNotesDialog();
+    showStatus('🗑️ 正在删除...', 'loading');
+    var success = 0, failed = 0;
+    for (var i = 0; i < items.length; i++) {
+        try {
+            var res = await fetch(DELETE_NOTE_API + '?bracketId=' + encodeURIComponent(items[i].bracketId) +
+                '&pipeNo=' + encodeURIComponent(items[i].pipeNo), { method: 'DELETE' });
+            var data = await res.json();
+            if (data.success) success++; else failed++;
+        } catch(e) { failed++; }
+    }
+    showStatus('✅ 完成：成功 ' + success + '，失败 ' + failed, 'success');
+    refreshNotesLive();
+}
+
+// ============================================================
+//                    2️⃣ 尾项
+// ============================================================
+function refreshTails() {
+    showStatus('🔄 正在刷新尾项...', 'loading');
+    fetch(TAIL_ITEMS_API + '&t=' + Date.now())
+        .then(function(res) { return res.json(); })
+        .then(function(obj) {
+            tailsData = [];
+            Object.keys(obj || {}).forEach(function(key) {
+                var arr = obj[key];
+                if (!Array.isArray(arr) || arr.length === 0) return;
+                var parts = key.split('_');
+                var lineNo = parts.pop();
+                var subItem = parts.join('_');
+                arr.forEach(function(t) {
+                    tailsData.push({
+                        id: t.id, subItem: subItem, lineNo: lineNo,
+                        content: t.content || '', createdAt: t.createdAt || '',
+                        user: t.user || ''
+                    });
+                });
+            });
+            tailsData.sort(function(a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
+            filteredTailsData = tailsData;
+            tailsPage = 1;
+            renderTailsTable();
+            refreshAllStatus();
+            showStatus('✅ 尾项共 ' + tailsData.length + ' 条', 'success');
+        })
+        .catch(function(err) { showStatus('❌ 刷新失败：' + err.message, 'error'); });
+}
+
+function renderTailsTable() {
+    var box = document.getElementById('dataBody');
+    tailsPages = Math.ceil(filteredTailsData.length / PAGE_SIZE) || 1;
+    if (tailsPage > tailsPages) tailsPage = tailsPages;
+    if (tailsPage < 1) tailsPage = 1;
+    renderCardList(box, filteredTailsData, function(item, idx) {
+        return '<div class="card">' +
+            '<div class="card-head">' +
+                '<div class="title">' + escapeHtml(item.subItem) + ' · ' + escapeHtml(item.lineNo) + '</div>' +
+                '<div class="index">#' + idx + '</div>' +
+            '</div>' +
+            cardRow('尾项内容', escapeHtml(item.content)) +
+            renderUserRow(item.user) +
+            cardRow('时间', escapeHtml(item.createdAt)) +
+            '<div class="card-actions">' +
+                '<button class="edit" onclick="openEditTailDialog(' + item.id + ',\'' + escapeJs(item.subItem) + '\',\'' + escapeJs(item.lineNo) + '\',\'' + escapeJs(item.content) + '\')">✏️ 修改</button>' +
+                '<button class="del" onclick="deleteTailItem(' + item.id + ',\'' + escapeJs(item.subItem) + '\',\'' + escapeJs(item.lineNo) + '\')">🗑️ 删除</button>' +
+            '</div>' +
+        '</div>';
+    }, tailsPage, tailsPages, filteredTailsData.length);
+}
+
+function deleteTailItem(id, subItem, lineNo) {
+    if (!confirm('确认删除该尾项？\n' + subItem + ' / ' + lineNo)) return;
+    showStatus('🗑️ 正在删除...', 'loading');
+    fetch(TAIL_DELETE_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data && data.success) { showStatus('✅ 已删除', 'success'); refreshTails(); }
+        else showStatus('❌ ' + ((data && data.message) || '删除失败'), 'error');
+    })
+    .catch(function(err) { showStatus('❌ 删除失败：' + err.message, 'error'); });
+}
+
+var editTailData = {};
+function openEditTailDialog(id, subItem, lineNo, content) {
+    editTailData = { id: id, subItem: subItem, lineNo: lineNo, content: content };
+    document.getElementById('editTailInfo').textContent = '子项号：' + subItem + ' · 管线号：' + lineNo;
+    document.getElementById('editTailContent').value = content;
+    document.getElementById('editTailDialog').classList.add('active');
+}
+function closeEditTailDialog() { document.getElementById('editTailDialog').classList.remove('active'); }
+function doEditTail() {
+    var newContent = document.getElementById('editTailContent').value.trim();
+    if (!newContent) { alert('尾项内容不能为空'); return; }
+    if (newContent === editTailData.content) { closeEditTailDialog(); return; }
+    showStatus('📤 正在保存修改...', 'loading');
+    fetch(TAIL_UPDATE_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editTailData.id, content: newContent })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data && data.success) { closeEditTailDialog(); showStatus('✅ 修改成功', 'success'); refreshTails(); }
+        else showStatus('❌ ' + ((data && data.message) || '修改失败'), 'error');
+    })
+    .catch(function(err) { showStatus('❌ 修改失败：' + err.message, 'error'); });
+}
+
+function openAddTailDialog() {
+    document.getElementById('addTailSubItem').value = '';
+    document.getElementById('addTailLineNo').value = '';
+    document.getElementById('addTailContent').value = '';
+    document.getElementById('addTailDialog').classList.add('active');
+}
+function closeAddTailDialog() { document.getElementById('addTailDialog').classList.remove('active'); }
+function doAddTail() {
+    var subItem = document.getElementById('addTailSubItem').value.trim();
+    var lineNo = document.getElementById('addTailLineNo').value.trim();
+    var content = document.getElementById('addTailContent').value.trim();
+    if (!subItem || !lineNo || !content) { alert('请填写完整信息'); return; }
+    showStatus('📤 正在保存...', 'loading');
+    fetch(TAIL_SAVE_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subItem: subItem, lineNo: lineNo, content: content, user: CONSOLE_USER })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data && data.success) { closeAddTailDialog(); showStatus('✅ 添加成功', 'success'); refreshTails(); }
+        else showStatus('❌ ' + ((data && data.error) || '保存失败'), 'error');
+    })
+    .catch(function(err) { showStatus('❌ 保存失败：' + err.message, 'error'); });
+}
+
+function openImportTailsDialog() {
+    document.getElementById('importTailsText').value = '';
+    document.getElementById('importTailsDialog').classList.add('active');
+}
+function closeImportTailsDialog() { document.getElementById('importTailsDialog').classList.remove('active'); }
+async function doImportTails() {
+    var text = document.getElementById('importTailsText').value.trim();
+    if (!text) { alert('请输入数据'); return; }
+    var items = [];
+    text.split('\n').filter(function(l) { return l.trim(); }).forEach(function(line) {
+        var parts = line.split(',');
+        if (parts.length >= 3) items.push({ subItem: parts[0].trim(), lineNo: parts[1].trim(), content: parts.slice(2).join(',').trim() });
+    });
+    if (!items.length) { alert('没有有效数据'); return; }
+    if (!confirm('确认导入 ' + items.length + ' 条尾项？')) return;
+    closeImportTailsDialog();
+    var BATCH = 20, DELAY = 1000, success = 0, failed = 0, index = 0;
+    async function nextBatch() {
+        if (index >= items.length) {
+            showStatus('✅ 完成：成功 ' + success + '，失败 ' + failed, 'success');
+            refreshTails(); return;
+        }
+        var batch = items.slice(index, index + BATCH);
+        for (var i = 0; i < batch.length; i++) {
+            try {
+                var res = await fetch(TAIL_SAVE_API, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subItem: batch[i].subItem, lineNo: batch[i].lineNo, content: batch[i].content, user: CONSOLE_USER })
+                });
+                var data = await res.json();
+                if (data && data.success) success++; else failed++;
+            } catch(e) { failed++; }
+        }
+        index += BATCH;
+        showStatus('📤 已导入 ' + Math.min(index, items.length) + ' / ' + items.length, 'loading');
+        setTimeout(nextBatch, DELAY);
+    }
+    nextBatch();
+}
+
+function openBatchDeleteTailsDialog() {
+    document.getElementById('batchDeleteTailsText').value = '';
+    document.getElementById('batchDeleteTailsDialog').classList.add('active');
+}
+function closeBatchDeleteTailsDialog() { document.getElementById('batchDeleteTailsDialog').classList.remove('active'); }
+async function doBatchDeleteTails() {
+    var text = document.getElementById('batchDeleteTailsText').value.trim();
+    if (!text) { alert('请输入数据'); return; }
+    var items = [];
+    text.split('\n').filter(function(l) { return l.trim(); }).forEach(function(line) {
+        var parts = line.split(/[,\t]/).map(function(s){ return s.trim(); });
+        if (parts.length >= 2 && parts[0] && parts[1]) items.push({ subItem: parts[0], lineNo: parts[1] });
+    });
+    if (!items.length) { alert('没有有效数据'); return; }
+    if (!confirm('确认删除 ' + items.length + ' 条管线的所有尾项？')) return;
+    closeBatchDeleteTailsDialog();
+    showStatus('🗑️ 正在删除...', 'loading');
+    try {
+        var res = await fetch(TAIL_DELETE_API, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: items })
+        });
+        var data = await res.json();
+        if (data && data.success) { showStatus('✅ ' + (data.message || '已删除'), 'success'); refreshTails(); }
+        else showStatus('❌ ' + ((data && data.error) || '删除失败'), 'error');
+    } catch (err) { showStatus('❌ 删除失败：' + err.message, 'error'); }
+}
+
+function exportTailsExcel() {
+    if (filteredTailsData.length === 0) { showStatus('⚠️ 没有数据', 'error'); return; }
+    var rows = filteredTailsData.map(function(item, i) {
+        return [i + 1, item.subItem || '', item.lineNo || '', item.content || '', item.user || '', item.createdAt || ''];
+    });
+    var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">';
+    html += '<style>td{mso-number-format:"\\@";border:1px solid #ccc;padding:4px 8px;font-size:12px;}';
+    html += 'th{background:#07C160;color:white;border:1px solid #ccc;padding:6px 8px;font-size:13px;font-weight:bold;}</style>';
+    html += '</head><body><table>';
+    html += '<tr><th>序号</th><th>子项号</th><th>管线号</th><th>尾项内容</th><th>录入人</th><th>时间</th></tr>';
+    rows.forEach(function(r) {
+        html += '<tr>';
+        r.forEach(function(c) {
+            html += '<td>' + String(c == null ? '' : c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>';
+        });
+        html += '</tr>';
+    });
+    html += '</table></body></html>';
+    var blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = '尾项_' + today() + '.xls';
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 3000);
+    showStatus('✅ 已导出 ' + rows.length + ' 条到 Excel', 'success');
+}
+
+// ============================================================
+//              4️⃣-附加：状态页导出 Excel
+// ============================================================
+function exportStatusExcel() {
+    if (filteredStatusData.length === 0) { showStatus('⚠️ 没有数据', 'error'); return; }
+    var rows = filteredStatusData.map(function(item, i) {
+        return [i + 1, item.bracketId || '', item.pipeNo || '', item.status || '', item.user || '', item.updateTime || ''];
+    });
+    var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">';
+    html += '<style>td{mso-number-format:"\\@";border:1px solid #ccc;padding:4px 8px;font-size:12px;}';
+    html += 'th{background:#07C160;color:white;border:1px solid #ccc;padding:6px 8px;font-size:13px;font-weight:bold;}</style>';
+    html += '</head><body><table>';
+    html += '<tr><th>序号</th><th>支架号</th><th>管线号</th><th>状态</th><th>录入人</th><th>更新时间</th></tr>';
+    rows.forEach(function(r) {
+        html += '<tr>';
+        r.forEach(function(c) {
+            html += '<td>' + String(c == null ? '' : c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>';
+        });
+        html += '</tr>';
+    });
+    html += '</table></body></html>';
+    var blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = '支架状态_' + today() + '.xls';
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 3000);
+    showStatus('✅ 已导出 ' + rows.length + ' 条到 Excel', 'success');
+}
+
+// ============================================================
+//              6️⃣-附加：阀门数据导出 Excel
+// ============================================================
+function exportValveExcel() {
+    if (filteredValveData.length === 0) { showStatus('⚠️ 没有数据', 'error'); return; }
+    var rows = filteredValveData.map(function(item, i) {
+        return [
+            i + 1,
+            item.valveTag || '',
+            item.lineNo || '',
+            item.valveName || '',
+            item.weldNo1 || '',
+            item.weldNo2 || '',
+            item.serialNo || '',
+            item.user || '',
+            item.hasPending ? '待导出' : '已同步'
+        ];
+    });
+    var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">';
+    html += '<style>td{mso-number-format:"\\@";border:1px solid #ccc;padding:4px 8px;font-size:12px;}';
+    html += 'th{background:#07C160;color:white;border:1px solid #ccc;padding:6px 8px;font-size:13px;font-weight:bold;}</style>';
+    html += '</head><body><table>';
+    html += '<tr><th>序号</th><th>阀门位号</th><th>管线号</th><th>阀门名称</th><th>焊口号1</th><th>焊口号2</th><th>序列号</th><th>录入人</th><th>状态</th></tr>';
+    rows.forEach(function(r) {
+        html += '<tr>';
+        r.forEach(function(c) {
+            html += '<td>' + String(c == null ? '' : c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>';
+        });
+        html += '</tr>';
+    });
+    html += '</table></body></html>';
+    var blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = '阀门数据_' + today() + '.xls';
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 3000);
+    showStatus('✅ 已导出 ' + rows.length + ' 条到 Excel', 'success');
+}
+
+// ============================================================
+//                    3️⃣ 工作量统计
+// ============================================================
+function loadWorkLocalCache() {
+    try {
+        var c = localStorage.getItem('workLocalCache');
+        if (c) workLocalCache = JSON.parse(c) || {};
+    } catch(e) { workLocalCache = {}; }
+    try {
+        var p = localStorage.getItem('workPendingUpload');
+        if (p) workPendingUpload = JSON.parse(p) || {};
+    } catch(e) { workPendingUpload = {}; }
+}
+function saveWorkLocalCache() {
+    try { localStorage.setItem('workLocalCache', JSON.stringify(workLocalCache)); } catch(e) {}
+}
+function saveWorkPendingUpload() {
+    try { localStorage.setItem('workPendingUpload', JSON.stringify(workPendingUpload)); } catch(e) {}
+}
+
+function initWorkPanel() {
+    var d = document.getElementById('workDate');
+    if (!d.value) d.value = new Date().toISOString().slice(0, 10);
+    workCurrentDate = d.value;
+    var teamEl = document.getElementById('workTeamName');
+    if (teamEl && !teamEl.value) teamEl.value = getTeamName();
+    loadWorkLocalCache();
+}
+
+function refreshWorkAll() {
+    showStatus('🔄 正在刷新工作量...', 'loading');
+    refreshWorkColumns().then(function() {
+        return refreshWorkTeams();
+    }).then(function() {
+        loadWorkRecordsByDate();
+    }).catch(function(err) {
+        showStatus('❌ 刷新失败：' + (err && err.message || err), 'error');
+    });
+}
+
+function refreshWorkColumns() {
+    return fetch(WORK_COLUMNS_GET + '&t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(res) { workColumns = (res && res.data) ? res.data : []; })
+        .catch(function() { workColumns = []; });
+}
+
+function refreshWorkTeams() {
+    showStatus('🔄 正在加载班组...', 'loading');
+    fetch(WORK_TEAMS_GET + '&t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            workTeams = (res && res.data) ? res.data : [];
+            renderWorkTeams();
+            showStatus('✅ 班组 ' + workTeams.length + ' 个', 'success');
+        })
+        .catch(function(err) { showStatus('❌ 加载失败：' + err.message, 'error'); });
+}
+
+function loadWorkRecordsByDate() {
+    var date = document.getElementById('workDate').value;
+    if (!date) return;
+    workCurrentDate = date;
+    workMode = 'day';
+    workRecordsMap = {};
+    var local = workLocalCache[date] || {};
+    Object.keys(local).forEach(function(k) {
+        workRecordsMap[k] = { quantity: local[k].quantity || 0, note: local[k].note || '', _pending: local[k]._pending || false };
+    });
+    renderWorkTeams();
+    renderWorkTotals();
+    showStatus('🔄 加载 ' + date + ' 数据...', 'loading');
+    fetch(WORK_RECORDS_GET + '&date=' + date + '&t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            var rows = (res && res.data) ? res.data : [];
+            rows.forEach(function(r) {
+                var key = r.team_id + '_' + r.unit;
+                if (workRecordsMap[key] && workRecordsMap[key]._pending) return;
+                workRecordsMap[key] = { quantity: Number(r.quantity) || 0, note: r.note || '', _pending: false };
+            });
+            var cache = {};
+            Object.keys(workRecordsMap).forEach(function(k) {
+                cache[k] = { quantity: workRecordsMap[k].quantity, note: workRecordsMap[k].note, _pending: workRecordsMap[k]._pending || false };
+            });
+            workLocalCache[date] = cache;
+            saveWorkLocalCache();
+            renderWorkTeams();
+            renderWorkTotals();
+            var pendingCount = Object.keys(workPendingUpload[date] || {}).length;
+            if (pendingCount > 0) showStatus('✅ 已加载 ' + rows.length + ' 条（本地待上传 ' + pendingCount + ' 条）', 'success');
+            else showStatus('✅ 已加载 ' + rows.length + ' 条记录', 'success');
+        })
+        .catch(function() { showStatus('⚠️ 离线模式（本地缓存）', 'error'); });
+}
+
+function loadWorkRecordsByRange() {
+    var from = document.getElementById('workFrom').value;
+    var to = document.getElementById('workTo').value;
+    if (!from || !to) { alert('请选择起始和结束日期'); return; }
+    workMode = 'range';
+    showStatus('🔄 加载 ' + from + ' ~ ' + to + ' 汇总...', 'loading');
+    fetch(WORK_RECORDS_GET + '&from=' + from + '&to=' + to + '&t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            var rows = (res && res.data) ? res.data : [];
+            var sumMap = {};
+            rows.forEach(function(r) {
+                var key = r.team_id + '_' + r.unit;
+                if (!sumMap[key]) sumMap[key] = { quantity: 0, notes: [] };
+                sumMap[key].quantity += Number(r.quantity) || 0;
+                if (r.note) sumMap[key].notes.push(r.note);
+            });
+            workRecordsMap = {};
+            Object.keys(sumMap).forEach(function(k) {
+                workRecordsMap[k] = { quantity: sumMap[k].quantity, note: sumMap[k].notes.slice(-3).join(' / ') };
+            });
+            workPendingChanges = {};
+            renderWorkTeams();
+            renderWorkTotals();
+            showStatus('✅ 汇总完成：' + rows.length + ' 条原始记录', 'success');
+        })
+        .catch(function(err) { showStatus('❌ 加载失败：' + err.message, 'error'); });
+}
+
+function renderWorkTeams() {
+    var box = document.getElementById('workTeamsList');
+    if (!workTeams.length) {
+        box.innerHTML = '<div class="no-data"><span>👥</span>还没有班组，点「➕ 班组」或「📤 导入班组」</div>';
+        return;
+    }
+    if (!workColumns.length) {
+        box.innerHTML = '<div class="no-data"><span>📋</span>没有列配置，点「➕ 列」</div>';
+        return;
+    }
+    var html = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;">';
+    html += '<thead><tr style="background:#f8fafc;">' +
+            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:70px;">区域</th>' +
+            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:60px;">管工</th>' +
+            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:60px;">焊工</th>' +
+            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:60px;">普工</th>';
+    workColumns.forEach(function(col) {
+        html += '<th class="work-col-vert" style="color:#7F7F7F;width:34px;">' +
+                '<span>' + escapeHtml(col.col_name) + '</span>' +
+                '<br><a href="javascript:void(0)" class="col-icon-btn" style="color:#07C160;" onclick="renameWorkColumn(' + col.id + ',\'' + escapeJs(col.col_name) + '\')" title="改名">✏️</a>' +
+                '<br><a href="javascript:void(0)" class="col-icon-btn" style="color:#FA5151;" onclick="deleteWorkColumn(' + col.id + ',\'' + escapeJs(col.col_name) + '\')" title="删列">✖</a>' +
+                '</th>';
+    });
+    html += '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:120px;">备注</th>' +
+            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:center;width:60px;">操作</th>' +
+            '</tr></thead><tbody>';
+    workTeams.forEach(function(team) {
+        html += '<tr style="border-bottom:1px solid #f0f4f9;">';
+        html += '<td style="padding:4px 3px;width:70px;"><input class="work-table-input" type="text" value="' + escapeHtml(team.area) + '" onchange="updateTeamField(' + team.id + ',\'area\',this.value)"></td>';
+        html += '<td style="padding:4px 3px;width:60px;"><input class="work-table-input" type="text" value="' + escapeHtml(team.fitter) + '" onchange="updateTeamField(' + team.id + ',\'fitter\',this.value)"></td>';
+        html += '<td style="padding:4px 3px;width:60px;"><input class="work-table-input" type="text" value="' + escapeHtml(team.welder) + '" onchange="updateTeamField(' + team.id + ',\'welder\',this.value)"></td>';
+        html += '<td style="padding:4px 3px;width:60px;"><input class="work-table-input" type="text" value="' + escapeHtml(team.helper) + '" onchange="updateTeamField(' + team.id + ',\'helper\',this.value)"></td>';
+        workColumns.forEach(function(col) {
+            var key = team.id + '_' + col.col_key;
+            var rec = workRecordsMap[key] || { quantity: 0, note: '' };
+            var val = rec.quantity ? rec.quantity : '';
+            html += '<td style="text-align:center;width:34px;padding:3px 2px;">' +
+                    '<input class="work-num-input" type="number" step="0.01" value="' + val + '" ' +
+                    'onchange="onWorkInputChange(' + team.id + ',\'' + escapeJs(col.col_key) + '\',this.value)">' +
+                    '</td>';
+        });
+        var teamNote = '';
+        workColumns.forEach(function(col) {
+            var rec = workRecordsMap[team.id + '_' + col.col_key];
+            if (rec && rec.note && !teamNote) teamNote = rec.note;
+        });
+        html += '<td style="padding:4px 3px;width:120px;"><input class="work-table-input" type="text" value="' + escapeHtml(teamNote) + '" onchange="onWorkNoteChange(' + team.id + ',this.value)"></td>';
+        html += '<td style="padding:6px;text-align:center;white-space:nowrap;width:70px;">' +
+                '<button onclick="deleteWorkTeam(' + team.id + ')" style="padding:5px 10px;background:#FA5151;color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;">🗑️</button>' +
+                '</td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    box.innerHTML = html;
+}
+
+function onWorkInputChange(teamId, unitKey, value) {
+    var key = teamId + '_' + unitKey;
+    if (!workPendingChanges[key]) workPendingChanges[key] = {};
+    workPendingChanges[key].quantity = Number(value) || 0;
+    workPendingChanges[key].unit = unitKey;
+    workPendingChanges[key].team_id = teamId;
+    workPendingChanges[key].work_date = workCurrentDate;
+    renderWorkTotals();
+    stashWorkRecordsLocally();
+}
+
+function onWorkNoteChange(teamId, value) {
+    if (!workColumns.length) return;
+    var col = workColumns[0];
+    var key = teamId + '_' + col.col_key;
+    if (!workPendingChanges[key]) {
+        var existing = workRecordsMap[key];
+        workPendingChanges[key] = {
+            quantity: existing ? (existing.quantity || 0) : 0,
+            unit: col.col_key, team_id: teamId, work_date: workCurrentDate
+        };
+    }
+    workPendingChanges[key].note = value;
+    stashWorkRecordsLocally();
+}
+
+function getTeamName() { return (localStorage.getItem('workTeamName') || '').trim(); }
+function saveTeamName() {
+    var el = document.getElementById('workTeamName');
+    if (el) localStorage.setItem('workTeamName', el.value.trim());
+}
+
+function deleteWorkRecordsByDate() {
+    if (!workCurrentDate) { alert('请先选日期'); return; }
+    if (!confirm('⚠️ 确认删除 ' + workCurrentDate + ' 的所有工作量记录？\n\n此操作不可恢复！')) return;
+    if (!confirm('⚠️⚠️ 再次确认：真的要删除吗？')) return;
+    if (workLocalCache[workCurrentDate]) { delete workLocalCache[workCurrentDate]; saveWorkLocalCache(); }
+    if (workPendingUpload[workCurrentDate]) { delete workPendingUpload[workCurrentDate]; saveWorkPendingUpload(); }
+    showStatus('🗑️ 正在删除 ' + workCurrentDate + ' 的所有记录...', 'loading');
+    fetch(WORK_RECORDS_DELETE + '&date=' + workCurrentDate, { method: 'DELETE' })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res && res.success) {
+                showStatus('✅ ' + (res.message || '已删除 ' + (res.deleted || 0) + ' 条'), 'success');
+                loadWorkRecordsByDate();
+            } else showStatus('❌ ' + ((res && res.error) || '删除失败'), 'error');
+        })
+        .catch(function(err) { showStatus('❌ 删除失败：' + err.message, 'error'); });
+}
+
+function getUnitByColName(name) {
+    if (!name) return '个';
+    if (name.indexOf('重量') !== -1) return 'kg';
+    if (name.indexOf('阀门') !== -1) return '台';
+    if (name.indexOf('台') !== -1) return '台';
+    if (name.indexOf('管道') !== -1) return '寸';
+    if (name.indexOf('寸') !== -1) return '寸';
+    if (name.indexOf('支架') !== -1) return '个';
+    if (name.indexOf('个数') !== -1) return '个';
+    return '个';
+}
+
+function isExcludedFromReport(colName) {
+    if (!colName) return false;
+    return colName.indexOf('包含') !== -1 && colName.indexOf('2寸以下') !== -1;
+}
+
+function copyWorkAsReport() {
+    if (!workCurrentDate) { alert('请先选日期'); return; }
+    stashWorkRecordsLocally();
+    if (!workTeams.length) { alert('没有班组数据'); return; }
+    if (!workColumns.length) { alert('没有列配置'); return; }
+
+    var NOTE_KEYWORDS = ['管台焊接', '返修焊口', '借到', '结构', '支架'];
+    function noteMatches(note) {
+        if (!note) return false;
+        for (var i = 0; i < NOTE_KEYWORDS.length; i++) {
+            if (note.indexOf(NOTE_KEYWORDS[i]) !== -1) return true;
+        }
+        return false;
+    }
+
+    var lines = [];
+    var teamName = getTeamName();
+    if (teamName) lines.push('队伍:' + teamName);
+    var welderCount = 0;
+    workTeams.forEach(function(t) { if ((t.welder || '').trim()) welderCount++; });
+    lines.push('焊工人数:' + welderCount + '人');
+    var d = new Date(workCurrentDate);
+    lines.push(d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日');
+    lines.push('');
+
+    var seq = 0;
+    workTeams.forEach(function(team) {
+        var welderName = (team.welder || '').trim();
+        if (!welderName) return;
+        var parts = [];
+        workColumns.forEach(function(col) {
+            if (isExcludedFromReport(col.col_name)) return;
+            var key = team.id + '_' + col.col_key;
+            var rec = workRecordsMap[key];
+            if (rec && Number(rec.quantity) > 0) {
+                var qty = Number(rec.quantity);
+                var display = (qty % 1 === 0) ? qty : qty.toFixed(2);
+                parts.push(col.col_name + display + getUnitByColName(col.col_name));
+            }
+        });
+
+        var note = '';
+        workColumns.forEach(function(col) {
+            var rec = workRecordsMap[team.id + '_' + col.col_key];
+            if (rec && rec.note && !note) {
+                if (parts.length > 0) {
+                    if (noteMatches(rec.note)) note = rec.note;
+                } else {
+                    note = rec.note;
+                }
+            }
+        });
+        if (parts.length === 0 && !note) return;
+        seq++;
+        var nameLine = seq + '、 ' + welderName;
+        if (parts.length > 0) {
+            nameLine += '  ' + parts.join(' ');
+            if (note) nameLine += '  【' + note + '】';
+        } else if (note) {
+            nameLine += '  ' + note;
+        }
+        lines.push(nameLine);
+    });
+
+    if (seq === 0) { showStatus('⚠️ 没有符合条件的焊工数据', 'error'); return; }
+
+    lines.push('');
+    var totalParts = [];
+    workColumns.forEach(function(col) {
+        if (isExcludedFromReport(col.col_name)) return;
+        var sum = 0;
+        workTeams.forEach(function(team) {
+            if (!(team.welder || '').trim()) return;
+            var rec = workRecordsMap[team.id + '_' + col.col_key];
+            if (rec) sum += Number(rec.quantity) || 0;
+        });
+        if (sum > 0) {
+            var display = (sum % 1 === 0) ? sum : sum.toFixed(2);
+            totalParts.push(col.col_name + display + getUnitByColName(col.col_name));
+        }
+    });
+    if (totalParts.length > 0) lines.push('【合计】 ' + totalParts.join(' '));
+
+    // ============ 追加：未完成量（精简版，优先用缓存） ============
+    var t = totalData;
+    if (!t) {
+        try {
+            var cached = localStorage.getItem(TOTAL_CACHE_KEY);
+            if (cached) t = JSON.parse(cached);
+        } catch(e) {}
+    }
+
+    function appendTotal() {
+        if (t) {
+            var s = t.summary || {};
+            lines.push('');
+            lines.push('总未完成:' + (s.unwelded || 0) + '寸');
+            (t.list || []).forEach(function(a) {
+                lines.push(a.area + '  未完成' + (Number(a.unwelded) || 0) + '寸');
+            });
+        }
+        copyTextWithFallback(lines.join('\n'), seq);
+    }
+
+    if (t) {
+        appendTotal();
+    } else {
+        // 内存和缓存都没有 → 兜底请求一次
+        fetch(DATA4_URL + '?t=' + Date.now())
+            .then(function(r) { return r.json(); })
+            .catch(function() { return null; })
+            .then(function(data4) {
+                if (data4) {
+                    totalData = data4;
+                    try { localStorage.setItem(TOTAL_CACHE_KEY, JSON.stringify(data4)); } catch(e) {}
+                    t = data4;
+                }
+                appendTotal();
+            });
+    }   
+}
+function copyTextWithFallback(text, seq) {
+    var msg = '✅ 已复制 ' + seq + ' 条焊工日报';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() { showStatus(msg, 'success'); })
+            .catch(function() {
+                if (execCommandCopySilent(text)) showStatus(msg, 'success');
+                else showManualCopyDialog(text);
+            });
+    } else {
+        if (execCommandCopySilent(text)) showStatus(msg, 'success');
+        else showManualCopyDialog(text);
+    }
+}
+function execCommandCopySilent(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+    document.body.appendChild(ta);
+    var ok = false;
+    try { ta.focus(); ta.select(); ta.setSelectionRange(0, text.length); ok = document.execCommand('copy'); } catch(e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+}
+function showManualCopyDialog(text) {
+    var dlg = document.createElement('div');
+    dlg.className = 'dialog-overlay active';
+    dlg.innerHTML = '<div class="dialog">' +
+        '<h2>📋 手动复制</h2>' +
+        '<p>长按下方文本 → 全选 → 复制</p>' +
+        '<textarea id="manualCopyArea" style="height:280px;" readonly></textarea>' +
+        '<div class="dialog-buttons"><button class="btn-primary" onclick="this.closest(\'.dialog-overlay\').remove()">关闭</button></div>' +
+        '</div>';
+    document.body.appendChild(dlg);
+    var ta = dlg.querySelector('#manualCopyArea');
+    ta.value = text;
+    setTimeout(function() { ta.focus(); ta.select(); }, 100);
+}
+
+function stashWorkRecordsLocally() {
+    if (workMode !== 'day') return;
+    if (!workCurrentDate) return;
+    if (!workColumns.length) return;
+    if (!workTeams.length) return;
+
+    var date = workCurrentDate;
+    var firstColKey = workColumns[0].col_key;
+    var records = [];
+
+    workTeams.forEach(function(team) {
+        workColumns.forEach(function(col) {
+            var key = team.id + '_' + col.col_key;
+            var pending = workPendingChanges[key];
+            var existing = workRecordsMap[key];
+            var qty = pending ? pending.quantity : (existing ? existing.quantity : 0);
+            if (qty > 0) {
+                records.push({
+                    team_id: team.id, work_date: date,
+                    unit: col.col_key, quantity: qty, note: ''
+                });
+            }
+        });
+
+        var firstKey = team.id + '_' + firstColKey;
+        var firstPending = workPendingChanges[firstKey];
+        var firstExisting = workRecordsMap[firstKey];
+        var teamNote = firstPending && firstPending.note !== undefined
+                     ? firstPending.note
+                     : (firstExisting ? firstExisting.note : '');
+
+        if (teamNote && teamNote.trim() !== '') {
+            var hasFirst = records.some(function(r) {
+                return r.team_id === team.id && r.unit === firstColKey;
+            });
+            if (!hasFirst) {
+                records.push({
+                    team_id: team.id, work_date: date,
+                    unit: firstColKey, quantity: 0, note: teamNote
+                });
+            } else {
+                records.forEach(function(r) {
+                    if (r.team_id === team.id && r.unit === firstColKey) {
+                        r.note = teamNote;
+                    }
+                });
+            }
+        }
+    });
+
+    if (!records.length) return;
+
+    if (!workLocalCache[date]) workLocalCache[date] = {};
+    records.forEach(function(r) {
+        var key = r.team_id + '_' + r.unit;
+        workLocalCache[date][key] = {
+            quantity: r.quantity,
+            note: r.note || '',
+            _pending: true
+        };
+    });
+    saveWorkLocalCache();
+
+    if (!workPendingUpload[date]) workPendingUpload[date] = {};
+    records.forEach(function(r) {
+        var key = r.team_id + '_' + r.unit;
+        workPendingUpload[date][key] = {
+            team_id: r.team_id, unit: r.unit,
+            quantity: r.quantity, note: r.note || ''
+        };
+    });
+    saveWorkPendingUpload();
+}
+
+function saveAllWorkRecords() {
+    if (workMode !== 'day') { alert('范围汇总模式下不允许保存，请先切回日期'); return; }
+    if (!workCurrentDate) { alert('请先选日期'); return; }
+    if (!workColumns.length) { alert('没有列配置'); return; }
+
+    var date = workCurrentDate;
+    var firstColKey = workColumns[0].col_key;
+
+    stashWorkRecordsLocally();
+
+    var map = workPendingUpload[date] || {};
+    var records = Object.keys(map).map(function(k) {
+        var item = map[k];
+        return {
+            team_id: item.team_id, work_date: date,
+            unit: item.unit, quantity: item.quantity, note: item.note || ''
+        };
+    });
+
+    if (!records.length) { showStatus('⚠️ 没有要保存的数据', 'error'); return; }
+
+    workPendingChanges = {};
+    workRecordsMap = {};
+    var local = workLocalCache[date] || {};
+    Object.keys(local).forEach(function(k) {
+        workRecordsMap[k] = {
+            quantity: local[k].quantity || 0,
+            note: local[k].note || '',
+            _pending: true
+        };
+    });
+    renderWorkTeams();
+    renderWorkTotals();
+
+    showStatus('💾 已保存到本地，正在上传...', 'loading');
+    uploadWorkBatch(date, records);
+}
+
+function uploadWorkBatch(date, records) {
+    if (!navigator.onLine) { showStatus('📶 离线，已存本地，联网后自动上传', 'error'); return; }
+    fetch(WORK_RECORDS_BATCH, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records: records })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res && res.success) {
+            if (workPendingUpload[date]) {
+                records.forEach(function(r) {
+                    var key = r.team_id + '_' + r.unit;
+                    delete workPendingUpload[date][key];
+                });
+                if (Object.keys(workPendingUpload[date]).length === 0) delete workPendingUpload[date];
+                saveWorkPendingUpload();
+            }
+            if (workLocalCache[date]) {
+                records.forEach(function(r) {
+                    var key = r.team_id + '_' + r.unit;
+                    if (workLocalCache[date][key]) workLocalCache[date][key]._pending = false;
+                });
+                saveWorkLocalCache();
+            }
+            showStatus('✅ 已上传 ' + res.saved + ' 条', 'success');
+            loadWorkRecordsByDate();
+        } else showStatus('⚠️ 上传失败，已存本地，联网后自动重试', 'error');
+    })
+    .catch(function() { showStatus('⚠️ 网络错误，已存本地，联网后自动重试', 'error'); });
+}
+
+function syncPendingWork() {
+    if (!navigator.onLine) return;
+    Object.keys(workPendingUpload).forEach(function(date) {
+        var map = workPendingUpload[date];
+        var records = Object.keys(map).map(function(k) {
+            var item = map[k];
+            return { team_id: item.team_id, work_date: date, unit: item.unit, quantity: item.quantity, note: item.note || '' };
+        });
+        if (records.length > 0) uploadWorkBatch(date, records);
+    });
+}
+
+function updateTeamField(id, field, value) {
+    var team = workTeams.find(function(t) { return t.id === id; });
+    if (!team) return;
+    team[field] = value;
+    fetch(WORK_TEAMS_UPDATE, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, area: team.area, fitter: team.fitter, welder: team.welder, helper: team.helper })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res && res.success) showStatus('✅ 已更新', 'success');
+        else showStatus('❌ ' + ((res && res.error) || '更新失败'), 'error');
+    })
+    .catch(function(err) { showStatus('❌ 更新失败：' + err.message, 'error'); });
+}
+
+function deleteWorkTeam(id) {
+    if (!confirm('确认删除该班组？\n（会同时删除它所有工作量记录）')) return;
+    fetch(WORK_TEAMS_DELETE + '&id=' + id, { method: 'DELETE' })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res && res.success) { showStatus('✅ 已删除', 'success'); refreshWorkTeams(); }
+            else showStatus('❌ ' + ((res && res.error) || '删除失败'), 'error');
+        })
+        .catch(function(err) { showStatus('❌ 删除失败：' + err.message, 'error'); });
+}
+
+function openAddTeamDialog() {
+    document.getElementById('addTeamArea').value = '';
+    document.getElementById('addTeamFitter').value = '';
+    document.getElementById('addTeamWelder').value = '';
+    document.getElementById('addTeamHelper').value = '';
+    document.getElementById('addTeamDialog').classList.add('active');
+}
+function closeAddTeamDialog() { document.getElementById('addTeamDialog').classList.remove('active'); }
+function doAddTeam() {
+    var area = document.getElementById('addTeamArea').value.trim();
+    var fitter = document.getElementById('addTeamFitter').value.trim();
+    var welder = document.getElementById('addTeamWelder').value.trim();
+    var helper = document.getElementById('addTeamHelper').value.trim();
+    if (!area) { alert('区域不能为空'); return; }
+    showStatus('📤 正在添加...', 'loading');
+    fetch(WORK_TEAMS_ADD, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ area: area, fitter: fitter, welder: welder, helper: helper })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res && res.success) { closeAddTeamDialog(); showStatus('✅ 已添加', 'success'); refreshWorkTeams(); }
+        else showStatus('❌ ' + ((res && res.error) || '添加失败'), 'error');
+    })
+    .catch(function(err) { showStatus('❌ 添加失败：' + err.message, 'error'); });
+}
+
+function openImportTeamsDialog() {
+    document.getElementById('importTeamsText').value = '';
+    document.getElementById('importTeamsDialog').classList.add('active');
+}
+function closeImportTeamsDialog() { document.getElementById('importTeamsDialog').classList.remove('active'); }
+async function doImportTeams() {
+    var text = document.getElementById('importTeamsText').value.trim();
+    if (!text) { alert('请输入数据'); return; }
+    var items = [];
+    text.split('\n').filter(function(l) { return l.trim(); }).forEach(function(line) {
+        var parts = line.split(',').map(function(s){ return s.trim(); });
+        if (parts.length >= 1 && parts[0]) {
+            items.push({ area: parts[0], fitter: parts[1] || '', welder: parts[2] || '', helper: parts[3] || '' });
+        }
+    });
+    if (!items.length) { alert('没有有效数据'); return; }
+    if (!confirm('确认导入 ' + items.length + ' 个班组？')) return;
+    closeImportTeamsDialog();
+    showStatus('📤 正在导入...', 'loading');
+    var success = 0, failed = 0, i = 0;
+    function next() {
+        if (i >= items.length) {
+            showStatus('✅ 完成：成功 ' + success + '，失败 ' + failed, 'success');
+            refreshWorkTeams(); return;
+        }
+        fetch(WORK_TEAMS_ADD, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(items[i])
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res && res.success) success++; else failed++;
+            i++;
+            showStatus('📤 已导入 ' + i + ' / ' + items.length, 'loading');
+            setTimeout(next, 200);
+        })
+        .catch(function() { failed++; i++; setTimeout(next, 200); });
+    }
+    next();
+}
+
+function renameWorkColumn(id, oldName) {
+    var newName = prompt('输入新的列名：', oldName);
+    if (!newName || newName === oldName) return;
+    fetch(WORK_COLUMNS_UPDATE, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, col_name: newName.trim() })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res && res.success) {
+            showStatus('✅ 列名已更新', 'success');
+            refreshWorkColumns().then(function() { loadWorkRecordsByDate(); });
+        } else showStatus('❌ ' + ((res && res.error) || '更新失败'), 'error');
+    })
+    .catch(function(err) { showStatus('❌ 更新失败：' + err.message, 'error'); });
+}
+
+function deleteWorkColumn(id, name) {
+    if (!confirm('确认删除列「' + name + '」？\n（会同时删除该列所有数据）')) return;
+    fetch(WORK_COLUMNS_DELETE + '&id=' + id, { method: 'DELETE' })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res && res.success) {
+                showStatus('✅ 已删除', 'success');
+                refreshWorkColumns().then(function() { loadWorkRecordsByDate(); });
+            } else showStatus('❌ ' + ((res && res.error) || '删除失败'), 'error');
+        })
+        .catch(function(err) { showStatus('❌ 删除失败：' + err.message, 'error'); });
+}
+
+function openAddColumnDialog() {
+    var name = prompt('输入新列名称（如"管道安装米数"）：');
+    if (!name) return;
+    fetch(WORK_COLUMNS_ADD, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ col_name: name.trim() })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res && res.success) {
+            showStatus('✅ 已添加', 'success');
+            refreshWorkColumns().then(function() { loadWorkRecordsByDate(); });
+        } else showStatus('❌ ' + ((res && res.error) || '添加失败'), 'error');
+    })
+    .catch(function(err) { showStatus('❌ 添加失败：' + err.message, 'error'); });
+}
+
+function renderWorkTotals() {
+    var totals = {};
+    workColumns.forEach(function(col) { totals[col.col_key] = 0; });
+    workTeams.forEach(function(team) {
+        workColumns.forEach(function(col) {
+            var key = team.id + '_' + col.col_key;
+            var pending = workPendingChanges[key];
+            var existing = workRecordsMap[key];
+            var qty = pending ? pending.quantity : (existing ? existing.quantity : 0);
+            totals[col.col_key] += Number(qty) || 0;
+        });
+    });
+    var fitterCount = 0, welderCount = 0, helperCount = 0;
+    workTeams.forEach(function(t) {
+        if (t.fitter) fitterCount++;
+        if (t.welder) welderCount++;
+        if (t.helper) helperCount++;
+    });
+    var html = '';
+    html += '<div class="work-total-box people"><div class="tlabel">管工</div><div class="tvalue">' + fitterCount + '</div></div>';
+    html += '<div class="work-total-box people"><div class="tlabel">焊工</div><div class="tvalue">' + welderCount + '</div></div>';
+    html += '<div class="work-total-box people"><div class="tlabel">普工</div><div class="tvalue">' + helperCount + '</div></div>';
+    workColumns.forEach(function(col) {
+        var v = totals[col.col_key];
+        var display = (v % 1 === 0) ? v : v.toFixed(2);
+        var unit = getUnitByColName(col.col_name);
+        html += '<div class="work-total-box"><div class="tlabel">' + escapeHtml(col.col_name) + '</div><div class="tvalue">' + display + '<span style="font-size:12px;color:#7F7F7F;font-weight:400;margin-left:3px;">' + unit + '</span></div></div>';
+    });
+    document.getElementById('workTotals').innerHTML = html;
+}
+
+function exportWorkExcel() {
+    if (!workTeams.length) { showStatus('⚠️ 没有班组数据', 'error'); return; }
+    var rows = [];
+    workTeams.forEach(function(team) {
+        var row = [team.area || '', team.fitter || '', team.welder || '', team.helper || ''];
+        workColumns.forEach(function(col) {
+            var rec = workRecordsMap[team.id + '_' + col.col_key];
+            row.push(rec ? (rec.quantity || '') : '');
+        });
+        var note = '';
+        workColumns.forEach(function(col) {
+            var rec = workRecordsMap[team.id + '_' + col.col_key];
+            if (rec && rec.note && !note) note = rec.note;
+        });
+        row.push(note);
+        rows.push(row);
+    });
+    var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">';
+    html += '<style>td{mso-number-format:"\\@";border:1px solid #ccc;padding:4px 8px;font-size:12px;}';
+    html += 'th{background:#07C160;color:white;border:1px solid #ccc;padding:6px 8px;font-size:13px;font-weight:bold;}</style>';
+    html += '</head><body><table>';
+    html += '<tr><th>区域</th><th>管工</th><th>焊工</th><th>普工</th>';
+    workColumns.forEach(function(col) { html += '<th>' + escapeHtml(col.col_name) + '</th>'; });
+    html += '<th>备注</th></tr>';
+    rows.forEach(function(r) {
+        html += '<tr>';
+        r.forEach(function(c) {
+            html += '<td>' + String(c == null ? '' : c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>';
+        });
+        html += '</tr>';
+    });
+    html += '</table></body></html>';
+    var blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = '工作量_' + (workMode === 'day' ? workCurrentDate : 'range') + '_' + today() + '.xls';
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 3000);
+    showStatus('✅ 已导出到 Excel', 'success');
+}
+
+// ============================================================
+//                    4️⃣ 支架状态
+// ============================================================
+function loadStatusData(silent) {
+    if (!silent) showStatus('🔄 正在加载支架状态...', 'loading');
+    fetch(DATA1_URL + '?t=' + Date.now())
+        .then(function(res) { return res.json(); })
+        .then(function(statusMap) {
+            var notesMap = {};
+            (notesLiveData || []).forEach(function(item) {
+                if (!item || !item.notes || item.notes.length === 0) return;
+                var bracketId = item.bracketId, pipeNo = item.pipeNo;
+                if (!bracketId || !pipeNo) return;
+                notesMap[bracketId + '_' + pipeNo] = {
+                    note: (item.notes[0].note || '').trim(),
+                    time: item.notes[0].time || '',
+                    user: item.notes[0].user || ''
+                };
+            });
+            statusData = [];
+            Object.keys(statusMap || {}).forEach(function(key) {
+                var item = statusMap[key] || {};
+                var parts = key.split('_');
+                var bracketId = parts[0];
+                var pipeNo = parts.slice(1).join('_');
+                var staticStatus = item.status || '';
+                var staticTime = item.updateTime || '';
+                var noteInfo = notesMap[key];
+                var hasNote = !!noteInfo;
+                var displayStatus;
+                if (hasNote) {
+                    var lastDash = staticStatus.lastIndexOf('-');
+                    var prefix = lastDash === -1 ? '' : staticStatus.substring(0, lastDash + 1);
+                    displayStatus = prefix + noteInfo.note;
+                } else displayStatus = staticStatus;
+                statusData.push({
+                    key: key, bracketId: bracketId, pipeNo: pipeNo,
+                    status: displayStatus,
+                    updateTime: hasNote ? (noteInfo.time || staticTime) : staticTime,
+                    user: hasNote ? (noteInfo.user || '') : '',
+                    hasPending: hasNote
+                });
+            });
+            Object.keys(notesMap).forEach(function(key) {
+                if (statusMap && statusMap[key]) return;
+                var info = notesMap[key];
+                var parts = key.split('_');
+                statusData.push({
+                    key: key, bracketId: parts[0], pipeNo: parts.slice(1).join('_'),
+                    status: info.note, updateTime: info.time || '', user: info.user || '', hasPending: true
+                });
+            });
+            statusData.sort(function(a, b) { return a.hasPending === b.hasPending ? 0 : (a.hasPending ? -1 : 1); });
+            filteredStatusData = statusData;
+            statusPage = 1;
+            renderStatusTable();
+            if (!silent) {
+                var pend = statusData.filter(function(s){ return s.hasPending; }).length;
+                showStatus('✅ 已加载 ' + statusData.length + ' 条（待导出 ' + pend + ' 条）', 'success');
+            }
+        })
+        .catch(function(err) { if (!silent) showStatus('❌ 加载失败：' + err.message, 'error'); });
+}
+
+function renderStatusTable() {
+    var box = document.getElementById('dataBody');
+    statusPages = Math.ceil(filteredStatusData.length / PAGE_SIZE) || 1;
+    if (statusPage > statusPages) statusPage = statusPages;
+    if (statusPage < 1) statusPage = 1;
+    renderCardList(box, filteredStatusData, function(item, idx) {
+        var badge = item.hasPending ? ' <span class="badge-new">⏳ 待导出</span>' : '';
+        return '<div class="card">' +
+            '<div class="card-head">' +
+                '<div class="title">' + escapeHtml(item.bracketId) + badge + '</div>' +
+                '<div class="index">#' + idx + '</div>' +
+            '</div>' +
+            cardRow('管线号', escapeHtml(item.pipeNo)) +
+            cardRow('状态', escapeHtml(item.status), '#07C160') +
+            renderUserRow(item.user) +
+            cardRow('更新时间', escapeHtml(item.updateTime)) +
+        '</div>';
+    }, statusPage, statusPages, filteredStatusData.length);
+}
+
+async function exportData1Json() {
+    if (!confirm('生成并导出 data1.json？')) return;
+    showStatus('📥 正在生成...', 'loading');
+    try {
+        var notesRes = await fetch(GET_NOTES_API + '?t=' + Date.now());
+        var notesObj = await notesRes.json();
+        var data1Res = await fetch(DATA1_URL + '?t=' + Date.now());
+        var oldStatusMap = await data1Res.json();
+        var newStatusMap = JSON.parse(JSON.stringify(oldStatusMap));
+        var updated = 0, skipped = 0;
+        Object.keys(notesObj || {}).forEach(function(key) {
+            var item = notesObj[key];
+            if (!item || !item.notes || item.notes.length === 0) return;
+            var bracketId = item.bracketId, pipeNo = item.pipeNo;
+            if (!bracketId || !pipeNo) return;
+            var notes = item.notes.slice().sort(function(a, b) { return (b.time || '').localeCompare(a.time || ''); });
+            var noteText = (notes[0].note || '').trim();
+            if (noteText === '') return;
+            var statusKey = bracketId + '_' + pipeNo;
+            if (!oldStatusMap[statusKey]) { skipped++; return; }
+            var oldStatus = oldStatusMap[statusKey].status || '';
+            var lastDash = oldStatus.lastIndexOf('-');
+            newStatusMap[statusKey] = {
+                status: (lastDash === -1) ? noteText : (oldStatus.substring(0, lastDash + 1) + noteText),
+                updateTime: notes[0].time || new Date().toLocaleString(),
+                user: notes[0].user || ''                                  // ✅ 补上
+            };
+            updated++;
+        });
+        downloadJSON(newStatusMap, 'data1_' + today() + '.json');
+        showStatus('✅ 完成（更新 ' + updated + ' 条，跳过 ' + skipped + ' 条）', 'success');
+    } catch (err) { showStatus('❌ 失败：' + err.message, 'error'); }
+}
+
+// ============================================================
+//                    5️⃣ 阀门动态库
+// ============================================================
+function refreshValveLive() {
+    showStatus('🔄 正在刷新阀门动态库...', 'loading');
+    fetch(GET_VALVES_API + '?t=' + Date.now())
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            valveLiveData = (data && data.success && Array.isArray(data.data)) ? data.data : [];
+            filteredValveLive = valveLiveData;
+            valveLivePage = 1;
+            renderValveLiveTable();
+            refreshAllStatus();
+            showStatus('✅ 共 ' + valveLiveData.length + ' 条', 'success');
+        })
+        .catch(function(err) { showStatus('❌ 刷新失败：' + err.message, 'error'); });
+}
+
+function renderValveLiveTable() {
+    var box = document.getElementById('dataBody');
+    valveLivePages = Math.ceil(filteredValveLive.length / PAGE_SIZE) || 1;
+    if (valveLivePage > valveLivePages) valveLivePage = valveLivePages;
+    if (valveLivePage < 1) valveLivePage = 1;
+    renderCardList(box, filteredValveLive, function(item, idx) {
+        return '<div class="card">' +
+            '<div class="card-head">' +
+                '<div class="title">' + escapeHtml(item.valveTag) + '</div>' +
+                '<div class="index">#' + idx + '</div>' +
+            '</div>' +
+            cardRow('焊口号1', item.weldNo1 || '—') +
+            cardRow('焊口号2', item.weldNo2 || '—') +
+            cardRow('序列号', item.serialNo || '—') +
+            renderUserRow(item.user) +
+            cardRow('更新时间', escapeHtml(item.updateTime || '')) +
+            '<div class="card-actions">' +
+                '<button class="edit" onclick="openEditValveLiveDialog(\'' + escapeJs(item.valveTag) + '\', \'' + escapeJs(item.weldNo1 || '') + '\', \'' + escapeJs(item.weldNo2 || '') + '\', \'' + escapeJs(item.serialNo || '') + '\', \'' + escapeJs(item.user || '') + '\')">✏️ 修改</button>' +
+                '<button class="del" onclick="deleteValveLiveItem(\'' + escapeJs(item.valveTag) + '\')">🗑️ 删除</button>' +
+            '</div>' +
+        '</div>';
+    }, valveLivePage, valveLivePages, filteredValveLive.length);
+}
+
+function deleteValveLiveItem(valveTag) {
+    if (!confirm('确认删除该阀门所有录入？\n' + valveTag)) return;
+    showStatus('🗑️ 正在删除...', 'loading');
+    fetch(DELETE_VALVE_API + '?key=' + encodeURIComponent('阀门_' + valveTag), { method: 'DELETE' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) { showStatus('✅ ' + (data.message || '已删除'), 'success'); refreshValveLive(); }
+            else showStatus('❌ ' + (data.message || '删除失败'), 'error');
+        })
+        .catch(function(err) { showStatus('❌ 删除失败：' + err.message, 'error'); });
+}
+
+// ============================================================
+//              修改阀门录入（阀门动态库）
+// ============================================================
+var editValveLiveTag = '';
+var editValveLiveUser = '';   // 保存原录入人
+
+function openEditValveLiveDialog(valveTag, weldNo1, weldNo2, serialNo, user) {
+    editValveLiveTag = valveTag;
+    editValveLiveUser = user || '';
+    document.getElementById('editValveLiveTag').textContent = '阀门位号：' + valveTag;
+    document.getElementById('editValveLiveUser').textContent = user || '（未记录）';
+    document.getElementById('editValveLiveWeld1').value = weldNo1 || '';
+    document.getElementById('editValveLiveWeld2').value = weldNo2 || '';
+    document.getElementById('editValveLiveSerial').value = serialNo || '';
+    document.getElementById('editValveLiveDialog').classList.add('active');
+}
+
+function closeEditValveLiveDialog() {
+    document.getElementById('editValveLiveDialog').classList.remove('active');
+}
+
+function doEditValveLive() {
+    var valveTag = editValveLiveTag;
+    if (!valveTag) return;
+
+    var weldNo1 = document.getElementById('editValveLiveWeld1').value.trim();
+    var weldNo2 = document.getElementById('editValveLiveWeld2').value.trim();
+    var serialNo = document.getElementById('editValveLiveSerial').value.trim();
+
+    if (!weldNo1 && !weldNo2 && !serialNo) { alert('请至少填写一项'); return; }
+
+    showStatus('📤 正在保存修改...', 'loading');
+
+    fetch(SAVE_VALVE_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            valveTag: valveTag,
+            weldNo1: weldNo1,
+            weldNo2: weldNo2,
+            serialNo: serialNo,
+            user: editValveLiveUser,   // ✅ 原样带回，不再覆盖成"控制台"
+            timestamp: new Date().toLocaleString()
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data && data.success) {
+            closeEditValveLiveDialog();
+            showStatus('✅ 修改成功', 'success');
+            refreshValveLive();
+        } else {
+            showStatus('❌ ' + ((data && data.message) || '修改失败'), 'error');
+        }
+    })
+    .catch(function(err) { showStatus('❌ 修改失败：' + err.message, 'error'); });
+}
+
+function exportValveLiveCSV() {
+    if (filteredValveLive.length === 0) { showStatus('⚠️ 没有数据', 'error'); return; }
+    var csv = '\uFEFF序号,阀门位号,焊口号1,焊口号2,阀门序列号,录入人,更新时间\n';
+    filteredValveLive.forEach(function(item, index) {
+        csv += (index + 1) + ',"' + (item.valveTag || '').replace(/"/g, '""') + '","' +
+            (item.weldNo1 || '').replace(/"/g, '""') + '","' +
+            (item.weldNo2 || '').replace(/"/g, '""') + '","' +
+            (item.serialNo || '').replace(/"/g, '""') + '","' +
+            (item.user || '').replace(/"/g, '""') + '","' +
+            (item.updateTime || '').replace(/"/g, '""') + '"\n';
+    });
+    downloadCSV(csv, '阀门动态库_' + today() + '.csv');
+    showStatus('✅ 已导出', 'success');
+}
+
+function openAddValveDialog() {
+    document.getElementById('addValveTag').value = '';
+    document.getElementById('addValveWeld1').value = '';
+    document.getElementById('addValveWeld2').value = '';
+    document.getElementById('addValveSerial').value = '';
+    document.getElementById('addValveDialog').classList.add('active');
+}
+function closeAddValveDialog() { document.getElementById('addValveDialog').classList.remove('active'); }
+function doAddValve() {
+    var valveTag = document.getElementById('addValveTag').value.trim();
+    var weldNo1 = document.getElementById('addValveWeld1').value.trim();
+    var weldNo2 = document.getElementById('addValveWeld2').value.trim();
+    var serialNo = document.getElementById('addValveSerial').value.trim();
+    if (!valveTag) { alert('阀门位号不能为空'); return; }
+    if (!weldNo1 && !weldNo2 && !serialNo) { alert('至少填写一项'); return; }
+    showStatus('📤 正在保存...', 'loading');
+    fetch(SAVE_VALVE_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ valveTag: valveTag, weldNo1: weldNo1, weldNo2: weldNo2, serialNo: serialNo, user: CONSOLE_USER, timestamp: new Date().toLocaleString() })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) { closeAddValveDialog(); showStatus('✅ 添加成功', 'success'); refreshValveLive(); }
+        else showStatus('❌ ' + (data.message || '保存失败'), 'error');
+    })
+    .catch(function(err) { showStatus('❌ 保存失败：' + err.message, 'error'); });
+}
+
+function openImportValvesDialog() {
+    document.getElementById('importValvesText').value = '';
+    document.getElementById('importValvesDialog').classList.add('active');
+}
+function closeImportValvesDialog() { document.getElementById('importValvesDialog').classList.remove('active'); }
+async function doImportValves() {
+    var text = document.getElementById('importValvesText').value.trim();
+    if (!text) { alert('请输入数据'); return; }
+    var items = [];
+    text.split('\n').filter(function(l) { return l.trim(); }).forEach(function(line) {
+        var parts = line.split(',');
+        if (parts.length >= 2) items.push({
+            valveTag: parts[0].trim(),
+            weldNo1: parts[1] ? parts[1].trim() : '',
+            weldNo2: parts[2] ? parts[2].trim() : '',
+            serialNo: parts[3] ? parts[3].trim() : ''
+        });
+    });
+    if (!items.length) { alert('没有有效数据'); return; }
+    if (!confirm('确认导入 ' + items.length + ' 条阀门录入？')) return;
+    closeImportValvesDialog();
+    var BATCH = 20, DELAY = 1000, success = 0, failed = 0, index = 0;
+    async function nextBatch() {
+        if (index >= items.length) {
+            showStatus('✅ 完成：成功 ' + success + '，失败 ' + failed, 'success');
+            refreshValveLive(); return;
+        }
+        var batch = items.slice(index, index + BATCH);
+        for (var i = 0; i < batch.length; i++) {
+            try {
+                var res = await fetch(SAVE_VALVE_API, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ valveTag: batch[i].valveTag, weldNo1: batch[i].weldNo1, weldNo2: batch[i].weldNo2, serialNo: batch[i].serialNo, user: CONSOLE_USER, timestamp: new Date().toLocaleString() })
+                });
+                var data = await res.json();
+                if (data.success) success++; else failed++;
+            } catch(e) { failed++; }
+        }
+        index += BATCH;
+        showStatus('📤 已导入 ' + Math.min(index, items.length) + ' / ' + items.length, 'loading');
+        setTimeout(nextBatch, DELAY);
+    }
+    nextBatch();
+}
+
+// ============================================================
+//                    6️⃣ 阀门数据
+// ============================================================
+function loadValveData(silent) {
+    if (!silent) showStatus('🔄 正在加载阀门数据...', 'loading');
+    fetch(DATA2_URL + '?t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .catch(function() { return {}; })
+        .then(function(staticMap) {
+            var upstashList = valveLiveData || [];
+            var upstashMap = {};
+            upstashList.forEach(function(item) { if (item.valveTag) upstashMap[item.valveTag] = item; });
+            valveData = [];
+            Object.keys(staticMap || {}).forEach(function(tag) {
+                var base = staticMap[tag];
+                var up = upstashMap[tag];
+                valveData.push({
+                    valveTag: tag, lineNo: base.lineNo || '', valveName: base.valveName || '',
+                    weldNo1: up ? (up.weldNo1 || '') : (base.weldNo1 || ''),
+                    weldNo2: up ? (up.weldNo2 || '') : (base.weldNo2 || ''),
+                    serialNo: up ? (up.serialNo || '') : (base.serialNo || ''),
+                    user: up ? (up.user || '') : (base.user || ''),
+                    hasPending: !!up
+                });
+            });
+            Object.keys(upstashMap).forEach(function(tag) {
+                if (!staticMap[tag]) {
+                    var up = upstashMap[tag];
+                    valveData.push({
+                        valveTag: tag, lineNo: '', valveName: '',
+                        weldNo1: up.weldNo1 || '', weldNo2: up.weldNo2 || '', serialNo: up.serialNo || '',
+                        user: up.user || '',
+                        hasPending: true
+                    });
+                }
+            });
+            valveData.sort(function(a, b) { return a.hasPending === b.hasPending ? 0 : (a.hasPending ? -1 : 1); });
+            filteredValveData = valveData;
+            valvePage = 1;
+            renderValveTable();
+            if (!silent) {
+                var pend = valveData.filter(function(v){ return v.hasPending; }).length;
+                showStatus('✅ 已加载 ' + valveData.length + ' 条（待导出 ' + pend + ' 条）', 'success');
+            }
+        })
+        .catch(function(err) { if (!silent) showStatus('❌ 加载失败：' + err.message, 'error'); });
+}
+
+function renderValveTable() {
+    var box = document.getElementById('dataBody');
+    valvePages = Math.ceil(filteredValveData.length / PAGE_SIZE) || 1;
+    if (valvePage > valvePages) valvePage = valvePages;
+    if (valvePage < 1) valvePage = 1;
+    renderCardList(box, filteredValveData, function(item, idx) {
+        var badge = item.hasPending
+            ? '<span class="badge-new">⏳ 待导出</span>'
+            : '<span class="badge-ok">✅ 已同步</span>';
+        return '<div class="card">' +
+            '<div class="card-head">' +
+                '<div class="title">' + escapeHtml(item.valveTag) + '</div>' +
+                '<div class="index">#' + idx + '</div>' +
+            '</div>' +
+            cardRow('管线号', escapeHtml(item.lineNo)) +
+            cardRow('阀门名称', escapeHtml(item.valveName)) +
+            cardRow('焊口号1', item.weldNo1 || '—') +
+            cardRow('焊口号2', item.weldNo2 || '—') +
+            cardRow('序列号', item.serialNo || '—') +
+            renderUserRow(item.user) +
+            cardRow('状态', badge) +
+        '</div>';
+    }, valvePage, valvePages, filteredValveData.length);
+}
+
+async function exportData2Json() {
+    if (!confirm('生成并导出 data2.json？')) return;
+    showStatus('📥 正在生成...', 'loading');
+    try {
+        var staticRes = await fetch(DATA2_URL + '?t=' + Date.now());
+        var staticMap = await staticRes.json();
+        var upstashRes = await fetch(GET_VALVES_API + '?t=' + Date.now());
+        var upstashData = await upstashRes.json();
+        var upstashList = (upstashData && upstashData.data) ? upstashData.data : [];
+        var newMap = JSON.parse(JSON.stringify(staticMap));
+        var updated = 0, added = 0;
+        upstashList.forEach(function(item) {
+            var tag = item.valveTag;
+            if (!tag) return;
+            if (newMap[tag]) {
+                newMap[tag].weldNo1 = item.weldNo1 || newMap[tag].weldNo1 || '';
+                newMap[tag].weldNo2 = item.weldNo2 || newMap[tag].weldNo2 || '';
+                newMap[tag].serialNo = item.serialNo || newMap[tag].serialNo || '';
+                newMap[tag].user = item.user || newMap[tag].user || '';           // ✅ 补上
+                updated++;
+            } else {
+                newMap[tag] = {
+                    subItem: '', lineNo: '', valveName: '', valveTag: tag,
+                    valveId: '', diameter: '', pressure: '',
+                    weldNo1: item.weldNo1 || '', weldNo2: item.weldNo2 || '', serialNo: item.serialNo || '',
+                    user: item.user || ''                                          // ✅ 补上
+                };
+                added++;
+            }
+        });
+        downloadJSON(newMap, 'data2_' + today() + '.json');
+        showStatus('✅ 完成（更新 ' + updated + ' 条，新增 ' + added + ' 条）', 'success');
+    } catch (err) { showStatus('❌ 失败：' + err.message, 'error'); }
+}
+
+async function deleteAllValves() {
+    if (!confirm('⚠️ 确认清空 Upstash 所有阀门录入？')) return;
+    if (!confirm('⚠️⚠️ 再次确认？')) return;
+    showStatus('🗑️ 正在清空...', 'loading');
+    try {
+        var res = await fetch(DELETE_VALVE_API + '?all=1', { method: 'DELETE' });
+        var data = await res.json();
+        if (data.success) {
+            showStatus('✅ ' + data.message, 'success');
+            refreshValveLive();
+            loadValveData(true);
+        } else showStatus('❌ ' + (data.message || '清空失败'), 'error');
+    } catch (err) { showStatus('❌ 失败：' + err.message, 'error'); }
+}
+
+async function flushWholeDatabase() {
+    if (!confirm('☠️ 危险操作！\n\n这会清空整个 Upstash Redis 库：\n· 所有备注\n· 所有阀门录入\n\n（不会影响 Neon 的尾项和工作量）\n\n请确保数据已导出！')) return;
+    if (!confirm('⚠️ 再次确认：真的要清空整个 Redis 库吗？')) return;
+    showStatus('☠️ 正在清空 Redis...', 'loading');
+    try {
+        var res = await fetch(FLUSH_DB_API, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirm: 'FLUSH' })
+        });
+        var data = await res.json();
+        if (data.success) {
+            showStatus('✅ ' + data.message, 'success');
+            refreshNotesLive();
+            refreshValveLive();
+            refreshAllStatus();
+            loadStatusData(true);
+            loadValveData(true);
+        } else showStatus('❌ ' + (data.message || '清空失败'), 'error');
+    } catch (err) { showStatus('❌ 清空失败：' + err.message, 'error'); }
+}
+
+// ============================================================
+//                    搜索
+// ============================================================
+function filterData() {
+    var q = document.getElementById('searchInput').value.trim().toLowerCase();
+    if (currentTab === 'notesLive') {
+        filteredNotesLive = !q ? notesLiveData : notesLiveData.filter(function(item) {
+            return (item.bracketId && item.bracketId.toLowerCase().indexOf(q) !== -1) ||
+                   (item.pipeNo && item.pipeNo.toLowerCase().indexOf(q) !== -1) ||
+                   item.notes.some(function(n) { return (n.note || '').toLowerCase().indexOf(q) !== -1; });
+        });
+        notesLivePage = 1; renderNotesLiveTable();
+    } else if (currentTab === 'tails') {
+        filteredTailsData = !q ? tailsData : tailsData.filter(function(item) {
+            return (item.subItem && item.subItem.toLowerCase().indexOf(q) !== -1) ||
+                   (item.lineNo && item.lineNo.toLowerCase().indexOf(q) !== -1) ||
+                   (item.content && item.content.toLowerCase().indexOf(q) !== -1);
+        });
+        tailsPage = 1; renderTailsTable();
+    } else if (currentTab === 'status') {
+        filteredStatusData = !q ? statusData : statusData.filter(function(item) {
+            return (item.bracketId && item.bracketId.toLowerCase().indexOf(q) !== -1) ||
+                   (item.pipeNo && item.pipeNo.toLowerCase().indexOf(q) !== -1) ||
+                   (item.status && item.status.toLowerCase().indexOf(q) !== -1);
+        });
+        statusPage = 1; renderStatusTable();
+    } else if (currentTab === 'valveLive') {
+        filteredValveLive = !q ? valveLiveData : valveLiveData.filter(function(item) {
+            return (item.valveTag && item.valveTag.toLowerCase().indexOf(q) !== -1) ||
+                   (item.weldNo1 && item.weldNo1.toLowerCase().indexOf(q) !== -1) ||
+                   (item.weldNo2 && item.weldNo2.toLowerCase().indexOf(q) !== -1) ||
+                   (item.serialNo && item.serialNo.toLowerCase().indexOf(q) !== -1);
+        });
+        valveLivePage = 1; renderValveLiveTable();
+    } else if (currentTab === 'valve') {
+        filteredValveData = !q ? valveData : valveData.filter(function(item) {
+            return (item.valveTag && item.valveTag.toLowerCase().indexOf(q) !== -1) ||
+                   (item.lineNo && item.lineNo.toLowerCase().indexOf(q) !== -1) ||
+                   (item.valveName && item.valveName.toLowerCase().indexOf(q) !== -1);
+        });
+        valvePage = 1; renderValveTable();
+    }
+}
+// ============================================================
+//                    7️⃣ 总量
+// ============================================================
+function refreshTotal() {
+    // 1. 先读缓存，秒显
+    try {
+        var cached = localStorage.getItem(TOTAL_CACHE_KEY);
+        if (cached) {
+            totalData = JSON.parse(cached);
+            renderTotalTable();
+            showStatus('📦 已加载本地缓存，正在刷新...', 'loading');
+        } else {
+            showStatus('🔄 正在加载总量...', 'loading');
+        }
+    } catch(e) {
+        showStatus('🔄 正在加载总量...', 'loading');
+    }
+
+    // 2. 再拉最新
+    fetch(DATA4_URL + '?t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(data4) {
+            totalData = data4 || { list: [], summary: {} };
+            try { localStorage.setItem(TOTAL_CACHE_KEY, JSON.stringify(totalData)); } catch(e) {}
+            renderTotalTable();
+            showStatus('✅ 总量已更新', 'success');
+        })
+        .catch(function(err) {
+            if (totalData) {
+                showStatus('⚠️ 网络失败，显示本地缓存', 'error');
+            } else {
+                showStatus('❌ 加载失败：' + err.message, 'error');
+            }
+        });
+}
+
+function renderTotalTable() {
+    var box = document.getElementById('dataBody');
+    var d = totalData || { list: [], summary: {} };
+    var s = d.summary || {};
+    var html = '';
+
+    // 总合计卡片
+    html += '<div class="card" style="grid-column:1/-1;">' +
+        '<div class="card-head"><div class="title">🏗️ 总合计（全部工区）</div></div>' +
+        cardRow('十四化建总量', (s.total || 0) + ' 寸', '#07C160') +
+        cardRow('焊接完成', (s.welded || 0) + ' 寸', '#07C160') +
+        cardRow('焊接未完成', (s.unwelded || 0) + ' 寸', '#FA5151') +
+        '</div>';
+
+    // 各工区卡片
+    (d.list || []).forEach(function(a, i) {
+        var total = Number(a.total) || 0;
+        var welded = Number(a.welded) || 0;
+        var unwelded = Number(a.unwelded) || 0;
+        html += '<div class="card">' +
+            '<div class="card-head">' +
+                '<div class="title">📍 工区 ' + escapeHtml(a.area) + '</div>' +
+                '<div class="index">#' + (i + 1) + '</div>' +
+            '</div>' +
+            cardRow('总量', total + ' 寸', '#07C160') +
+            cardRow('✅ 焊接完成', welded + ' 寸', '#07C160') +
+            cardRow('❌ 焊接未完成', unwelded + ' 寸', '#FA5151') +
+            (a.note ? cardRow('备注', escapeHtml(a.note)) : '') +
+            '</div>';
+    });
+
+    box.innerHTML = html || '<div class="no-data"><span>📭</span>暂无总量数据</div>';
+    document.getElementById('paginationBar').style.display = 'none';
+}
+
+// ============ 一键复制总量（文本格式，适合发微信/日报） ============
+function copyTotalReport() {
+    if (!totalData) { showStatus('⚠️ 请先刷新总量', 'error'); return; }
+    var d = totalData;
+    var s = d.summary || {};
+    var lines = [];
+    lines.push('总未完成:' + (s.unwelded || 0) + '寸');
+    (d.list || []).forEach(function(a) {
+        lines.push(a.area + '  未完成' + (Number(a.unwelded) || 0) + '寸');
+    });
+    var text = lines.join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            showStatus('✅ 未完成量已复制', 'success');
+        }).catch(function() { fallbackCopyTotal(text); });
+    } else {
+        fallbackCopyTotal(text);
+    }
+}
+
+function fallbackCopyTotal(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+    document.body.appendChild(ta);
+    var ok = false;
+    try { ta.focus(); ta.select(); ta.setSelectionRange(0, text.length); ok = document.execCommand('copy'); } catch(e) { ok = false; }
+    document.body.removeChild(ta);
+    if (ok) showStatus('✅ 总量已复制到剪贴板', 'success');
+    else showManualCopyDialog(text);
+}
+
+// ============ 导出总量 Excel ============
+function exportTotalExcel() {
+    if (!totalData) { showStatus('⚠️ 请先刷新总量', 'error'); return; }
+    var d = totalData;
+    var rows = [];
+    var s = d.summary || {};
+    rows.push(['总合计（全部工区）', s.total || 0, s.welded || 0, s.unwelded || 0, '']);
+    (d.list || []).forEach(function(a) {
+        rows.push(['工区 ' + (a.area || ''), Number(a.total) || 0, Number(a.welded) || 0, Number(a.unwelded) || 0, a.note || '']);
+    });
+
+    var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">';
+    html += '<style>td{mso-number-format:"\\@";border:1px solid #ccc;padding:4px 8px;font-size:12px;}';
+    html += 'th{background:#07C160;color:white;border:1px solid #ccc;padding:6px 8px;font-size:13px;font-weight:bold;}</style>';
+    html += '</head><body><table>';
+    html += '<tr><th>工区</th><th>总量(寸)</th><th>焊接完成(寸)</th><th>焊接未完成(寸)</th><th>备注</th></tr>';
+    rows.forEach(function(r) {
+        html += '<tr>';
+        r.forEach(function(c) {
+            html += '<td>' + String(c == null ? '' : c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>';
+        });
+        html += '</tr>';
+    });
+    html += '</table></body></html>';
+    var blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = '总量_' + today() + '.xls';
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 3000);
+    showStatus('✅ 已导出总量 Excel', 'success');
+}
+
+// ============================================================
+//                    工具
+// ============================================================
+function showStatus(msg, type) {
+    var bar = document.getElementById('statusBar');
+    bar.textContent = msg;
+    bar.className = 'status-bar';
+    if (type) bar.classList.add(type);
+}
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text).replace(/[&<>"']/g, function(m) {
+        var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return map[m];
+    });
+}
+function escapeJs(text) {
+    return String(text || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+}
+function today() { return new Date().toISOString().slice(0, 10).replace(/-/g, ''); }
+function downloadCSV(csv, filename) {
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+}
+function downloadJSON(obj, filename) {
+    var jsonStr = JSON.stringify(obj, null, 2);
+    var blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 3000);
+}
+
+// ============================================================
+//                    网络状态
+// ============================================================
+window.addEventListener('online', function() {
+    setTimeout(syncPendingWork, 1000);
+    setTimeout(refreshWorkAll, 1500);
+});
+
+window.addEventListener('beforeunload', function() {
+    try { stashWorkRecordsLocally(); } catch(e) {}
+});
+
+document.getElementById('passwordInput').addEventListener('keyup', function(e) {
+    if (e.key === 'Enter') doLogin();
+});
+</script>
+</body>
+</html>

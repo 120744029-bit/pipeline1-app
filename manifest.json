@@ -1,0 +1,79 @@
+{
+    "name" : "管线查询",
+    "id" : "H5D1E0AAC",
+    "version" : {
+        "name" : "3.0.0",
+        "code" : 300
+    },
+    "description" : "工程管线查询工具",
+    "launch_path" : "index.html",
+    "plus" : {
+        "useragent" : {
+            "value" : "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36",
+            "concatenate" : true
+        },
+        "splashscreen" : {
+            "autoclose" : true,
+            "waiting" : true,
+            "delay" : 0
+        },
+        "icons" : {
+            "hdpi" : "icon-192.png",
+            "xhdpi" : "icon-192.png",
+            "xxhdpi" : "icon-192.png",
+            "xxxhdpi" : "icon-192.png"
+        },
+        "launchwebview" : {
+            "render" : "always"
+        },
+        "statusbar" : {
+            "immersed" : false
+        },
+        "webview" : {
+            "cache" : false,
+            "allowFileAccess" : true,
+            "allowFileAccessFromFileURLs" : true,
+            "allowUniversalAccessFromFileURLs" : true
+        },
+        "netinfo" : {
+            "timeout" : 30000
+        },
+        "distribute" : {
+            "apple" : {},
+            "google" : {},
+            "android" : {
+                "permissions" : [
+                    "<uses-permission android:name=\"android.permission.INTERNET\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\"/>",
+                    "<uses-permission android:name=\"android.permission.READ_PHONE_STATE\"/>",
+                    "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>",
+                    "<uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"/>",
+                    "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
+                    "<uses-permission android:name=\"android.permission.CAMERA\"/>",
+                    "<uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>",
+                    "<uses-permission android:name=\"android.permission.MODIFY_AUDIO_SETTINGS\"/>"
+                ],
+                "icons" : {
+                    "hdpi" : "icon-192.png",
+                    "xhdpi" : "icon-192.png",
+                    "xxhdpi" : "icon-192.png",
+                    "xxxhdpi" : "icon-192.png"
+                }
+            },
+            "ios" : {
+                "dSYMs" : false
+            }
+        },
+        "orientation" : [ "portrait-primary", "portrait-secondary" ]
+    },
+    "titleNView" : {
+        "autoBackButton" : true,
+        "homeButton" : false,
+        "backgroundColor" : "#2a7de1",
+        "titleColor" : "#ffffff",
+        "titleText" : "管线查询"
+    }
+}
