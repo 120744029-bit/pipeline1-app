@@ -1109,18 +1109,22 @@
 // ============================================================
 var APP_VERSION = '1.0.0';
 var currentVersion = APP_VERSION;
-var UPDATE_URL = 'https://app-rho-nine-41.vercel.app/version.json';
-var API_BASE_URL = 'https://app-rho-nine-41.vercel.app/api';
-var DATA1_URL = 'https://app-rho-nine-41.vercel.app/data1.json';
-var DATA2_URL = 'https://app-rho-nine-41.vercel.app/data2.json';
-var DATA3_URL = 'https://app-rho-nine-41.vercel.app/data3.json';
-var DATA4_URL = 'https://app-rho-nine-41.vercel.app/data4.json';
-var DATA5_URL = 'https://app-rho-nine-41.vercel.app/data5.json';
-var SCHEDULE_URL = 'https://app-rho-nine-41.vercel.app/schedule.json';
-var ELBOW_URL = 'https://app-rho-nine-41.vercel.app/elbow.json';
-var SUBITEMS_URL = 'https://app-rho-nine-41.vercel.app/subitems.json';
-var PIPELINE_URL = 'https://app-rho-nine-41.vercel.app/data.json';
-var WORK_API = API_BASE_URL + '/work';
+var BASE = 'https://pipeline1-app-sjb7zjvz.edgeone.dev';   // ← 换成你自己的域名，结尾不要带斜杠
+
+var UPDATE_URL   = BASE + '/version.json';
+var API_BASE_URL = BASE + '/api';
+var DATA1_URL    = BASE + '/data1.json';
+var DATA2_URL    = BASE + '/data2.json';
+var DATA3_URL    = BASE + '/data3.json';
+var DATA4_URL    = BASE + '/data4.json';
+var DATA5_URL    = BASE + '/data5.json';
+var SCHEDULE_URL = BASE + '/schedule.json';
+var ELBOW_URL    = BASE + '/elbow.json';
+var SUBITEMS_URL = BASE + '/subitems.json';
+var PIPELINE_URL = BASE + '/data.json';
+
+var KV_API         = API_BASE_URL + '/kv';      // ← 新增：KV 统一入口
+var WORK_API       = API_BASE_URL + '/work';
 var TAIL_ITEMS_API = API_BASE_URL + '/tails?action=get-all';
 var TAIL_GET_API   = API_BASE_URL + '/tails?action=get';
 var TAIL_SAVE_API  = API_BASE_URL + '/tails?action=save';
@@ -2661,7 +2665,7 @@ function getValveData(valveTag) {
 }
 function uploadValveToCloud(valveTag, weldNo1, weldNo2, serialNo, user) {
     if (!navigator.onLine) return;
-    fetch(API_BASE_URL + '/save-valve', {
+    fetch(KV_API + '?action=save-valve', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             valveTag: valveTag, weldNo1: weldNo1, weldNo2: weldNo2, serialNo: serialNo,
@@ -2792,7 +2796,7 @@ function isNoteSynced(bracketId, pipeNo) {
 }
 function uploadNoteToCloud(bracketId, pipeNo, note, user) {
     if (!navigator.onLine) return;
-    fetch(API_BASE_URL + '/save-note', {
+    fetch(KV_API + '?action=save-note', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             bracketId: bracketId, pipeNo: pipeNo, note: note,
@@ -2833,7 +2837,7 @@ function syncPendingNotes() {
 }
 function fetchAllNotesFromCloud() {
     if (!navigator.onLine) return;
-    fetch(API_BASE_URL + '/get-notes?t=' + Date.now())
+    fetch(KV_API + '?action=get-notes&t=' + Date.now())
         .then(function(r) { return r.json(); })
         .then(function(cloudNotes) {
             var newNotes = {};
@@ -2859,7 +2863,7 @@ function fetchAllNotesFromCloud() {
 }
 function fetchNotesFromCloud(bracketId, pipelineItems) {
     if (!navigator.onLine) return;
-    fetch(API_BASE_URL + '/get-notes?bracketId=' + encodeURIComponent(bracketId) + '&t=' + Date.now())
+    fetch(KV_API + '?action=get-notes&bracketId=' + encodeURIComponent(bracketId) + '&t=' + Date.now())
         .then(function(r) { return r.json(); })
         .then(function(cloudNotes) {
             var notes = lsGet('bracketNotes', {});
