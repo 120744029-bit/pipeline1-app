@@ -1,3 +1,68 @@
+import { neon } from '@neondatabase/serverless';
+
+function jsonResponse(data, status) {
+    return new Response(JSON.stringify(data), {
+        status: status || 200,
+        headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type'
+        }
+    });
+}
+
+export async function onRequest(context) {
+    const { request } = context;
+
+    if (request.method === 'OPTIONS') {
+        return new Response(null, {
+            status: 200,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            }
+        });
+    }
+
+    // ---- 构造一个假的 req/res，兼容原 Vercel 写法 ----
+    const url = new URL(request.url);
+    let body = {};
+    if (request.method === 'POST' || request.method === 'PUT' || request.method === 'DELETE') {
+        try { body = await request.json(); } catch (e) { body = {}; }
+    }
+
+    const req = {
+        method: request.method,
+        query: Object.fromEntries(url.searchParams.entries()),
+        body: body,
+        headers: Object.fromEntries(request.headers.entries())
+    };
+
+    let _responseData = null;
+    let _responseStatus = 200;
+    let _responseHeaders = {};
+
+    const res = {
+        setHeader: (k, v) => { _responseHeaders[k] = v; },
+        status: (code) => { _responseStatus = code; return res; },
+        json: (data) => { _responseData = data; return res; },
+        end: () => { return res; }
+    };
+
+    // ---- 原样调用业务逻辑 ----
+    await originalHandler(req, res);
+
+    return new Response(_responseData !== null ? JSON.stringify(_responseData) : '', {
+        status: _responseStatus,
+        headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Access-Control-Allow-Origin': '*',
+            ..._responseHeaders
+        }
+    });
+}
 // ============================================================
 //              Vercel Serverless Function - 工作量统计（Neon 合并版）
 //              ?action= 区分：
@@ -11,7 +76,7 @@
 // ============================================================
 import { neon } from '@neondatabase/serverless';
 
-export default async function handler(req, res) {
+async function originalHandler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

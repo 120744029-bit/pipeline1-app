@@ -1,3 +1,51 @@
+import { neon } from '@neondatabase/serverless';
+
+export async function onRequest(context) {
+    const { request } = context;
+
+    if (request.method === 'OPTIONS') {
+        return new Response(null, {
+            status: 200,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            }
+        });
+    }
+
+    const url = new URL(request.url);
+    let body = {};
+    if (request.method === 'POST' || request.method === 'DELETE') {
+        try { body = await request.json(); } catch (e) { body = {}; }
+    }
+
+    const req = {
+        method: request.method,
+        query: Object.fromEntries(url.searchParams.entries()),
+        body: body,
+        headers: Object.fromEntries(request.headers.entries())
+    };
+
+    let _responseData = null;
+    let _responseStatus = 200;
+    const res = {
+        setHeader: () => {},
+        status: (code) => { _responseStatus = code; return res; },
+        json: (data) => { _responseData = data; return res; },
+        end: () => { return res; }
+    };
+
+    await originalHandler(req, res);
+
+    return new Response(_responseData !== null ? JSON.stringify(_responseData) : '', {
+        status: _responseStatus,
+        headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Access-Control-Allow-Origin': '*'
+        }
+    });
+}
 // ============================================================
 //              Vercel Serverless Function - 尾项接口（Neon 合并版）
 //              根据 ?action= 区分操作
@@ -6,7 +54,7 @@
 // ============================================================
 import { neon } from '@neondatabase/serverless';
 
-export default async function handler(req, res) {
+async function originalHandler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

@@ -1,12 +1,11 @@
 // ============================================================
-//        api/kv.js —— Upstash Redis 统一入口
+//        cloud-functions/api/kv.js —— Upstash Redis 统一入口
 //        整合：备注 + 阀门 + 清库
 //        用法：/api/kv?action=save-note | get-notes | ...
 // ============================================================
 import https from 'https';
 import { URL } from 'url';
 
-// ---------- 通用请求封装 ----------
 function httpsReq(method, url, headers, body) {
     return new Promise((resolve, reject) => {
         const parsedUrl = new URL(url);
@@ -30,7 +29,6 @@ function httpsReq(method, url, headers, body) {
 const httpsGet = (url, headers) => httpsReq('GET', url, headers);
 const httpsPost = (url, headers, body) => httpsReq('POST', url, headers, body);
 
-// ---------- 环境变量 ----------
 function getKvEnv() {
     const url = process.env.KV_REST_API_URL;
     const token = process.env.KV_REST_API_TOKEN;
@@ -38,27 +36,51 @@ function getKvEnv() {
     return { url, token };
 }
 
-export default async function handler(req, res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') return res.status(200).end();
+function jsonResponse(data, status) {
+    return new Response(JSON.stringify(data), {
+        status: status || 200,
+        headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type'
+        }
+    });
+}
 
-    const { action } = req.query;
+export async function onRequest(context) {
+    const { request } = context;
+    const method = request.method;
+
+    if (method === 'OPTIONS') {
+        return new Response(null, {
+            status: 200,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            }
+        });
+    }
+
+    const url = new URL(request.url);
+    const action = url.searchParams.get('action');
+
+    let body = {};
+    if (method === 'POST') {
+        try { body = await request.json(); } catch (e) { body = {}; }
+    }
 
     try {
         const { url: UPSTASH_URL, token: UPSTASH_TOKEN } = getKvEnv();
         const authHeaders = { 'Authorization': `Bearer ${UPSTASH_TOKEN}` };
 
-        // ============================================================
-        // 备注相关
-        // ============================================================
+        // ========== 备注：保存/删除 ==========
         if (action === 'save-note') {
-            if (req.method !== 'POST') return res.status(405).json({ success: false, message: '仅支持 POST' });
-            const { bracketId, pipeNo, note, timestamp, user } = req.body || {};
-            if (!bracketId || !pipeNo) return res.status(400).json({ success: false, message: '支架号和管线号不能为空' });
+            if (method !== 'POST') return jsonResponse({ success: false, message: '仅支持 POST' }, 405);
+            const { bracketId, pipeNo, note, timestamp, user } = body;
+            if (!bracketId || !pipeNo) return jsonResponse({ success: false, message: '支架号和管线号不能为空' }, 400);
 
-            // 空 note → 删除该支架+管线所有备注
             if (!note || note.trim() === '') {
                 const prefix = `备注_${bracketId}_${pipeNo}`;
                 const keysRes = await httpsGet(`${UPSTASH_URL}/keys/${encodeURIComponent(prefix + '*')}`, authHeaders);
@@ -67,18 +89,13 @@ export default async function handler(req, res) {
                     const keysData = JSON.parse(keysRes.body);
                     if (keysData && keysData.result && Array.isArray(keysData.result)) matchKeys = keysData.result;
                 } catch (e) {}
-
                 let deleted = 0;
                 for (const k of matchKeys) {
-                    try {
-                        await httpsGet(`${UPSTASH_URL}/del/${encodeURIComponent(k)}`, authHeaders);
-                        deleted++;
-                    } catch (e) {}
+                    try { await httpsGet(`${UPSTASH_URL}/del/${encodeURIComponent(k)}`, authHeaders); deleted++; } catch (e) {}
                 }
-                return res.status(200).json({ success: true, message: '已删除 ' + deleted + ' 条备注', deleted });
+                return jsonResponse({ success: true, message: '已删除 ' + deleted + ' 条备注', deleted });
             }
 
-            // 正常保存
             const now = Date.now();
             const key = `备注_${bracketId}_${pipeNo}_${now}`;
             const data = { bracketId, pipeNo, note, user: user || '', time: timestamp || new Date().toLocaleString() };
@@ -87,16 +104,17 @@ export default async function handler(req, res) {
                 { ...authHeaders, 'Content-Type': 'application/json' },
                 JSON.stringify(JSON.stringify(data))
             );
-            return res.status(200).json({ success: saveRes.status === 200, message: '备注已保存', key });
+            return jsonResponse({ success: saveRes.status === 200, message: '备注已保存', key });
         }
 
+        // ========== 备注：读取 ==========
         if (action === 'get-notes') {
-            const { bracketId } = req.query;
+            const bracketId = url.searchParams.get('bracketId');
             const pattern = bracketId ? `备注_${bracketId}_*` : '备注_*';
             const keysRes = await httpsGet(`${UPSTASH_URL}/keys/${encodeURIComponent(pattern)}`, authHeaders);
             const keysData = JSON.parse(keysRes.body);
             const allKeys = (keysData.result && Array.isArray(keysData.result)) ? keysData.result : [];
-            if (allKeys.length === 0) return res.status(200).json({});
+            if (allKeys.length === 0) return jsonResponse({});
 
             const result = {};
             const BATCH = 100;
@@ -106,7 +124,6 @@ export default async function handler(req, res) {
                 const mgetRes = await httpsGet(mgetUrl, authHeaders);
                 const mgetData = JSON.parse(mgetRes.body);
                 const values = (mgetData.result && Array.isArray(mgetData.result)) ? mgetData.result : [];
-
                 batchKeys.forEach((key, idx) => {
                     let item = values[idx];
                     if (item === null || item === undefined) return;
@@ -117,7 +134,6 @@ export default async function handler(req, res) {
                     if (!item) return;
                     const realKey = item.bracketId + '_' + item.pipeNo;
                     if (!result[realKey]) result[realKey] = { bracketId: item.bracketId, pipeNo: item.pipeNo, notes: [] };
-
                     if (item.note !== undefined) {
                         result[realKey].notes.push({ note: item.note, time: item.time || '', user: item.user || '' });
                     } else if (item.notes && Array.isArray(item.notes)) {
@@ -127,38 +143,39 @@ export default async function handler(req, res) {
                     }
                 });
             }
-            return res.status(200).json(result);
+            return jsonResponse(result);
         }
 
+        // ========== 备注：删除 ==========
         if (action === 'delete-note') {
-            let { key, bracketId, pipeNo } = req.query;
+            let key = url.searchParams.get('key');
+            const bracketId = url.searchParams.get('bracketId');
+            const pipeNo = url.searchParams.get('pipeNo');
+
             if (key) {
                 if (!key.startsWith('备注_')) key = '备注_' + key;
                 await httpsGet(`${UPSTASH_URL}/del/${encodeURIComponent(key)}`, authHeaders);
-                return res.status(200).json({ success: true, message: '已删除', key });
+                return jsonResponse({ success: true, message: '已删除', key });
             }
-            if (!bracketId || !pipeNo) return res.status(400).json({ success: false, message: 'key 或 bracketId+pipeNo 至少一个' });
+            if (!bracketId || !pipeNo) return jsonResponse({ success: false, message: 'key 或 bracketId+pipeNo 至少一个' }, 400);
 
             const prefix = `备注_${bracketId}_${pipeNo}`;
             const keysRes = await httpsGet(`${UPSTASH_URL}/keys/${encodeURIComponent(prefix + '*')}`, authHeaders);
             const keysData = JSON.parse(keysRes.body);
             const allKeys = (keysData && Array.isArray(keysData.result)) ? keysData.result : [];
             if (allKeys.indexOf(prefix) === -1) allKeys.push(prefix);
-
             let deleted = 0;
             for (const k of allKeys) {
                 try { await httpsGet(`${UPSTASH_URL}/del/${encodeURIComponent(k)}`, authHeaders); deleted++; } catch (e) {}
             }
-            return res.status(200).json({ success: true, message: '已删除 ' + deleted + ' 条备注', deleted });
+            return jsonResponse({ success: true, message: '已删除 ' + deleted + ' 条备注', deleted });
         }
 
-        // ============================================================
-        // 阀门相关
-        // ============================================================
+        // ========== 阀门：保存 ==========
         if (action === 'save-valve') {
-            if (req.method !== 'POST') return res.status(405).json({ success: false, message: '仅支持 POST' });
-            const { valveTag, weldNo1, weldNo2, serialNo, timestamp, user } = req.body || {};
-            if (!valveTag) return res.status(400).json({ success: false, message: '阀门位号不能为空' });
+            if (method !== 'POST') return jsonResponse({ success: false, message: '仅支持 POST' }, 405);
+            const { valveTag, weldNo1, weldNo2, serialNo, timestamp, user } = body;
+            if (!valveTag) return jsonResponse({ success: false, message: '阀门位号不能为空' }, 400);
 
             const key = `阀门_${valveTag}`;
             const data = { valveTag, weldNo1: weldNo1 || '', weldNo2: weldNo2 || '', serialNo: serialNo || '', user: user || '', updateTime: timestamp || new Date().toLocaleString() };
@@ -167,14 +184,15 @@ export default async function handler(req, res) {
                 { ...authHeaders, 'Content-Type': 'application/json' },
                 JSON.stringify(JSON.stringify(data))
             );
-            return res.status(200).json({ success: saveRes.status === 200, message: '阀门数据已保存', key });
+            return jsonResponse({ success: saveRes.status === 200, message: '阀门数据已保存', key });
         }
 
+        // ========== 阀门：读取 ==========
         if (action === 'get-valves') {
             const keysRes = await httpsGet(`${UPSTASH_URL}/keys/${encodeURIComponent('阀门_*')}`, authHeaders);
             const keysData = JSON.parse(keysRes.body);
             const allKeys = (keysData.result && Array.isArray(keysData.result)) ? keysData.result : [];
-            if (allKeys.length === 0) return res.status(200).json({ success: true, total: 0, data: [] });
+            if (allKeys.length === 0) return jsonResponse({ success: true, total: 0, data: [] });
 
             const results = await Promise.all(allKeys.map(async (key) => {
                 try {
@@ -192,11 +210,12 @@ export default async function handler(req, res) {
                 return null;
             }));
             const valid = results.filter(x => x !== null);
-            return res.status(200).json({ success: true, total: valid.length, data: valid });
+            return jsonResponse({ success: true, total: valid.length, data: valid });
         }
 
+        // ========== 阀门：删除 ==========
         if (action === 'delete-valve') {
-            if (req.query.all === '1') {
+            if (url.searchParams.get('all') === '1') {
                 const keysRes = await httpsGet(`${UPSTASH_URL}/keys/${encodeURIComponent('阀门_*')}`, authHeaders);
                 const keysData = JSON.parse(keysRes.body);
                 const allKeys = (keysData.result && Array.isArray(keysData.result)) ? keysData.result : [];
@@ -204,22 +223,20 @@ export default async function handler(req, res) {
                 for (const k of allKeys) {
                     try { await httpsGet(`${UPSTASH_URL}/del/${encodeURIComponent(k)}`, authHeaders); deleted++; } catch (e) {}
                 }
-                return res.status(200).json({ success: true, message: '已清空 ' + deleted + ' 条阀门录入', deleted });
+                return jsonResponse({ success: true, message: '已清空 ' + deleted + ' 条阀门录入', deleted });
             }
-            let { key } = req.query;
-            if (!key) return res.status(400).json({ success: false, message: 'key 不能为空' });
+            let key = url.searchParams.get('key');
+            if (!key) return jsonResponse({ success: false, message: 'key 不能为空' }, 400);
             if (!key.startsWith('阀门_')) key = `阀门_${key}`;
             await httpsGet(`${UPSTASH_URL}/del/${encodeURIComponent(key)}`, authHeaders);
-            return res.status(200).json({ success: true, message: '已删除', key });
+            return jsonResponse({ success: true, message: '已删除', key });
         }
 
-        // ============================================================
-        // 清空整库
-        // ============================================================
+        // ========== 清空整库 ==========
         if (action === 'flush-db') {
-            if (req.method !== 'POST') return res.status(405).json({ success: false, message: '仅支持 POST' });
-            const { confirm } = req.body || {};
-            if (confirm !== 'FLUSH') return res.status(400).json({ success: false, message: '缺少确认参数 confirm=FLUSH' });
+            if (method !== 'POST') return jsonResponse({ success: false, message: '仅支持 POST' }, 405);
+            const confirm = body.confirm;
+            if (confirm !== 'FLUSH') return jsonResponse({ success: false, message: '缺少确认参数 confirm=FLUSH' }, 400);
 
             const flushRes = await httpsPost(`${UPSTASH_URL}/flushdb`, { ...authHeaders, 'Content-Type': 'application/json' }, '');
             let ok = false;
@@ -227,13 +244,13 @@ export default async function handler(req, res) {
                 const data = JSON.parse(flushRes.body);
                 ok = data && data.result === 'OK';
             } catch (e) { ok = flushRes.status === 200; }
-            return res.status(200).json({ success: ok, message: ok ? '已清空整个 Redis 库' : '清空失败', status: flushRes.status });
+            return jsonResponse({ success: ok, message: ok ? '已清空整个 Redis 库' : '清空失败', status: flushRes.status });
         }
 
-        return res.status(400).json({ success: false, message: '未知 action: ' + action });
+        return jsonResponse({ success: false, message: '未知 action: ' + action }, 400);
 
     } catch (error) {
         console.error('KV 操作失败:', error);
-        return res.status(500).json({ success: false, message: '服务器错误: ' + error.message });
+        return jsonResponse({ success: false, message: '服务器错误: ' + error.message }, 500);
     }
-};
+}
