@@ -1,0 +1,3439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <meta name="theme-color" content="#07C160">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <title>管线查询</title>
+    <style>
+        /* ============================================================
+           微信风格基础 + 深色模式 & 字体大小变量
+           ============================================================ */
+        :root {
+            --bg-page: #EDEDED;
+            --bg-card: #FFFFFF;
+            --bg-input: #F7F7F7;
+            --bg-hover: #F2F2F2;
+            --bg-nav: #EDEDED;
+            --bg-tab: #F7F7F7;
+            --bg-dialog: #FFFFFF;
+            --bg-toast: rgba(0,0,0,0.8);
+            --text-primary: #000000;
+            --text-secondary: #7F7F7F;
+            --text-tertiary: #AAB7C9;
+            --text-value: #0b1b33;
+            --text-inverse: #FFFFFF;
+            --border-light: #E5E5E5;
+            --border-inner: #F2F2F2;
+            --green-primary: #07C160;
+            --green-bg: #d1fae5;
+            --green-text: #065f46;
+            --red-bg: #fee2e2;
+            --red-text: #991b1b;
+            --amber-bg: #fef3c7;
+            --amber-text: #92400e;
+            --purple-bg: #ede9fe;
+            --purple-text: #5b21b6;
+            --font-scale: 1;
+            --shadow: 0 20px 60px rgba(0,0,0,0.3);
+            --highlight-bg: #FEF3C7;
+            --highlight-border: #F59E0B;
+        }
+
+        /* 深色模式变量 */
+        body.dark-mode {
+            --bg-page: #121212;
+            --bg-card: #1E1E1E;
+            --bg-input: #2C2C2C;
+            --bg-hover: #2C2C2C;
+            --bg-nav: #1A1A1A;
+            --bg-tab: #1A1A1A;
+            --bg-dialog: #2C2C2C;
+            --bg-toast: rgba(255,255,255,0.15);
+            --text-primary: #E0E0E0;
+            --text-secondary: #A0A0A0;
+            --text-tertiary: #6B6B6B;
+            --text-value: #E0E0E0;
+            --text-inverse: #121212;
+            --border-light: #333333;
+            --border-inner: #2A2A2A;
+            --green-primary: #34D399;
+            --green-bg: #1A3A2E;
+            --green-text: #A7F3D0;
+            --red-bg: #3A1A1A;
+            --red-text: #FCA5A5;
+            --amber-bg: #3A2E1A;
+            --amber-text: #FCD34D;
+            --purple-bg: #2A1A3A;
+            --purple-text: #C4B5FD;
+            --highlight-bg: #3A2E1A;
+            --highlight-border: #F59E0B;
+            --shadow: 0 20px 60px rgba(0,0,0,0.6);
+        }
+
+        * {
+            margin: 0; padding: 0; box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", system-ui, sans-serif;
+            font-size: calc(16px * var(--font-scale));
+        }
+
+        body {
+            background: var(--bg-page);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            color: var(--text-primary);
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .app {
+            max-width: 480px; width: 100%;
+            background: var(--bg-page);
+            min-height: 100vh;
+            padding-bottom: calc(70px + env(safe-area-inset-bottom));
+            position: relative;
+            transition: background 0.2s;
+        }
+
+        /* ============ 顶部导航栏 ============ */
+        .navbar {
+            background: var(--bg-nav);
+            padding: 12px 16px;
+            text-align: center;
+            position: sticky; top: 0; z-index: 100;
+            border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .navbar h1 { font-size: calc(17px * var(--font-scale)); font-weight: 600; color: var(--text-primary); }
+        .navbar .right-btn {
+            position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+            font-size: calc(20px * var(--font-scale)); color: var(--text-primary); background: none; border: none; cursor: pointer;
+            padding: 4px 8px;
+        }
+        .navbar .status-badge {
+            position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+            font-size: calc(11px * var(--font-scale)); padding: 3px 10px; border-radius: 20px; font-weight: 500;
+        }
+        .navbar .status-badge.online { background: var(--green-bg); color: var(--green-text); }
+        .navbar .status-badge.offline { background: var(--red-bg); color: var(--red-text); }
+
+        /* ============ 二级 Tab ============ */
+        .sub-tabs {
+            background: var(--bg-nav);
+            display: flex;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--border-light);
+            position: sticky; top: 49px; z-index: 99;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .sub-tabs button {
+            flex: 1; padding: 10px 4px; border: none; background: none;
+            font-size: calc(14px * var(--font-scale)); color: var(--text-secondary); font-weight: 500; cursor: pointer;
+            position: relative;
+        }
+        .sub-tabs button.active { color: var(--green-primary); font-weight: 600; }
+        .sub-tabs button.active::after {
+            content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+            width: 20px; height: 2px; background: var(--green-primary); border-radius: 2px;
+        }
+
+        /* ============ 内容区 ============ */
+        .content { padding: 8px 0; }
+        .page-mode { display: none; }
+        .page-mode.active { display: block; }
+
+        /* ============ 日期栏 ============ */
+        .date-bar {
+            background: var(--bg-card);
+            padding: 14px 16px;
+            display: flex; align-items: center; gap: 10px;
+            border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .date-bar .date-info { flex: 1; }
+        .date-bar .date-label { font-size: calc(12px * var(--font-scale)); color: var(--text-secondary); margin-bottom: 2px; }
+        .date-bar .date-value { font-size: calc(17px * var(--font-scale)); font-weight: 600; color: var(--text-primary); }
+        .date-bar .change-btn {
+            background: var(--bg-hover); color: var(--green-primary); border: none;
+            padding: 6px 14px; border-radius: 4px; font-size: calc(14px * var(--font-scale)); cursor: pointer;
+        }
+
+        /* ============ 范围查询 ============ */
+        .range-bar {
+            background: var(--bg-card);
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .range-bar .range-title { font-size: calc(13px * var(--font-scale)); color: var(--text-secondary); margin-bottom: 8px; }
+        .range-bar .range-flex { display: flex; align-items: center; gap: 6px; }
+        .range-bar input[type="date"] {
+            flex: 1; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: 4px;
+            font-size: calc(14px * var(--font-scale)); outline: none; background: var(--bg-input); min-width: 0;
+            color: var(--text-primary);
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .range-bar .range-btn {
+            background: var(--green-primary); color: white; border: none;
+            padding: 8px 14px; border-radius: 4px; font-size: calc(14px * var(--font-scale)); font-weight: 500;
+            cursor: pointer; white-space: nowrap;
+        }
+
+        /* ============ 合计卡片 ============ */
+        .total-card {
+            background: var(--bg-card);
+            margin: 8px 0;
+            padding: 16px;
+            border-top: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .total-card .total-title {
+            font-size: calc(15px * var(--font-scale)); font-weight: 600; color: var(--text-primary);
+            margin-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .total-card .total-title .date-tag { font-size: calc(12px * var(--font-scale)); color: var(--text-secondary); font-weight: 400; }
+        .total-list .total-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 0; border-bottom: 1px solid var(--border-inner);
+        }
+        .total-list .total-row:last-child { border-bottom: none; }
+        .total-list .total-row .row-label { font-size: calc(15px * var(--font-scale)); color: var(--text-primary); }
+        .total-list .total-row .row-value { font-size: calc(15px * var(--font-scale)); color: var(--green-primary); font-weight: 600; }
+        .total-list .total-row .row-value .unit { font-size: calc(13px * var(--font-scale)); color: var(--text-secondary); font-weight: 400; margin-left: 2px; }
+
+        /* ============ 人数概览 ============ */
+        .people-card {
+            background: var(--bg-card);
+            margin: 8px 0;
+            padding: 16px;
+            border-top: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .people-row { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; }
+        .people-row .person-box { padding: 8px 4px; border-right: 1px solid var(--border-inner); }
+        .people-row .person-box:last-child { border-right: none; }
+        .people-row .person-box .plabel { font-size: calc(13px * var(--font-scale)); color: var(--text-secondary); margin-bottom: 6px; }
+        .people-row .person-box .pvalue { font-size: calc(24px * var(--font-scale)); font-weight: 600; color: var(--green-primary); }
+
+        /* ============ 班组卡片 ============ */
+        .team-card {
+            background: var(--bg-card);
+            margin: 8px 0;
+            border-top: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .team-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-inner);
+        }
+        .team-header .team-name {
+            font-size: calc(15px * var(--font-scale)); font-weight: 600; color: var(--text-primary);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .team-header .team-name .index-tag {
+            background: var(--bg-hover); color: var(--text-secondary);
+            font-size: calc(11px * var(--font-scale)); padding: 2px 6px; border-radius: 3px; font-weight: 500;
+        }
+        .people-list {
+            display: flex; flex-wrap: wrap; gap: 6px;
+            padding: 10px 16px; border-bottom: 1px solid var(--border-inner);
+        }
+        .people-list .person-tag {
+            background: var(--bg-hover); color: var(--text-primary);
+            padding: 4px 10px; border-radius: 4px;
+            font-size: calc(13px * var(--font-scale)); display: inline-flex; align-items: center; gap: 4px;
+        }
+        .people-list .person-tag .role { font-size: calc(10px * var(--font-scale)); color: var(--text-secondary); }
+        .work-list { padding: 12px 16px; border-bottom: 1px solid var(--border-inner); }
+        .work-list .work-row {
+            display: flex; justify-content: space-between; padding: 6px 0; font-size: calc(14px * var(--font-scale));
+        }
+        .work-list .work-row .wlabel { color: var(--text-secondary); }
+        .work-list .work-row .wvalue { color: var(--green-primary); font-weight: 600; }
+        .work-list .work-row .wvalue .unit { font-size: calc(12px * var(--font-scale)); color: var(--text-secondary); font-weight: 400; margin-left: 2px; }
+        .team-note {
+            padding: 10px 16px; font-size: calc(13px * var(--font-scale)); color: var(--text-secondary);
+            background: var(--bg-input); display: flex; gap: 6px; align-items: flex-start;
+        }
+        .team-note .note-icon { flex-shrink: 0; }
+        .team-note .note-text { flex: 1; line-height: 1.5; }
+
+        /* ============ 空状态 ============ */
+        .no-result {
+            text-align: center; padding: 50px 20px; color: var(--text-secondary);
+            background: var(--bg-card); margin: 8px 0;
+            border-top: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .no-result span { display: block; font-size: calc(38px * var(--font-scale)); margin-bottom: 12px; }
+
+        /* ============ 通用搜索框 ============ */
+        .search-box {
+            background: var(--bg-card);
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex; gap: 8px; align-items: center;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .search-box input {
+            flex: 1; padding: 10px 14px;
+            border: 1px solid var(--border-light); border-radius: 4px;
+            font-size: calc(15px * var(--font-scale)); outline: none; background: var(--bg-input);
+            font-family: system-ui, sans-serif;
+            color: var(--text-primary);
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .search-box input:focus { border-color: var(--green-primary); background: var(--bg-card); }
+        .search-box button {
+            background: var(--green-primary); color: white; border: none;
+            padding: 10px 18px; border-radius: 4px; font-size: calc(14px * var(--font-scale)); font-weight: 500;
+            cursor: pointer; white-space: nowrap;
+        }
+
+        /* ============ 子项号选择器 ============ */
+        .subitem-box {
+            background: var(--bg-card);
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex; align-items: center; gap: 10px;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .subitem-box label { font-size: calc(14px * var(--font-scale)); color: var(--text-primary); font-weight: 500; flex-shrink: 0; }
+        .subitem-box select {
+            flex: 1; padding: 10px 14px; border: 1px solid var(--border-light); border-radius: 4px;
+            font-size: calc(15px * var(--font-scale)); background: var(--bg-input); color: var(--text-primary); outline: none;
+            font-family: system-ui, sans-serif;
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .subitem-box select:focus { border-color: var(--green-primary); background: var(--bg-card); }
+
+        /* ============ 键盘面板 ============ */
+        .keyboard-panel {
+            background: var(--bg-card); padding: 12px; margin: 8px 0;
+            border-top: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .keyboard-title {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: calc(13px * var(--font-scale)); color: var(--text-secondary);
+            font-weight: 500; margin-bottom: 10px; padding: 0 4px;
+        }
+        .keyboard-title .clear-btn {
+            background: #ef4444; color: white; border: none; padding: 4px 12px;
+            border-radius: 4px; font-size: calc(12px * var(--font-scale)); cursor: pointer;
+        }
+        .keyboard-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+        .keyboard-grid button {
+            padding: 10px 2px; border: 1px solid var(--border-light); border-radius: 4px;
+            background: var(--bg-card); font-size: calc(14px * var(--font-scale)); font-weight: 600;
+            color: var(--text-primary); cursor: pointer; text-align: center;
+            transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.1s;
+        }
+        .keyboard-grid button:active { background: var(--green-primary); color: white; transform: scale(0.92); }
+
+        /* ============ 快捷按钮组 ============ */
+        .quick { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; padding: 0 16px; }
+        .quick button {
+            background: var(--bg-card); border: 1px solid var(--border-light);
+            padding: 6px 14px; border-radius: 4px; font-size: calc(12px * var(--font-scale));
+            color: var(--text-primary); cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .quick button:active { background: var(--bg-hover); }
+
+        /* ============ 结果卡片 ============ */
+        .result-card {
+            background: var(--bg-card);
+            margin: 8px 0;
+            padding: 16px;
+            border-top: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .card-row {
+            display: flex; padding: 8px 0; border-bottom: 1px solid var(--border-inner);
+        }
+        .card-row:last-child { border-bottom: none; flex-wrap: wrap; }
+        .label { width: 100px; font-weight: 500; color: var(--text-secondary); font-size: calc(14px * var(--font-scale)); flex-shrink: 0; }
+        .value { flex: 1; color: var(--text-value); font-weight: 500; font-size: calc(15px * var(--font-scale)); word-break: break-word; }
+
+        .badge {
+            display: inline-block; padding: 4px 12px; border-radius: 4px;
+            font-size: calc(13px * var(--font-scale)); font-weight: 500; margin: 2px 4px 2px 0;
+            border: 1px solid var(--border-light); background: var(--bg-input); color: var(--text-primary);
+            cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .badge.highlight { background: var(--highlight-bg); border-color: var(--highlight-border); }
+
+        .stats { font-size: calc(13px * var(--font-scale)); color: var(--text-secondary); margin: 12px 16px 6px; }
+
+        /* ============ 壁厚查询相关 ============ */
+        .dn-quick-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 6px 16px 12px; }
+        .dn-quick-grid button {
+            padding: 6px 2px; border: 1px solid var(--border-light); border-radius: 4px;
+            background: var(--bg-card); font-size: calc(11px * var(--font-scale)); color: var(--text-primary);
+            cursor: pointer; text-align: center;
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .dn-quick-grid button:active { background: var(--bg-hover); }
+        .dn-quick-grid button.active { background: var(--green-primary); color: white; border-color: var(--green-primary); }
+        .dn-quick-grid .dn-group-label {
+            grid-column: span 5; font-size: calc(11px * var(--font-scale)); color: var(--text-secondary);
+            padding: 8px 0 4px; border-bottom: 1px solid var(--border-inner); margin-top: 4px;
+        }
+
+        .schedule-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 6px 16px 12px; }
+        .schedule-grid button {
+            padding: 6px 2px; border: 1px solid var(--border-light); border-radius: 4px;
+            background: var(--bg-card); font-size: calc(11px * var(--font-scale)); color: var(--text-primary);
+            cursor: pointer; text-align: center;
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .schedule-grid button:active { background: var(--bg-hover); }
+        .schedule-grid button.active { background: var(--green-primary); color: white; border-color: var(--green-primary); }
+
+        /* 壁厚结果 */
+        .result-card-schedule {
+            background: var(--bg-card);
+            margin: 8px 0;
+            padding: 16px;
+            border-top: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .result-card-schedule .big-number { font-size: calc(28px * var(--font-scale)); font-weight: 700; color: var(--text-value); }
+        .result-card-schedule .big-number span { font-size: calc(16px * var(--font-scale)); font-weight: 400; color: var(--text-secondary); margin-left: 4px; }
+        .result-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-inner); }
+        .result-row:last-child { border-bottom: none; }
+        .result-row .rlabel { color: var(--text-secondary); font-size: calc(14px * var(--font-scale)); }
+        .result-row .rvalue { font-weight: 600; font-size: calc(16px * var(--font-scale)); color: var(--text-value); }
+        .result-row .rvalue .unit { font-weight: 400; font-size: calc(13px * var(--font-scale)); color: var(--text-secondary); margin-left: 4px; }
+
+        /* ============ 弯头计算器 ============ */
+        .bend-calc-card {
+            background: var(--bg-card); margin: 8px 0; padding: 20px 16px;
+            border-top: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light);
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .bend-calc-title {
+            font-size: calc(17px * var(--font-scale)); font-weight: 600; color: var(--text-primary);
+            margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
+        }
+        .bend-calc-title span { background: var(--green-primary); color: white; font-size: calc(11px * var(--font-scale)); padding: 3px 10px; border-radius: 4px; }
+        .bend-calc-sub { color: var(--text-secondary); font-size: calc(12px * var(--font-scale)); margin-bottom: 16px; padding-left: 10px; border-left: 3px solid var(--green-primary); }
+        .bend-field { margin-bottom: 12px; }
+        .bend-field label { display: block; font-size: calc(13px * var(--font-scale)); font-weight: 500; color: var(--text-primary); margin-bottom: 6px; }
+        .bend-field select, .bend-field input {
+            width: 100%; padding: 11px 14px; border: 1px solid var(--border-light); border-radius: 4px;
+            font-size: calc(15px * var(--font-scale)); background: var(--bg-card); outline: none; color: var(--text-primary);
+            font-family: system-ui, sans-serif;
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .bend-field select:focus, .bend-field input:focus { border-color: var(--green-primary); }
+        .bend-btn-row { display: flex; gap: 10px; margin-top: 14px; margin-bottom: 16px; }
+        .bend-btn { flex: 1; padding: 12px 14px; border: none; border-radius: 4px; font-weight: 600; font-size: calc(14px * var(--font-scale)); cursor: pointer; }
+        .bend-btn:active { transform: scale(0.97); }
+        .bend-btn-primary { background: var(--green-primary); color: white; }
+        .bend-btn-secondary { background: var(--bg-hover); color: var(--text-primary); }
+        .bend-result-card { background: var(--bg-input); border-radius: 4px; padding: 16px 14px; border: 1px solid var(--border-light); transition: background 0.2s, border-color 0.2s; }
+        .bend-result-title {
+            font-size: calc(12px * var(--font-scale)); font-weight: 600; color: var(--green-primary);
+            margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+        }
+        .bend-badge { background: var(--bg-card); padding: 4px 12px; border-radius: 4px; font-size: calc(11px * var(--font-scale)); font-weight: 500; color: var(--green-primary); border: 1px solid var(--border-light); }
+        .bend-result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .bend-result-item { background: var(--bg-card); border-radius: 4px; padding: 10px 12px; }
+        .bend-result-label { font-size: calc(11px * var(--font-scale)); color: var(--text-secondary); margin-bottom: 4px; }
+        .bend-result-value { font-size: calc(22px * var(--font-scale)); font-weight: 700; color: var(--text-value); }
+        .bend-result-unit { font-size: calc(12px * var(--font-scale)); color: var(--text-secondary); margin-left: 3px; }
+        .bend-error { color: #c0392b; font-size: calc(13px * var(--font-scale)); margin-top: 8px; padding: 8px 12px; background: #fdecea; border-radius: 4px; }
+
+        /* ============ 对话框 ============ */
+        .dialog-input {
+            width: 100%; padding: 12px 16px; border: 1px solid var(--border-light); border-radius: 4px;
+            font-size: calc(15px * var(--font-scale)); margin-bottom: 12px; outline: none;
+            font-family: system-ui, sans-serif; background: var(--bg-card); color: var(--text-primary);
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .dialog-input:focus { border-color: var(--green-primary); }
+
+        /* ============ 底部 Tab ============ */
+        .bottom-tabs {
+            position: fixed;
+            bottom: 0; left: 50%; transform: translateX(-50%);
+            max-width: 480px; width: 100%;
+            background: var(--bg-tab);
+            display: flex;
+            border-top: 1px solid var(--border-light);
+            padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+            z-index: 200;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .bottom-tabs .tab-item {
+            flex: 1;
+            background: none; border: none;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 3px; padding: 4px 0;
+            cursor: pointer; color: var(--text-secondary);
+            transition: color 0.15s;
+            -webkit-tap-highlight-color: transparent;
+            position: relative;
+        }
+        .bottom-tabs .tab-item svg {
+            width: 24px; height: 24px;
+            transition: transform 0.15s;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .bottom-tabs .tab-item .tab-label { font-size: calc(10px * var(--font-scale)); line-height: 1; font-weight: 500; }
+        .bottom-tabs .tab-item.active { color: var(--green-primary); }
+        .bottom-tabs .tab-item.active .tab-label { font-weight: 600; }
+        .bottom-tabs .tab-item:active svg { transform: scale(0.9); }
+        .bottom-tabs .tab-item .badge {
+            position: absolute;
+            top: 2px; right: 50%; margin-right: -22px;
+            background: #FA5151; color: white;
+            font-size: calc(9px * var(--font-scale)); min-width: 16px; height: 16px; line-height: 16px;
+            text-align: center; border-radius: 8px; padding: 0 4px;
+            font-weight: 500;
+        }
+
+        /* ============ 范围汇总弹窗 ============ */
+        .range-dialog { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9998; justify-content: center; align-items: flex-start; padding: 20px 12px; overflow-y: auto; }
+        .range-dialog.active { display: flex; }
+        .range-dialog-inner {
+            background: var(--bg-dialog); border-radius: 8px; padding: 20px 16px;
+            max-width: 480px; width: 100%; box-shadow: var(--shadow);
+            transition: background 0.2s;
+        }
+        .range-dialog-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-light);
+        }
+        .range-dialog-header h3 { font-size: calc(16px * var(--font-scale)); color: var(--text-primary); }
+        .range-dialog-header .close-x {
+            background: var(--bg-hover); border: none; width: 32px; height: 32px;
+            border-radius: 4px; font-size: calc(16px * var(--font-scale)); cursor: pointer; color: var(--text-secondary);
+        }
+
+        /* ============ 通用弹窗 ============ */
+        .dialog-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center; }
+        .dialog-overlay.active { display: flex; }
+        .dialog {
+            background: var(--bg-dialog); border-radius: 8px; padding: 24px 20px;
+            max-width: 380px; width: 88%; box-shadow: var(--shadow);
+            transition: background 0.2s;
+        }
+        .dialog h3 { font-size: calc(17px * var(--font-scale)); color: var(--text-primary); margin-bottom: 12px; }
+        .dialog p { font-size: calc(13px * var(--font-scale)); color: var(--text-secondary); margin-bottom: 12px; }
+        .dialog textarea {
+            width: 100%; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: 4px;
+            font-size: calc(14px * var(--font-scale)); font-family: system-ui, sans-serif; resize: vertical; outline: none;
+            box-sizing: border-box; background: var(--bg-card); color: var(--text-primary);
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .dialog textarea:focus { border-color: var(--green-primary); }
+
+        /* ============ Toast ============ */
+        .toast {
+            position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+            background: var(--bg-toast); color: var(--text-primary); padding: 10px 20px;
+            border-radius: 4px; font-size: calc(14px * var(--font-scale)); z-index: 9999;
+            display: none; max-width: 80%; text-align: center;
+            transition: background 0.2s, color 0.2s;
+        }
+        .toast.show { display: block; animation: toastIn 0.3s ease; }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+        /* ============ 工具类 ============ */
+        .hidden { display: none !important; }
+
+        /* ============ 支架状态徽章 ============ */
+        .result-card .status-badge {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 4px;
+            font-size: calc(13px * var(--font-scale));
+            font-weight: 600;
+        }
+        .result-card .status-badge.status-installed     { background: var(--green-bg); color: var(--green-text); }
+        .result-card .status-badge.status-checking      { background: var(--amber-bg); color: var(--amber-text); }
+        .result-card .status-badge.status-not-installed { background: var(--red-bg); color: var(--red-text); }
+        .result-card .status-badge.status-other         { background: var(--purple-bg); color: var(--purple-text); }
+        .status-empty { color: var(--text-tertiary); font-size: calc(13px * var(--font-scale)); }
+
+        /* ============ 备注显示 ============ */
+        .remark-display { font-size: calc(14px * var(--font-scale)); color: var(--text-primary); line-height: 1.6; word-break: break-all; }
+        .remark-empty   { color: var(--text-secondary); font-size: calc(14px * var(--font-scale)); }
+        .remark-pending { color: #f59e0b; font-size: calc(12px * var(--font-scale)); margin-left: 6px; }
+
+        /* ============ 设置面板（新增） ============ */
+        .settings-panel {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 10000;
+            display: none; justify-content: center; align-items: flex-end;
+            padding: 0 12px 12px;
+        }
+        .settings-panel.active { display: flex; }
+        .settings-inner {
+            background: var(--bg-dialog); border-radius: 12px 12px 8px 8px;
+            padding: 24px 20px 30px; max-width: 480px; width: 100%;
+            box-shadow: var(--shadow); max-height: 80vh; overflow-y: auto;
+            transition: background 0.2s;
+        }
+        .settings-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border-light);
+        }
+        .settings-header h3 { font-size: calc(18px * var(--font-scale)); color: var(--text-primary); }
+        .settings-header .close-settings {
+            background: var(--bg-hover); border: none; width: 36px; height: 36px;
+            border-radius: 50%; font-size: calc(18px * var(--font-scale)); cursor: pointer; color: var(--text-secondary);
+        }
+
+        .settings-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 0; border-bottom: 1px solid var(--border-inner);
+        }
+        .settings-row:last-child { border-bottom: none; }
+        .settings-row .settings-label {
+            font-size: calc(15px * var(--font-scale)); color: var(--text-primary); font-weight: 500;
+        }
+        .settings-row .settings-desc {
+            font-size: calc(12px * var(--font-scale)); color: var(--text-secondary); margin-top: 2px;
+        }
+        .settings-row .settings-control { display: flex; align-items: center; gap: 10px; }
+
+        /* 开关 */
+        .toggle-switch {
+            position: relative; width: 52px; height: 30px;
+            background: var(--border-light); border-radius: 15px;
+            cursor: pointer; transition: background 0.25s;
+            border: none; outline: none; flex-shrink: 0;
+        }
+        .toggle-switch::after {
+            content: ''; position: absolute; top: 3px; left: 3px;
+            width: 24px; height: 24px; border-radius: 50%;
+            background: white; transition: transform 0.25s;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+        .toggle-switch.active { background: var(--green-primary); }
+        .toggle-switch.active::after { transform: translateX(22px); }
+
+        /* 字体大小控制 */
+        .font-size-btns { display: flex; gap: 8px; align-items: center; }
+        .font-size-btns button {
+            width: 40px; height: 40px; border-radius: 8px;
+            border: 1px solid var(--border-light); background: var(--bg-card);
+            font-size: calc(18px * var(--font-scale)); font-weight: 700;
+            color: var(--text-primary); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .font-size-btns button:active { background: var(--bg-hover); }
+        .font-size-btns button:disabled { opacity: 0.3; cursor: not-allowed; }
+        .font-size-btns .font-size-value {
+            font-size: calc(14px * var(--font-scale)); font-weight: 600;
+            color: var(--text-primary); min-width: 44px; text-align: center;
+        }
+
+        /* 底部设置按钮 */
+        .settings-float-btn {
+            position: fixed;
+            bottom: calc(80px + env(safe-area-inset-bottom));
+            right: 16px;
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            background: var(--green-primary);
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(7, 193, 96, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 199;
+            transition: transform 0.2s, background 0.2s;
+        }
+        .settings-float-btn:active { transform: scale(0.92); }
+        .settings-float-btn svg { width: 24px; height: 24px; fill: none; stroke: white; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* ============ 响应式 ============ */
+        @media (max-width: 400px) {
+            .label { width: 80px; font-size: calc(13px * var(--font-scale)); }
+            .keyboard-grid { grid-template-columns: repeat(7, 1fr); }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+
+    <!-- 顶部导航栏 -->
+    <div class="navbar">
+        <span class="status-badge online" id="statusBadge">✅ 在线</span>
+        <span class="status-badge" id="userBadge" onclick="promptUserName()" style="left:auto;right:60px;background:var(--bg-hover);color:var(--text-primary);display:none;cursor:pointer;">👤</span>
+        <h1 id="mainTitle">工作量</h1>
+        <button class="right-btn" onclick="showInfo()">⋯</button>
+    </div>
+
+    <!-- ==================== 页面 1：工作量 ==================== -->
+    <div id="pageWork" class="page-mode active">
+        <!-- 二级 Tab -->
+        <div class="sub-tabs">
+            <button class="active" id="subTabWork" onclick="switchSubTab('work')">工作量</button>
+            <button id="subTabTotal" onclick="switchSubTab('total')">总量</button>
+        </div>
+
+        <!-- 子页 1：工作量 -->
+        <div id="subPageWork">
+            <div class="date-bar">
+                <div class="date-info">
+                    <div class="date-label">📅 显示日期</div>
+                    <div class="date-value" id="workCurrentDateDisplay">加载中...</div>
+                </div>
+                <button class="change-btn" onclick="changeWorkDate()">改日期</button>
+            </div>
+
+            <div class="range-bar">
+                <div class="range-title">📈 日期范围汇总</div>
+                <div class="range-flex">
+                    <input type="date" id="workRangeFrom">
+                    <span style="color:#7F7F7F;">~</span>
+                    <input type="date" id="workRangeTo">
+                    <button class="range-btn" onclick="openRangeSummary()">查询</button>
+                </div>
+            </div>
+
+            <div id="workDailyContent">
+                <div class="no-result"><span>⏳</span>正在加载工作量...</div>
+            </div>
+        </div>
+
+        <!-- 子页 2：总量 -->
+        <div id="subPageTotal" style="display:none;">
+            <div id="workTotalContent">
+                <div class="no-result"><span>⏳</span>正在加载总量...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 页面 2：管线 ==================== -->
+    <div id="pagePipeline" class="page-mode">
+        <div class="subitem-box">
+            <label for="subItemSelect">子项号：</label>
+            <select id="subItemSelect" onchange="onSubItemChange()">
+                <option value="">全部</option>
+            </select>
+        </div>
+        <div class="search-box" id="pipelineSearch">
+            <input type="text" id="pipelineInput" placeholder="输入管线号或点下方按键">
+            <button id="pipelineBtn">查询</button>
+        </div>
+        <div class="keyboard-panel">
+            <div class="keyboard-title">
+                <span>⌨️ 快捷输入</span>
+                <button type="button" onclick="clearPipelineInput()" class="clear-btn">清空</button>
+            </div>
+            <div class="keyboard-grid" id="keyboardGrid"></div>
+        </div>
+        <div id="resultAreaPipeline"></div>
+    </div>
+
+    <!-- ==================== 页面 3：支架 ==================== -->
+    <div id="pageBracket" class="page-mode">
+        <div class="search-box" id="bracketSearch">
+            <input type="text" id="bracketInput" placeholder="输入支架号，如 12-SUP-30194">
+            <button id="bracketBtn">查支架</button>
+        </div>
+        <div class="quick" id="bracketQuick">
+            <button data-bracket="12-SUP-">12-SUP-</button>
+            <button data-bracket="13-SUP-">13-SUP-</button>
+            <button data-bracket="15-SUP-">15-SUP-</button>
+            <button data-bracket="20-SUP-">20-SUP-</button>
+        </div>
+        <div id="resultAreaBracket"></div>
+    
+        <!-- 👇 新增：刷新按钮 -->
+        <div style="padding: 10px 16px 0;">
+            <button onclick="refreshBracketData()" id="bracketRefreshBtn" style="width:100%;padding:12px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:15px;font-weight:600;cursor:pointer;">🔄 刷新支架数据</button>
+        </div>
+        <!-- 👆 新增结束 -->
+    
+        <div id="bracketTotalArea"></div>	
+    </div>
+
+    <!-- ==================== 页面 4：阀门 ==================== -->
+    <!-- ==================== 页面 4：阀门 ==================== -->
+    <div id="pageValve" class="page-mode">
+        <div class="search-box" id="valveSearch">
+            <input type="text" id="valveInput" placeholder="输入阀门位号，如 565-GV-0026">
+            <button id="valveBtn">查阀门</button>
+        </div>
+        <div class="quick" id="valveQuick">
+            <button data-valve="565-GV-">565-GV-</button>
+            <button data-valve="567-GV-">567-GV-</button>
+            <button data-valve="567-CV-">567-CV-</button>
+            <button data-valve="569-GV-">569-GV-</button>
+        </div>
+        <div id="resultAreaValve"></div>
+    
+        <!-- 👇 新增：刷新按钮 -->
+        <div style="padding: 10px 16px 0;">
+            <button onclick="refreshValveData()" id="valveRefreshBtn" style="width:100%;padding:12px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:15px;font-weight:600;cursor:pointer;">🔄 刷新阀门数据</button>
+        </div>
+        <!-- 👆 新增结束 -->
+    
+        <!-- 阀门总量 + 细分 容器 -->
+        <div id="valveTotalArea"></div>
+    </div>
+
+    <!-- ==================== 页面 5：壁厚 ==================== -->
+    <div id="pageSchedule" class="page-mode">
+        <div class="search-box" id="scheduleSearch">
+            <input type="text" id="scheduleInput" placeholder="输入公称直径，如 DN100 或 100">
+            <button id="scheduleBtn">查询</button>
+        </div>
+        <div style="padding: 12px 16px 4px; font-size: 12px; color: #7F7F7F;">💡 快速选择公称直径</div>
+        <div class="dn-quick-grid" id="dnQuickGrid">
+            <div class="dn-group-label">小口径 DN6-DN50</div>
+            <button data-dn="DN6">DN6</button>
+            <button data-dn="DN8">DN8</button>
+            <button data-dn="DN10">DN10</button>
+            <button data-dn="DN15">DN15</button>
+            <button data-dn="DN20">DN20</button>
+            <button data-dn="DN25">DN25</button>
+            <button data-dn="DN32">DN32</button>
+            <button data-dn="DN40">DN40</button>
+            <button data-dn="DN50">DN50</button>
+            <div class="dn-group-label">中口径 DN65-DN200</div>
+            <button data-dn="DN65">DN65</button>
+            <button data-dn="DN80">DN80</button>
+            <button data-dn="DN90">DN90</button>
+            <button data-dn="DN100">DN100</button>
+            <button data-dn="DN125">DN125</button>
+            <button data-dn="DN150">DN150</button>
+            <button data-dn="DN200">DN200</button>
+            <div class="dn-group-label">大口径 DN250-DN1000</div>
+            <button data-dn="DN250">DN250</button>
+            <button data-dn="DN300">DN300</button>
+            <button data-dn="DN350">DN350</button>
+            <button data-dn="DN400">DN400</button>
+            <button data-dn="DN450">DN450</button>
+            <button data-dn="DN500">DN500</button>
+            <button data-dn="DN550">DN550</button>
+            <button data-dn="DN600">DN600</button>
+            <button data-dn="DN650">DN650</button>
+            <button data-dn="DN700">DN700</button>
+            <button data-dn="DN750">DN750</button>
+            <button data-dn="DN800">DN800</button>
+            <button data-dn="DN850">DN850</button>
+            <button data-dn="DN900">DN900</button>
+            <button data-dn="DN950">DN950</button>
+            <button data-dn="DN1000">DN1000</button>
+        </div>
+        <div style="padding: 12px 16px 4px; font-size: 12px; color: #7F7F7F;">💡 选择壁厚代码</div>
+        <div class="schedule-grid" id="scheduleGrid">
+            <button data-sch="SCH5S">SCH5S</button>
+            <button data-sch="SCH10S">SCH10S</button>
+            <button data-sch="SCH40S">SCH40S</button>
+            <button data-sch="SCH80S">SCH80S</button>
+            <button data-sch="SCH10">SCH10</button>
+            <button data-sch="SCH20">SCH20</button>
+            <button data-sch="SCH30">SCH30</button>
+            <button data-sch="STD">STD</button>
+            <button data-sch="SCH40">SCH40</button>
+            <button data-sch="SCH60">SCH60</button>
+            <button data-sch="XS">XS</button>
+            <button data-sch="SCH80">SCH80</button>
+            <button data-sch="SCH100">SCH100</button>
+            <button data-sch="SCH120">SCH120</button>
+            <button data-sch="SCH140">SCH140</button>
+            <button data-sch="SCH160">SCH160</button>
+            <button data-sch="XXS">XXS</button>
+        </div>
+        <div id="scheduleResult" style="margin-top:12px;"></div>
+
+        <!-- 弯头计算器 -->
+        <div class="bend-calc-card">
+            <div class="bend-calc-title">⚙️ 弯头计算器 <span>1.5D</span></div>
+            <div class="bend-calc-sub">ASME B16.9 长半径 · 任意角度 · 支持自定义管径</div>
+            <div class="bend-field">
+                <label for="npsSelect">📋 选择标准公称尺寸 (NPS)</label>
+                <select id="npsSelect">
+                    <option value="1/2">1/2"</option><option value="3/4">3/4"</option>
+                    <option value="1">1"</option><option value="1-1/4">1-1/4"</option>
+                    <option value="1-1/2">1-1/2"</option><option value="2">2"</option>
+                    <option value="2-1/2">2-1/2"</option><option value="3">3"</option>
+                    <option value="4" selected>4"</option><option value="5">5"</option>
+                    <option value="6">6"</option><option value="8">8"</option>
+                    <option value="10">10"</option><option value="12">12"</option>
+                    <option value="14">14"</option><option value="16">16"</option>
+                    <option value="18">18"</option><option value="20">20"</option>
+                    <option value="24">24"</option>
+                </select>
+            </div>
+            <div class="bend-field">
+                <label for="customNpsInput">✏️ 或手动输入公称尺寸</label>
+                <input type="text" id="customNpsInput" placeholder="例如: 1-1/4, 2.5, 4, 6" value="">
+            </div>
+            <div class="bend-field">
+                <label for="angleInput">📐 弯头角度 (°)</label>
+                <input type="number" id="angleInput" value="90" min="1" max="179.9" step="0.1">
+            </div>
+            <div class="bend-btn-row">
+                <button class="bend-btn bend-btn-primary" id="calcBtn">计算</button>
+                <button class="bend-btn bend-btn-secondary" id="resetBtn">重置</button>
+            </div>
+            <div class="bend-result-card">
+                <div class="bend-result-title">
+                    <span>📊 计算结果</span>
+                    <span class="bend-badge" id="bendRadiusBadge">R = 152.4 mm</span>
+                </div>
+                <div class="bend-result-grid">
+                    <div class="bend-result-item">
+                        <div class="bend-result-label">🔹 中心到端面 A</div>
+                        <div class="bend-result-value" id="bendResultA">152.4<span class="bend-result-unit">mm</span></div>
+                    </div>
+                    <div class="bend-result-item">
+                        <div class="bend-result-label">📏 弧长 L</div>
+                        <div class="bend-result-value" id="bendResultL">239.39<span class="bend-result-unit">mm</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="bend-error" id="bendErrorMsg" style="display:none;"></div>
+        </div>
+    </div>
+
+    <!-- ==================== 底部 Tab ==================== -->
+    <div class="bottom-tabs">
+        <button class="tab-item active" id="tabWork" onclick="switchPage('work')">
+            <svg viewBox="0 0 24 24">
+                <rect x="3" y="12" width="4" height="9" rx="1"/>
+                <rect x="10" y="6" width="4" height="15" rx="1"/>
+                <rect x="17" y="3" width="4" height="18" rx="1"/>
+            </svg>
+            <span class="tab-label">工作量</span>
+        </button>
+
+        <button class="tab-item" id="tabPipeline" onclick="switchPage('pipeline')">
+            <svg viewBox="0 0 24 24">
+                <path d="M4 6h6a4 4 0 0 1 4 4v4a4 4 0 0 0 4 4h2"/>
+                <circle cx="4" cy="6" r="1.5"/>
+                <circle cx="20" cy="18" r="1.5"/>
+            </svg>
+            <span class="tab-label">管线</span>
+        </button>
+
+        <button class="tab-item" id="tabBracket" onclick="switchPage('bracket')">
+            <svg viewBox="0 0 24 24">
+                <path d="M4 20V8l8-4 8 4v12"/>
+                <path d="M4 14h16"/>
+                <path d="M12 4v16"/>
+            </svg>
+            <span class="tab-label">支架</span>
+        </button>
+
+        <button class="tab-item" id="tabValve" onclick="switchPage('valve')">
+            <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="7"/>
+                <path d="M12 5v14"/>
+                <path d="M5 12h14"/>
+                <path d="M12 2v2M12 20v2M2 12h2M20 12h2"/>
+            </svg>
+            <span class="tab-label">阀门</span>
+        </button>
+
+        <button class="tab-item" id="tabSchedule" onclick="switchPage('schedule')">
+            <svg viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <path d="M7 7v10"/>
+                <path d="M7 9h10"/>
+                <path d="M7 13h6"/>
+            </svg>
+            <span class="tab-label">壁厚</span>
+        </button>
+    </div>
+
+    <!-- 设置悬浮按钮 -->
+    <button class="settings-float-btn" id="settingsFloatBtn" onclick="openSettings()" aria-label="设置">
+        <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+    </button>
+
+    <!-- 版本信息 -->
+    <div style="text-align:center;padding:20px 16px 10px;font-size:12px;color:var(--text-secondary);">
+        数据版本 <span id="currentVersion">1.0.0</span> · 支持热更新
+    </div>
+
+</div>   <!-- .app 结束 -->
+
+<!-- ============ 范围汇总弹窗 ============ -->
+<div class="range-dialog" id="rangeDialog" onclick="if(event.target===this) closeRangeDialog()">
+    <div class="range-dialog-inner">
+        <div class="range-dialog-header">
+            <h3 id="rangeDialogTitle">📈 范围汇总</h3>
+            <button class="close-x" onclick="closeRangeDialog()">✕</button>
+        </div>
+        <div id="rangeDialogContent">
+            <div class="no-result"><span>⏳</span>正在加载...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 备注编辑弹框 ============ -->
+<div class="dialog-overlay" id="noteDialog">
+    <div class="dialog">
+        <h3>📝 编辑备注</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">
+            录入人：<span id="noteDialogUser" style="color:var(--green-primary);font-weight:600;">—</span>
+            <button onclick="changeNoteUser()" style="margin-left:8px;padding:3px 10px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:4px;font-size:12px;cursor:pointer;">修改</button>
+        </p>
+        <textarea id="noteDialogInput" rows="4" placeholder="请输入支架位置信息..." style="min-height: 100px;"></textarea>
+        <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+            <button onclick="closeNoteDialog()" style="padding:8px 18px;background:var(--bg-hover);border:none;border-radius:4px;font-size:14px;cursor:pointer;color:var(--text-primary);">取消</button>
+            <button onclick="deleteNoteFromDialog()" style="padding:8px 18px;background:#ef4444;color:white;border:none;border-radius:4px;font-size:14px;cursor:pointer;">🗑️ 删除</button>
+            <button onclick="saveNoteFromDialog()" style="padding:8px 18px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:14px;cursor:pointer;">💾 保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 阀门录入弹框 ============ -->
+<div class="dialog-overlay" id="valveDialog">
+    <div class="dialog">
+        <h3>🚪 阀门数据录入</h3>
+        <p id="valveDialogTag">阀门位号：—</p>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
+            录入人：<span id="valveDialogUser" style="color:var(--green-primary);font-weight:600;">—</span>
+            <button onclick="changeValveUser()" style="margin-left:8px;padding:3px 10px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:4px;font-size:12px;cursor:pointer;">修改</button>
+        </p>
+        <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">焊口号1</label>
+        <input type="text" id="valveWeld1" class="dialog-input" placeholder="如 S02">
+        <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">焊口号2</label>
+        <input type="text" id="valveWeld2" class="dialog-input" placeholder="如 S03">
+        <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">阀门序列号</label>
+        <input type="text" id="valveSerial" class="dialog-input" placeholder="如 B24040030-6-77">
+        <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+            <button onclick="closeValveDialog()" style="padding:8px 18px;background:var(--bg-hover);border:none;border-radius:4px;font-size:14px;cursor:pointer;color:var(--text-primary);">取消</button>
+            <button onclick="saveValveFromDialog()" style="padding:8px 18px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:14px;cursor:pointer;">确认上传</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 焊口信息弹窗 ============ -->
+<div class="dialog-overlay" id="weldDialog">
+    <div class="dialog" style="max-height:80vh;overflow-y:auto;">
+        <h3 id="weldDialogTitle">🔍 焊口信息</h3>
+        <div id="weldDialogBody"></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+            <button onclick="closeWeldDialog()" style="padding:8px 22px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:14px;cursor:pointer;">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 添加尾项弹窗 ============ -->
+<div class="dialog-overlay" id="tailDialog">
+    <div class="dialog">
+        <h3>➕ 添加尾项</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">
+            录入人：<span id="tailDialogUser" style="color:var(--green-primary);font-weight:600;">—</span>
+            <button onclick="changeTailUser()" style="margin-left:8px;padding:3px 10px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:4px;font-size:12px;cursor:pointer;">修改</button>
+        </p>
+        <input type="text" id="tailDialogInput" placeholder="请输入尾项内容..." class="dialog-input">
+        <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
+            <button onclick="closeTailDialog()" style="padding:8px 18px;background:var(--bg-hover);border:none;border-radius:4px;font-size:14px;cursor:pointer;color:var(--text-primary);">取消</button>
+            <button onclick="saveTailFromDialog()" style="padding:8px 18px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:14px;cursor:pointer;">上传</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 设置面板 ============ -->
+<div class="settings-panel" id="settingsPanel">
+    <div class="settings-inner">
+        <div class="settings-header">
+            <h3>⚙️ 设置</h3>
+            <button class="close-settings" onclick="closeSettings()">✕</button>
+        </div>
+
+        <!-- 深色模式开关 -->
+        <div class="settings-row">
+            <div>
+                <div class="settings-label">🌙 深色模式</div>
+                <div class="settings-desc">切换深色/浅色外观</div>
+            </div>
+            <div class="settings-control">
+                <button class="toggle-switch" id="darkModeToggle" onclick="toggleDarkMode()" aria-label="深色模式开关"></button>
+            </div>
+        </div>
+
+        <!-- 字体大小调节 -->
+        <div class="settings-row">
+            <div>
+                <div class="settings-label">🔤 字体大小</div>
+                <div class="settings-desc">调整全局字体缩放比例</div>
+            </div>
+            <div class="settings-control">
+                <div class="font-size-btns">
+                    <button id="fontDecreaseBtn" onclick="decreaseFontSize()" aria-label="减小字体">−</button>
+                    <span class="font-size-value" id="fontSizeValue">100%</span>
+                    <button id="fontIncreaseBtn" onclick="increaseFontSize()" aria-label="增大字体">+</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 恢复默认 -->
+        <div class="settings-row" style="border-bottom:none;justify-content:center;padding-top:20px;">
+            <button onclick="resetAllSettings()" style="padding:10px 28px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:6px;font-size:14px;cursor:pointer;color:var(--text-primary);font-weight:500;">恢复默认设置</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+<script>
+// ============================================================
+//                    配置
+// ============================================================
+var APP_VERSION = '1.0.0';
+var currentVersion = APP_VERSION;
+var UPDATE_URL = 'https://app-rho-nine-41.vercel.app/version.json';
+var API_BASE_URL = 'https://app-rho-nine-41.vercel.app/api';
+var DATA1_URL = 'https://app-rho-nine-41.vercel.app/data1.json';
+var DATA2_URL = 'https://app-rho-nine-41.vercel.app/data2.json';
+var DATA3_URL = 'https://app-rho-nine-41.vercel.app/data3.json';
+var DATA4_URL = 'https://app-rho-nine-41.vercel.app/data4.json';
+var DATA5_URL = 'https://app-rho-nine-41.vercel.app/data5.json';
+var SCHEDULE_URL = 'https://app-rho-nine-41.vercel.app/schedule.json';
+var ELBOW_URL = 'https://app-rho-nine-41.vercel.app/elbow.json';
+var SUBITEMS_URL = 'https://app-rho-nine-41.vercel.app/subitems.json';
+var PIPELINE_URL = 'https://app-rho-nine-41.vercel.app/data.json';
+var WORK_API = API_BASE_URL + '/work';
+var TAIL_ITEMS_API = API_BASE_URL + '/tails?action=get-all';
+var TAIL_GET_API   = API_BASE_URL + '/tails?action=get';
+var TAIL_SAVE_API  = API_BASE_URL + '/tails?action=save';
+
+// ============================================================
+//                    全局状态
+// ============================================================
+var pipelineData = [];
+var dataLoaded = false;
+var currentPage = 'work';
+var currentSubTab = 'work';
+
+var scheduleData = {};
+var elbowData = {};
+
+var bracketStatusMap = {};
+var valveDataMap = {};
+var valvePendingMap = {};
+var data5Map = {};
+
+var weldInfoMap = {};
+var weldInfoLoaded = false;
+var weldInfoLoading = false;
+
+var tailItemsCache = {};
+var tailPendingMap = {};
+
+var workTeams = [];
+var workColumns = [];
+var workCurrentDate = '';
+var workDailyRecords = {};
+
+var toastTimer = null;
+var selectedDN = '';
+var selectedSCH = '';
+var valveDialogTag = '';
+var noteDialogData = {};
+var tailDialogData = {};
+
+// ========== 设置相关 ==========
+var DARK_MODE_KEY = 'app_dark_mode';
+var FONT_SCALE_KEY = 'app_font_scale';
+var FONT_MIN = 0.8;
+var FONT_MAX = 1.5;
+var FONT_STEP = 0.1;
+var currentFontScale = 1;
+// ========== 当前用户 ==========
+var CURRENT_USER_KEY = 'app_current_user';
+var currentUser = '';   // 格式：姓名 或 工号+姓名
+
+// ============================================================
+//                    DOM 引用
+// ============================================================
+var mainTitle = document.getElementById('mainTitle');
+var statusBadge = document.getElementById('statusBadge');
+var toast = document.getElementById('toast');
+var pipelineInput = document.getElementById('pipelineInput');
+var pipelineBtn = document.getElementById('pipelineBtn');
+var bracketInput = document.getElementById('bracketInput');
+var bracketBtn = document.getElementById('bracketBtn');
+var valveInput = document.getElementById('valveInput');
+var valveBtn = document.getElementById('valveBtn');
+var scheduleInput = document.getElementById('scheduleInput');
+var scheduleBtn = document.getElementById('scheduleBtn');
+var scheduleResult = document.getElementById('scheduleResult');
+var resultAreaPipeline = document.getElementById('resultAreaPipeline');
+var resultAreaBracket = document.getElementById('resultAreaBracket');
+var resultAreaValve = document.getElementById('resultAreaValve');
+var currentVersionEl = document.getElementById('currentVersion');
+
+// ============================================================
+//                    设置功能
+// ============================================================
+function loadSettings() {
+    // 深色模式
+    var isDark = lsGet(DARK_MODE_KEY, false);
+    if (isDark) {
+        document.body.classList.add('dark-mode');
+    }
+    var toggle = document.getElementById('darkModeToggle');
+    if (toggle) {
+        toggle.classList.toggle('active', isDark);
+    }
+
+    // 字体大小
+    currentFontScale = lsGet(FONT_SCALE_KEY, 1);
+    applyFontScale(currentFontScale);
+}
+
+
+function applyFontScale(scale) {
+    currentFontScale = scale;
+    document.documentElement.style.setProperty('--font-scale', scale);
+    var valueEl = document.getElementById('fontSizeValue');
+    if (valueEl) {
+        valueEl.textContent = Math.round(scale * 100) + '%';
+    }
+    var decreaseBtn = document.getElementById('fontDecreaseBtn');
+    var increaseBtn = document.getElementById('fontIncreaseBtn');
+    if (decreaseBtn) decreaseBtn.disabled = scale <= FONT_MIN + 0.001;
+    if (increaseBtn) increaseBtn.disabled = scale >= FONT_MAX - 0.001;
+}
+
+function toggleDarkMode() {
+    var isDark = document.body.classList.toggle('dark-mode');
+    lsSet(DARK_MODE_KEY, isDark);
+    var toggle = document.getElementById('darkModeToggle');
+    if (toggle) {
+        toggle.classList.toggle('active', isDark);
+    }
+    // 更新 meta theme-color
+    var metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+        metaTheme.content = isDark ? '#1A1A1A' : '#07C160';
+    }
+}
+
+function increaseFontSize() {
+    if (currentFontScale < FONT_MAX - 0.001) {
+        applyFontScale(Math.round((currentFontScale + FONT_STEP) * 100) / 100);
+        lsSet(FONT_SCALE_KEY, currentFontScale);
+    }
+}
+
+function decreaseFontSize() {
+    if (currentFontScale > FONT_MIN + 0.001) {
+        applyFontScale(Math.round((currentFontScale - FONT_STEP) * 100) / 100);
+        lsSet(FONT_SCALE_KEY, currentFontScale);
+    }
+}
+
+function resetAllSettings() {
+    // 重置深色模式
+    document.body.classList.remove('dark-mode');
+    lsSet(DARK_MODE_KEY, false);
+    var toggle = document.getElementById('darkModeToggle');
+    if (toggle) toggle.classList.remove('active');
+    var metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.content = '#07C160';
+
+    // 重置字体大小
+    applyFontScale(1);
+    lsSet(FONT_SCALE_KEY, 1);
+
+    showToast('✅ 已恢复默认设置');
+}
+
+function openSettings() {
+    document.getElementById('settingsPanel').classList.add('active');
+}
+function closeSettings() {
+    document.getElementById('settingsPanel').classList.remove('active');
+}
+// 点击遮罩关闭
+document.getElementById('settingsPanel').addEventListener('click', function(e) {
+    if (e.target === this) closeSettings();
+});
+
+// ============================================================
+//                    localStorage 封装
+// ============================================================
+function lsGet(key, def) {
+    try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch(e) { return def; }
+}
+function lsSet(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+}
+
+// ========== 当前用户相关 ==========
+function getCurrentUser() {
+    return lsGet(CURRENT_USER_KEY, '');
+}
+function setCurrentUser(name) {
+    currentUser = name || '';
+    lsSet(CURRENT_USER_KEY, currentUser);
+    updateUserBadge();
+    // 👇 同步刷新所有弹框里的显示
+    if (typeof updateNoteDialogUser === 'function') updateNoteDialogUser();
+    if (typeof updateValveDialogUser === 'function') updateValveDialogUser();
+    if (typeof updateTailDialogUser === 'function') updateTailDialogUser();   // ← 新增这行
+}
+function updateUserBadge() {
+    var el = document.getElementById('userBadge');
+    if (!el) return;
+    if (currentUser) {
+        el.textContent = '👤 ' + currentUser;
+    } else {
+        el.textContent = '👤 设置姓名';
+    }
+    el.style.display = '';
+}
+function promptUserName() {
+    var name = prompt('请输入你的姓名（用于记录录入人）', currentUser || '');
+    if (name !== null) {
+        setCurrentUser(name.trim());
+        showToast(currentUser ? '✅ 已设置：' + currentUser : '已清除姓名');
+    }
+}
+
+// ============================================================
+//                    工具
+// ============================================================
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text).replace(/[&<>"']/g, function(m) {
+        var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return map[m];
+    });
+}
+function escapeJs(text) {
+    if (!text) return '';
+    return String(text).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+}
+function showToast(msg, duration) {
+    duration = duration || 3000;
+    toast.textContent = msg;
+    toast.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { toast.classList.remove('show'); }, duration);
+}
+function showInfo() {
+    alert('数据版本：' + APP_VERSION + '\n缓存状态：' + (navigator.onLine ? '在线' : '离线'));
+}
+
+// ============================================================
+//                    页面切换
+// ============================================================
+function switchPage(page) {
+    currentPage = page;
+    document.querySelectorAll('.page-mode').forEach(function(el) { el.classList.remove('active'); });
+    document.querySelectorAll('.bottom-tabs .tab-item').forEach(function(el) { el.classList.remove('active'); });
+
+    var titles = {
+        work: '工作量',
+        pipeline: '管线',
+        bracket: '支架',
+        valve: '阀门',
+        schedule: '壁厚'
+    };
+    mainTitle.textContent = titles[page] || '查询';
+
+    if (page === 'work') {
+        document.getElementById('pageWork').classList.add('active');
+        document.getElementById('tabWork').classList.add('active');
+        if (!workTeams.length) initWorkPage();
+    } else if (page === 'pipeline') {
+        document.getElementById('pagePipeline').classList.add('active');
+        document.getElementById('tabPipeline').classList.add('active');
+        showWelcomePipeline();
+    } else if (page === 'bracket') {
+        document.getElementById('pageBracket').classList.add('active');
+        document.getElementById('tabBracket').classList.add('active');
+        showWelcomeBracket();
+        renderBracketTotalArea();   // ✅ 新增：加载支架总量
+    } else if (page === 'valve') {
+        document.getElementById('pageValve').classList.add('active');
+        document.getElementById('tabValve').classList.add('active');
+        showWelcomeValve();
+        renderValveTotalArea();   // ✅ 新增：加载阀门总量 + 细分
+    } else if (page === 'schedule') {
+        document.getElementById('pageSchedule').classList.add('active');
+        document.getElementById('tabSchedule').classList.add('active');
+    }
+}
+
+function switchSubTab(tab) {
+    currentSubTab = tab;
+    document.getElementById('subTabWork').classList.toggle('active', tab === 'work');
+    document.getElementById('subTabTotal').classList.toggle('active', tab === 'total');
+    document.getElementById('subPageWork').style.display = tab === 'work' ? 'block' : 'none';
+    document.getElementById('subPageTotal').style.display = tab === 'total' ? 'block' : 'none';
+    if (tab === 'total') initTotalPage();
+}
+
+// ============================================================
+//                    静态库加载
+// ============================================================
+function loadStaticLibs() {
+    var cachedSchedule = lsGet('staticScheduleCache', null);
+    var cachedElbow = lsGet('staticElbowCache', null);
+    if (cachedSchedule) scheduleData = cachedSchedule;
+    if (cachedElbow) elbowData = cachedElbow;
+
+    return Promise.all([
+        fetch(SCHEDULE_URL + '?t=' + Date.now()).then(function(r) { return r.json(); }).catch(function() { return null; }),
+        fetch(ELBOW_URL + '?t=' + Date.now()).then(function(r) { return r.json(); }).catch(function() { return null; })
+    ]).then(function(results) {
+        if (results[0]) { scheduleData = results[0]; lsSet('staticScheduleCache', results[0]); }
+        if (results[1]) { elbowData = results[1]; lsSet('staticElbowCache', results[1]); }
+    });
+}
+
+function loadSubItems() {
+    var select = document.getElementById('subItemSelect');
+    var cached = lsGet('staticSubItemsCache', null);
+    if (cached && select) {
+        var html = '<option value="">全部</option>';
+        cached.forEach(function(s) { html += '<option value="' + escapeHtml(s) + '">' + escapeHtml(s) + '</option>'; });
+        select.innerHTML = html;
+    }
+
+    return fetch(SUBITEMS_URL + '?t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(items) {
+            if (items && select) {
+                var html = '<option value="">全部</option>';
+                items.forEach(function(s) { html += '<option value="' + escapeHtml(s) + '">' + escapeHtml(s) + '</option>'; });
+                select.innerHTML = html;
+                lsSet('staticSubItemsCache', items);
+            }
+        })
+        .catch(function() {
+            if (!cached) populateSubItemsFromPipeline();
+        });
+}
+
+function populateSubItemsFromPipeline() {
+    var select = document.getElementById('subItemSelect');
+    if (!select || !pipelineData || pipelineData.length === 0) return;
+    var set = {};
+    pipelineData.forEach(function(item) { if (item.subItem) set[item.subItem] = true; });
+    var items = Object.keys(set).sort();
+    var html = '<option value="">全部</option>';
+    items.forEach(function(s) { html += '<option value="' + s + '">' + s + '</option>'; });
+    select.innerHTML = html;
+}
+function onSubItemChange() {
+    var q = pipelineInput.value.trim();
+    if (q || document.getElementById('subItemSelect').value) searchPipeline();
+}
+function clearPipelineInput() {
+    pipelineInput.value = '';
+}
+
+// ============================================================
+//                    工作量页
+// ============================================================
+function initWorkPage() {
+    var to = new Date();
+    var from = new Date();
+    from.setDate(from.getDate() - 14);
+    var fmt = function(d) { return d.toISOString().slice(0, 10); };
+    document.getElementById('workRangeFrom').value = fmt(from);
+    document.getElementById('workRangeTo').value = fmt(to);
+    loadWorkLatestDate();
+}
+
+function loadWorkLatestDate() {
+    var box = document.getElementById('workDailyContent');
+    var cachedTeams = lsGet('workTeamsCache', null);
+    var cachedColumns = lsGet('workColumnsCache', null);
+    var cachedDate = lsGet('workLatestDate', null);
+    var cachedRecords = cachedDate ? lsGet('workDailyCache_' + cachedDate, null) : null;
+
+    if (cachedDate) {
+        document.getElementById('workCurrentDateDisplay').textContent = cachedDate;
+        workCurrentDate = cachedDate;
+    }
+
+    if (cachedTeams && cachedColumns && cachedRecords && cachedDate) {
+        workTeams = cachedTeams;
+        workColumns = cachedColumns;
+        workDailyRecords = cachedRecords;
+        renderWorkContent(box, workTeams, workColumns, workDailyRecords, cachedDate);
+    } else {
+        box.innerHTML = '<div class="no-result"><span>⏳</span>加载中...</div>';
+    }
+
+    Promise.all([
+        fetch(WORK_API + '?action=latest-records-get&t=' + Date.now()).then(function(r) { return r.json(); }),
+        fetch(WORK_API + '?action=teams-get&t=' + Date.now()).then(function(r) { return r.json(); }),
+        fetch(WORK_API + '?action=columns-get&t=' + Date.now()).then(function(r) { return r.json(); })
+    ]).then(function(results) {
+        var latest = results[0] || {};
+        var teams = (results[1] && results[1].data) || [];
+        var columns = (results[2] && results[2].data) || [];
+        var date = latest.date || new Date().toISOString().slice(0, 10);
+        var rows = latest.records || [];
+
+        workTeams = teams;
+        workColumns = columns;
+        workDailyRecords = {};
+        rows.forEach(function(r) {
+            var key = r.team_id + '_' + r.unit;
+            workDailyRecords[key] = { quantity: Number(r.quantity) || 0, note: r.note || '' };
+        });
+
+        document.getElementById('workCurrentDateDisplay').textContent = date;
+        workCurrentDate = date;
+        lsSet('workTeamsCache', teams);
+        lsSet('workColumnsCache', columns);
+        lsSet('workLatestDate', date);
+        lsSet('workDailyCache_' + date, workDailyRecords);
+        renderWorkContent(box, workTeams, workColumns, workDailyRecords, date);
+    }).catch(function(err) {
+        if (!cachedTeams) {
+            box.innerHTML = '<div class="no-result"><span>⚠️</span>加载失败：' + escapeHtml(err.message || '') + '</div>';
+        }
+    });
+}
+
+function changeWorkDate() {
+    var d = prompt('选择要显示的日期（YYYY-MM-DD）', workCurrentDate);
+    if (!d) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { alert('格式不对'); return; }
+    document.getElementById('workCurrentDateDisplay').textContent = d;
+    workCurrentDate = d;
+    lsSet('workLatestDate', d);
+    loadWorkDaily(d);
+}
+
+function loadWorkDaily(date) {
+    var box = document.getElementById('workDailyContent');
+    var cachedTeams = lsGet('workTeamsCache', null);
+    var cachedColumns = lsGet('workColumnsCache', null);
+    var cachedRecords = lsGet('workDailyCache_' + date, null);
+
+    if (cachedTeams && cachedColumns && cachedRecords) {
+        workTeams = cachedTeams;
+        workColumns = cachedColumns;
+        workDailyRecords = cachedRecords;
+        renderWorkContent(box, workTeams, workColumns, workDailyRecords, date);
+    } else {
+        box.innerHTML = '<div class="no-result"><span>⏳</span>加载 ' + escapeHtml(date) + ' 数据中...</div>';
+    }
+
+    Promise.all([
+        fetch(WORK_API + '?action=teams-get&t=' + Date.now()).then(function(r) { return r.json(); }),
+        fetch(WORK_API + '?action=columns-get&t=' + Date.now()).then(function(r) { return r.json(); }),
+        fetch(WORK_API + '?action=records-get&date=' + encodeURIComponent(date) + '&t=' + Date.now()).then(function(r) { return r.json(); })
+    ]).then(function(results) {
+        var teams = (results[0] && results[0].data) || [];
+        var columns = (results[1] && results[1].data) || [];
+        var rows = (results[2] && results[2].data) || [];
+
+        workTeams = teams;
+        workColumns = columns;
+        workDailyRecords = {};
+        rows.forEach(function(r) {
+            var key = r.team_id + '_' + r.unit;
+            workDailyRecords[key] = { quantity: Number(r.quantity) || 0, note: r.note || '' };
+        });
+
+        lsSet('workTeamsCache', teams);
+        lsSet('workColumnsCache', columns);
+        lsSet('workDailyCache_' + date, workDailyRecords);
+        renderWorkContent(box, workTeams, workColumns, workDailyRecords, date);
+    }).catch(function(err) {
+        if (!cachedTeams) {
+            box.innerHTML = '<div class="no-result"><span>⚠️</span>加载失败：' + escapeHtml(err.message || '') + '</div>';
+        }
+    });
+}
+
+function renderWorkContent(box, teams, columns, recordsMap, dateLabel) {
+    if (!teams.length) { box.innerHTML = '<div class="no-result"><span>👥</span>暂无班组数据</div>'; return; }
+    if (!columns.length) { box.innerHTML = '<div class="no-result"><span>📋</span>暂无列配置</div>'; return; }
+
+    var totals = {};
+    columns.forEach(function(c) { totals[c.col_key] = 0; });
+    teams.forEach(function(t) {
+        columns.forEach(function(c) {
+            var rec = recordsMap[t.id + '_' + c.col_key];
+            if (rec) totals[c.col_key] += Number(rec.quantity) || 0;
+        });
+    });
+
+    var fitters = {}, welders = {}, helpers = {};
+    teams.forEach(function(t) {
+        if (t.fitter && t.fitter.trim()) fitters[t.fitter.trim()] = 1;
+        if (t.welder && t.welder.trim()) welders[t.welder.trim()] = 1;
+        if (t.helper && t.helper.trim()) helpers[t.helper.trim()] = 1;
+    });
+    var fitterCnt = Object.keys(fitters).length;
+    var welderCnt = Object.keys(welders).length;
+    var helperCnt = Object.keys(helpers).length;
+
+    function getUnit(name) {
+        if (!name) return '个';
+        if (name.indexOf('重量') !== -1) return 'kg';
+        if (name.indexOf('阀门') !== -1) return '台';
+        if (name.indexOf('台') !== -1) return '台';
+        if (name.indexOf('管道') !== -1) return '寸';
+        if (name.indexOf('寸') !== -1) return '寸';
+        if (name.indexOf('支架') !== -1) return '个';
+        return '个';
+    }
+
+    var html = '';
+
+    // 合计
+    html += '<div class="total-card">';
+    html += '<div class="total-title">当日合计<span class="date-tag">' + escapeHtml(dateLabel) + '</span></div>';
+    html += '<div class="total-list">';
+    columns.forEach(function(c) {
+        var v = totals[c.col_key];
+        if (v === 0) return;
+        var display = (v % 1 === 0) ? v : v.toFixed(2);
+        html += '<div class="total-row"><span class="row-label">' + escapeHtml(c.col_name) + '</span><span class="row-value">' + display + '<span class="unit">' + getUnit(c.col_name) + '</span></span></div>';
+    });
+    html += '</div></div>';
+
+    // 人数
+    html += '<div class="people-card">';
+    html += '<div class="people-row">';
+    html += '<div class="person-box"><div class="plabel">👤 管工</div><div class="pvalue">' + fitterCnt + '</div></div>';
+    html += '<div class="person-box"><div class="plabel">🔧 焊工</div><div class="pvalue">' + welderCnt + '</div></div>';
+    html += '<div class="person-box"><div class="plabel">👷 普工</div><div class="pvalue">' + helperCnt + '</div></div>';
+    html += '</div></div>';
+
+    // 班组卡片
+    teams.forEach(function(t, idx) {
+        var worksHtml = '';
+        columns.forEach(function(c) {
+            var rec = recordsMap[t.id + '_' + c.col_key];
+            if (rec && Number(rec.quantity) > 0) {
+                var display = (rec.quantity % 1 === 0) ? rec.quantity : Number(rec.quantity).toFixed(2);
+                worksHtml += '<div class="work-row"><span class="wlabel">' + escapeHtml(c.col_name) + '</span><span class="wvalue">' + display + '<span class="unit">' + getUnit(c.col_name) + '</span></span></div>';
+            }
+        });
+
+        var noteText = '';
+        columns.forEach(function(c) {
+            var rec = recordsMap[t.id + '_' + c.col_key];
+            if (rec && rec.note && rec.note.trim() && !noteText) noteText = rec.note.trim();
+        });
+
+        var peopleHtml = '';
+        if (t.fitter && t.fitter.trim()) peopleHtml += '<span class="person-tag"><span class="role">管</span>' + escapeHtml(t.fitter) + '</span>';
+        if (t.welder && t.welder.trim()) peopleHtml += '<span class="person-tag"><span class="role">焊</span>' + escapeHtml(t.welder) + '</span>';
+        if (t.helper && t.helper.trim()) peopleHtml += '<span class="person-tag"><span class="role">普</span>' + escapeHtml(t.helper) + '</span>';
+
+        html += '<div class="team-card">';
+        html += '<div class="team-header"><div class="team-name">📍 ' + escapeHtml(t.area) + '<span class="index-tag">' + (idx + 1) + '</span></div></div>';
+        html += '<div class="people-list">' + (peopleHtml || '<span style="color:var(--text-secondary);font-size:12px;">无人员信息</span>') + '</div>';
+        html += '<div class="work-list">' + (worksHtml || '<div class="work-row"><span class="wlabel" style="color:var(--text-tertiary);">无工作量数据</span></div>') + '</div>';
+        if (noteText) {
+            html += '<div class="team-note"><span class="note-icon">📝</span><span class="note-text">' + escapeHtml(noteText) + '</span></div>';
+        }
+        html += '</div>';
+    });
+
+    box.innerHTML = html;
+}
+
+// ============================================================
+//                    范围汇总弹窗（含 10 个缓存）
+// ============================================================
+function openRangeSummary() {
+    var from = document.getElementById('workRangeFrom').value;
+    var to = document.getElementById('workRangeTo').value;
+    if (!from || !to) { alert('请选择起止日期'); return; }
+    if (from > to) { alert('起始日期不能大于结束日期'); return; }
+
+    var cacheKey = 'workRangeCache_' + from + '_' + to;
+    document.getElementById('rangeDialogTitle').textContent = '📈 范围汇总 ' + from + ' ~ ' + to;
+    document.getElementById('rangeDialogContent').innerHTML = '<div class="no-result"><span>⏳</span>加载中...</div>';
+    document.getElementById('rangeDialog').classList.add('active');
+
+    var cached = lsGet(cacheKey, null);
+    if (cached && cached.teams && cached.columns && cached.records) {
+        var recordsMap = {};
+        cached.records.forEach(function(r) {
+            var key = r.team_id + '_' + r.unit;
+            recordsMap[key] = { quantity: Number(r.quantity) || 0, note: '' };
+        });
+        renderWorkContent(document.getElementById('rangeDialogContent'), cached.teams, cached.columns, recordsMap, from + ' ~ ' + to);
+    }
+
+    fetch(WORK_API + '?action=records-range-summary&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to) + '&t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (!res || !res.success || !res.data) {
+                if (!cached) document.getElementById('rangeDialogContent').innerHTML = '<div class="no-result"><span>⚠️</span>加载失败</div>';
+                return;
+            }
+            var teams = res.data.teams || [];
+            var columns = res.data.columns || [];
+            var records = res.data.records || [];
+            lsSet(cacheKey, { teams: teams, columns: columns, records: records });
+            updateRangeCacheKeys(cacheKey);
+
+            var recordsMap = {};
+            records.forEach(function(r) {
+                var key = r.team_id + '_' + r.unit;
+                recordsMap[key] = { quantity: Number(r.quantity) || 0, note: '' };
+            });
+            renderWorkContent(document.getElementById('rangeDialogContent'), teams, columns, recordsMap, from + ' ~ ' + to);
+        })
+        .catch(function(err) {
+            if (!cached) document.getElementById('rangeDialogContent').innerHTML = '<div class="no-result"><span>⚠️</span>加载失败：' + escapeHtml(err.message || '') + '</div>';
+        });
+}
+function closeRangeDialog() {
+    document.getElementById('rangeDialog').classList.remove('active');
+}
+function updateRangeCacheKeys(newKey) {
+    var keys = lsGet('workRangeKeys', []);
+    var idx = keys.indexOf(newKey);
+    if (idx !== -1) keys.splice(idx, 1);
+    keys.push(newKey);
+    while (keys.length > 10) {
+        var oldKey = keys.shift();
+        try { localStorage.removeItem(oldKey); } catch(e) {}
+    }
+    lsSet('workRangeKeys', keys);
+}
+
+// ============================================================
+//                    总量页
+// ============================================================
+function initTotalPage() {
+    var box = document.getElementById('workTotalContent');
+    var cachedData4 = lsGet('workTotalData4Cache', null);
+
+    if (cachedData4) {
+        box.innerHTML = renderTotalHTML(cachedData4, null, null, null);
+    } else {
+        box.innerHTML = '<div class="no-result"><span>⏳</span>正在加载总量...</div>';
+    }
+
+    fetch(DATA4_URL + '?t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(data4) {
+            if (data4) lsSet('workTotalData4Cache', data4);
+            box.innerHTML = renderTotalHTML(data4 || { list: [], summary: {} }, null, null, null);
+        })
+        .catch(function(err) {
+            if (!cachedData4) box.innerHTML = '<div class="no-result"><span>⚠️</span>加载失败：' + escapeHtml(err.message || '') + '</div>';
+        });
+}
+
+function renderTotalHTML(data4, data1, data2, d5Map) {
+    var html = '';
+
+    // 一、工区总量
+    html += '<div style="padding: 12px 16px 4px; font-size: 13px; color: var(--text-secondary); font-weight: 600;">🏗️ 各工区总量</div>';
+    var s = data4.summary || {};
+    html += '<div class="total-card">';
+    html += '<div class="total-title">总合计<span class="date-tag">全部工区</span></div>';
+    html += '<div class="total-list">';
+    html += '<div class="total-row"><span class="row-label">十四化建总量</span><span class="row-value">' + (s.total || 0) + '<span class="unit">寸</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">焊接完成</span><span class="row-value">' + (s.welded || 0) + '<span class="unit">寸</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">焊接未完成</span><span class="row-value">' + (s.unwelded || 0) + '<span class="unit">寸</span></span></div>';
+    html += '</div></div>';
+
+    (data4.list || []).forEach(function(a, i) {
+        var total = Number(a.total) || 0;
+        var welded = Number(a.welded) || 0;
+        var unwelded = Number(a.unwelded) || 0;
+        html += '<div class="team-card">';
+        html += '<div class="team-header"><div class="team-name">📍 工区 ' + escapeHtml(a.area) + '<span class="index-tag">' + (i + 1) + '</span></div></div>';
+        html += '<div class="work-list">';
+        html += '<div class="work-row"><span class="wlabel">总量</span><span class="wvalue">' + total + '<span class="unit">寸</span></span></div>';
+        html += '<div class="work-row"><span class="wlabel">✅ 焊接完成</span><span class="wvalue">' + welded + '<span class="unit">寸</span></span></div>';
+        html += '<div class="work-row"><span class="wlabel">❌ 焊接未完成</span><span class="wvalue" style="color:#FA5151;">' + unwelded + '<span class="unit">寸</span></span></div>';
+        html += '</div>';
+        if (a.note) html += '<div class="team-note"><span class="note-icon">📝</span><span class="note-text">' + escapeHtml(a.note) + '</span></div>';
+        html += '</div>';
+    });
+
+
+    // 支架、阀门部分已分别移到「支架」页和「阀门」页展示
+    return html;
+}
+
+// ============================================================
+//     支架页：支架总量
+// ============================================================
+// 🔄 刷新支架数据：清缓存 → 重新拉 data1.json → 重渲染
+function refreshBracketData() {
+    var btn = document.getElementById('bracketRefreshBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 刷新中...'; }
+
+    // 1. 删除旧缓存
+    try {
+        localStorage.removeItem('bracketStatus');
+        localStorage.removeItem('workTotalData1Cache');
+    } catch(e) {}
+
+    // 2. 重新拉 data1.json
+    fetch(DATA1_URL + '?t=' + Date.now(), { cache: 'no-store' })
+        .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+        .then(function(data) {
+            // 3. 写入两份缓存
+            bracketStatusMap = data || {};
+            lsSet('bracketStatus', bracketStatusMap);
+            lsSet('workTotalData1Cache', data);
+
+            // 4. 重新渲染支架总量
+            var box = document.getElementById('bracketTotalArea');
+            if (box) box.innerHTML = renderBracketTotalHTML(data || {});
+
+            // 5. 如果当前有搜索词，重新渲染支架查询结果
+            var q = bracketInput.value.trim();
+            if (q) doBracketSearch(q);
+
+            showToast('✅ 支架数据已刷新');
+        })
+        .catch(function(err) {
+            showToast('❌ 刷新失败：' + (err.message || '网络错误'));
+        })
+        .then(function() {
+            if (btn) { btn.disabled = false; btn.textContent = '🔄 刷新支架数据'; }
+        });
+}
+
+function renderBracketTotalArea() {
+    var box = document.getElementById('bracketTotalArea');
+    if (!box) return;
+
+    var cachedData1 = lsGet('workTotalData1Cache', null);
+
+    if (cachedData1) {
+        box.innerHTML = renderBracketTotalHTML(cachedData1);
+        return;
+    }
+
+    box.innerHTML = '<div class="no-result"><span>⏳</span>正在加载支架总量...</div>';
+
+    fetch(DATA1_URL + '?t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(data1) {
+            if (data1) lsSet('workTotalData1Cache', data1);
+            box.innerHTML = renderBracketTotalHTML(data1 || {});
+        })
+        .catch(function(err) {
+            box.innerHTML = '<div class="no-result"><span>⚠️</span>加载失败：' + escapeHtml(err.message || '') + '</div>';
+        });
+}
+
+function renderBracketTotalHTML(data1) {
+    var bStat = computeBracketStats(data1);
+    var html = '';
+
+    html += '<div style="padding: 12px 16px 4px; font-size: 13px; color: var(--text-secondary); font-weight: 600;">🔧 支架总量</div>';
+    html += '<div class="total-card">';
+    html += '<div class="total-title">支架总览<span class="date-tag">共 ' + bStat.total + ' 个</span></div>';
+    html += '<div class="total-list">';
+
+    // ================= 成品 =================
+    html += '<div class="total-row"><span class="row-label">📦 成品支架</span><span class="row-value">' + bStat.product.total + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　└ ✅ 到货</span><span class="row-value">' + bStat.product.arrived + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　　　到货已领</span><span class="row-value" style="font-weight:400;">' + bStat.product.arrivedClaimed + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　　　到货未领</span><span class="row-value" style="font-weight:400;">' + bStat.product.arrivedNotClaimed + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　　　已到现场</span><span class="row-value" style="font-weight:400;">' + bStat.product.onSite + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　　　已安装</span><span class="row-value" style="font-weight:400;">' + bStat.product.installed + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　　　已焊接</span><span class="row-value" style="font-weight:400;">' + bStat.product.welded + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　　　其他到货</span><span class="row-value" style="font-weight:400;">' + bStat.product.otherArrived + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　└ ❌ 未到货</span><span class="row-value" style="color:#FA5151;">' + bStat.product.notArrived + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　└ ⚠️ 其他（状态空/识别不出）</span><span class="row-value" style="color:#f59e0b;">' + bStat.product.other + '<span class="unit">个</span></span></div>';
+
+    // ================= 自制 =================
+    html += '<div class="total-row" style="margin-top:6px;"><span class="row-label">🔧 自制支架</span><span class="row-value">' + bStat.made.total + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　└ ✅ 已预制</span><span class="row-value">' + bStat.made.made + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　　　已预制</span><span class="row-value" style="font-weight:400;">' + bStat.made.preMade + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　　　已到现场</span><span class="row-value" style="font-weight:400;">' + bStat.made.onSite + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　　　已焊接</span><span class="row-value" style="font-weight:400;">' + bStat.made.welded + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　　　其他</span><span class="row-value" style="font-weight:400;">' + bStat.made.otherMade + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　└ ❌ 未预制</span><span class="row-value" style="color:#FA5151;">' + bStat.made.notMade + '<span class="unit">个</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">　└ ⚠️ 其他（状态空/识别不出）</span><span class="row-value" style="color:#f59e0b;">' + bStat.made.other + '<span class="unit">个</span></span></div>';
+
+    // ================= 特殊 =================
+    html += '<div class="total-row" style="margin-top:6px;"><span class="row-label">⭐ 特殊支架</span><span class="row-value">' + bStat.special.total + '<span class="unit">个</span></span></div>';
+
+    html += '</div></div>';
+    return html;
+}
+
+// ============================================================
+//     阀门页：阀门总量 + 到货总览 + 按规格明细
+// ============================================================
+function renderValveTotalArea() {
+    var box = document.getElementById('valveTotalArea');
+    if (!box) return;
+
+    // 缓存
+    var cachedData2 = lsGet('workTotalData2Cache', null);
+    var cachedData5 = lsGet('workTotalData5Cache', null);
+
+    function buildData5Map(data5) {
+        var map = {};
+        if (!data5 || !data5.list) return map;
+        (data5.list || []).forEach(function(item) {
+            var key = (item.name || '') + '|' + (item.valveId || '') + '|' + (item.diameter || '');
+            map[key] = Number(item.arrived) || 0;
+        });
+        return map;
+    }
+
+    if (cachedData2 && cachedData5) {
+        var d5Map = buildData5Map(cachedData5);
+        box.innerHTML = renderValveTotalHTML(cachedData2, d5Map);
+        return;
+    }
+
+    box.innerHTML = '<div class="no-result"><span>⏳</span>正在加载阀门总量...</div>';
+
+    Promise.all([
+        fetch(DATA2_URL + '?t=' + Date.now()).then(function(r) { return r.json(); }).catch(function() { return null; }),
+        fetch(DATA5_URL + '?t=' + Date.now()).then(function(r) { return r.json(); }).catch(function() { return null; })
+    ]).then(function(results) {
+        var data2 = results[0] || cachedData2 || {};
+        var data5 = results[1] || cachedData5 || { list: [] };
+        if (results[0]) lsSet('workTotalData2Cache', results[0]);
+        if (results[1]) lsSet('workTotalData5Cache', results[1]);
+        var d5Map = buildData5Map(data5);
+        box.innerHTML = renderValveTotalHTML(data2, d5Map);
+    }).catch(function(err) {
+        if (!cachedData2) {
+            box.innerHTML = '<div class="no-result"><span>⚠️</span>加载失败：' + escapeHtml(err.message || '') + '</div>';
+        }
+    });
+}
+
+// 🔄 刷新阀门数据：清缓存 → 重新拉 data2.json + data5.json → 重渲染
+function refreshValveData() {
+    var btn = document.getElementById('valveRefreshBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 刷新中...'; }
+
+    // 1. 删除旧缓存
+    try {
+        localStorage.removeItem('valveData');
+        localStorage.removeItem('workTotalData2Cache');
+        localStorage.removeItem('workTotalData5Cache');
+    } catch(e) {}
+
+    // 2. 重新拉 data2.json + data5.json
+    Promise.all([
+        fetch(DATA2_URL + '?t=' + Date.now(), { cache: 'no-store' }).then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }),
+        fetch(DATA5_URL + '?t=' + Date.now(), { cache: 'no-store' }).then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    ]).then(function(results) {
+        var data2 = results[0] || {};
+        var data5 = results[1] || { list: [] };
+
+        // 3. 写入缓存
+        valveDataMap = data2;
+        lsSet('valveData', data2);
+        lsSet('workTotalData2Cache', data2);
+        lsSet('workTotalData5Cache', data5);
+
+        // 4. 重新渲染阀门总量
+        var box = document.getElementById('valveTotalArea');
+        if (box) {
+            var d5Map = {};
+            (data5.list || []).forEach(function(item) {
+                var key = (item.name || '') + '|' + (item.valveId || '') + '|' + (item.diameter || '');
+                d5Map[key] = Number(item.arrived) || 0;
+            });
+            box.innerHTML = renderValveTotalHTML(data2, d5Map);
+        }
+
+        // 5. 如果当前有搜索词，重新渲染阀门查询结果
+        var q = valveInput.value.trim();
+        if (q) doValveSearch(q);
+
+        showToast('✅ 阀门数据已刷新');
+    }).catch(function(err) {
+        showToast('❌ 刷新失败：' + (err.message || '网络错误'));
+    }).then(function() {
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 刷新阀门数据'; }
+    });
+}
+
+function renderValveTotalHTML(data2, d5Map) {
+    var vStat = computeValveStats(data2, d5Map);
+    var html = '';
+
+    // 一、阀门到货总览
+    html += '<div style="padding: 12px 16px 4px; font-size: 13px; color: var(--text-secondary); font-weight: 600;">🚚 阀门到货总览</div>';
+    html += '<div class="total-card">';
+    html += '<div class="total-title">全部到货情况<span class="date-tag">已到 ' + vStat.totalArrived + ' 台</span></div>';
+    html += '<div class="total-list">';
+    html += '<div class="total-row"><span class="row-label">✅ 已到货</span><span class="row-value">' + vStat.totalArrived + '<span class="unit">台</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">❌ 未到货</span><span class="row-value" style="color:#FA5151;">' + (vStat.total - vStat.totalArrived) + '<span class="unit">台</span></span></div>';
+    html += '</div></div>';
+
+    // 二、阀门总量（安装状态总览）
+    html += '<div style="padding: 12px 16px 4px; font-size: 13px; color: var(--text-secondary); font-weight: 600;">🚪 阀门总量</div>';
+    html += '<div class="total-card">';
+    html += '<div class="total-title">安装状态总览<span class="date-tag">共 ' + vStat.total + ' 台</span></div>';
+    html += '<div class="total-list">';
+    html += '<div class="total-row"><span class="row-label">✅ 已安装</span><span class="row-value">' + vStat.installed + '<span class="unit">台</span></span></div>';
+    html += '<div class="total-row"><span class="row-label">❌ 未安装</span><span class="row-value" style="color:#FA5151;">' + vStat.notInstalled + '<span class="unit">台</span></span></div>';
+    html += '</div></div>';
+
+    // 三、按规格明细
+    html += '<div style="padding: 12px 16px 4px; font-size: 13px; color: var(--text-secondary); font-weight: 600;">📋 按规格明细（已安装 / 已到货 / 未到货）</div>';
+    html += '<div style="padding: 0 16px 8px;">';
+    html += '<input type="text" id="valveSpecSearch" placeholder="🔍 输入阀门代码或直径搜索" oninput="filterValveSpec()" style="width:100%;padding:10px 14px;border:1px solid var(--border-light);border-radius:4px;font-size:14px;outline:none;background:var(--bg-input);box-sizing:border-box;color:var(--text-primary);">';
+    html += '</div>';
+    html += '<div id="valveSpecList">';
+    vStat.specList.forEach(function(item) {
+        var notArrived = Math.max(0, item.total - item.arrived);
+        html += '<div class="total-card" style="margin:4px 0;" data-valve-id="' + escapeHtml(item.valveId) + '" data-name="' + escapeHtml(item.name) + '" data-diameter="' + escapeHtml(item.diameter) + '">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border-inner);">';
+        html += '<div style="font-size:14px;font-weight:600;color:var(--text-primary);">🔹 ' + escapeHtml(item.name) + ' <span style="font-size:11px;background:var(--bg-hover);color:var(--text-secondary);padding:2px 6px;border-radius:3px;">' + escapeHtml(item.valveId) + '</span></div>';
+        html += '<div style="font-size:12px;color:var(--text-secondary);">DN' + escapeHtml(item.diameter) + '</div>';
+        html += '</div>';
+        html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);text-align:center;padding:10px 8px;">';
+        html += '<div><div style="font-size:10px;color:var(--text-secondary);margin-bottom:4px;">总量</div><div style="font-size:16px;font-weight:700;color:var(--text-primary);">' + item.total + '</div><div style="font-size:10px;color:var(--text-secondary);">台</div></div>';
+        html += '<div><div style="font-size:10px;color:#2563eb;margin-bottom:4px;">✅ 已安装</div><div style="font-size:16px;font-weight:700;color:#2563eb;">' + item.installed + '</div><div style="font-size:10px;color:var(--text-secondary);">台</div></div>';
+        html += '<div><div style="font-size:10px;color:#059669;margin-bottom:4px;">📦 已到货</div><div style="font-size:16px;font-weight:700;color:#059669;">' + item.arrived + '</div><div style="font-size:10px;color:var(--text-secondary);">台</div></div>';
+        html += '<div><div style="font-size:10px;color:#dc2626;margin-bottom:4px;">❌ 未到货</div><div style="font-size:16px;font-weight:700;color:#dc2626;">' + notArrived + '</div><div style="font-size:10px;color:var(--text-secondary);">台</div></div>';
+        html += '</div>';
+        html += '</div>';
+    });
+    html += '</div>';
+
+    return html;
+}
+
+function computeValveStats(data2, d5Map) {
+    var stat = { total: 0, installed: 0, notInstalled: 0, totalArrived: 0, specList: [] };
+    var specMap = {};
+    Object.keys(data2 || {}).forEach(function(tag) {
+        var v = data2[tag];
+        if (!v) return;
+        stat.total++;
+        var serialNo = v.serialNo || '';
+        var isInstalled = serialNo && serialNo.trim() !== '';
+        if (isInstalled) stat.installed++; else stat.notInstalled++;
+
+        var name = v.valveName || '';
+        var valveId = v.valveId || '';
+        var diameter = v.diameter || '';
+        var groupKey = name + '|' + valveId + '|' + diameter;
+
+        if (!specMap[groupKey]) {
+            specMap[groupKey] = {
+                name: name, valveId: valveId, diameter: diameter,
+                total: 0, installed: 0, notInstalled: 0, arrived: 0,
+                _arrivedQueried: false
+            };
+        }
+        specMap[groupKey].total++;
+        if (isInstalled) {
+            specMap[groupKey].installed++;
+        } else {
+            specMap[groupKey].notInstalled++;
+        }
+        if (!specMap[groupKey]._arrivedQueried) {
+            specMap[groupKey].arrived = d5Map[groupKey] !== undefined ? Number(d5Map[groupKey]) : 0;
+            specMap[groupKey]._arrivedQueried = true;
+        }
+    });
+
+    var specList = [];
+    Object.keys(specMap).forEach(function(k) {
+        var item = specMap[k];
+        specList.push({
+            name: item.name,
+            valveId: item.valveId,
+            diameter: item.diameter,
+            total: item.total,
+            installed: item.installed,
+            notInstalled: item.notInstalled,
+            arrived: Math.min(item.arrived, item.total)
+        });
+    });
+    specList.sort(function(a, b) {
+        if (a.name !== b.name) return a.name.localeCompare(b.name);
+        if (a.valveId !== b.valveId) return a.valveId.localeCompare(b.valveId);
+        return (parseInt(a.diameter) || 0) - (parseInt(b.diameter) || 0);
+    });
+    stat.specList = specList;
+
+    var totalArrived = 0;
+    Object.keys(d5Map).forEach(function(k) { totalArrived += Number(d5Map[k]) || 0; });
+    stat.totalArrived = totalArrived;
+    return stat;
+}
+
+function computeBracketStats(data1) {
+    var stat = {
+        total: 0,
+        product: {
+            total: 0,
+            arrived: 0,           // 到货总数 = 已领+未领+已到+已安装+已焊接+其他到货
+            arrivedClaimed: 0,    // 到货已领
+            arrivedNotClaimed: 0, // 到货未领
+            onSite: 0,            // 已到现场
+            installed: 0,         // 已安装
+            welded: 0,            // 已焊接
+            otherArrived: 0,      // 其他带"已"
+            notArrived: 0,        // 未到货
+            other: 0              // 状态为空/识别不出
+        },
+        made: {
+            total: 0,
+            made: 0,
+            preMade: 0,
+            onSite: 0,
+            welded: 0,
+            otherMade: 0,         // 其他带"已"
+            notMade: 0,
+            other: 0              // 状态为空/识别不出
+        },
+        special: { total: 0 }
+    };
+
+    Object.keys(data1 || {}).forEach(function(key) {
+        var item = data1[key];
+        var raw = (item && item.status) ? String(item.status) : '';
+        if (!raw) return;
+
+        // 归一化：己 → 已
+        var status = raw.replace(/己/g, '已').trim();
+
+        var isSpecial = status.indexOf('特殊') !== -1;
+        var isProduct = status.indexOf('成品') !== -1;
+        var isMade    = status.indexOf('自制') !== -1;
+
+        // 取状态段：按 '-' 拆，第3段起合并
+        var parts = status.split('-');
+        var state = parts.length >= 3 ? parts.slice(2).join('-').trim() : '';
+
+        if (isSpecial) {
+            stat.special.total++; stat.total++;
+            return;
+        }
+
+        // ========== 成品支架 ==========
+        if (isProduct) {
+            stat.product.total++; stat.total++;
+
+            // ① 明确未到货
+            if (state.indexOf('未到货') !== -1 || state.indexOf('未到') !== -1) {
+                stat.product.notArrived++;
+                return;
+            }
+            // ② 到货已领
+            if (state.indexOf('到货已领') !== -1) {
+                stat.product.arrived++; stat.product.arrivedClaimed++;
+                return;
+            }
+            // ③ 到货未领
+            if (state.indexOf('到货未领') !== -1) {
+                stat.product.arrived++; stat.product.arrivedNotClaimed++;
+                return;
+            }
+            // ④ 已到现场
+            if (state.indexOf('已到') !== -1) {
+                stat.product.arrived++; stat.product.onSite++;
+                return;
+            }
+            // ⑤ 已安装
+            if (state.indexOf('已安装') !== -1) {
+                stat.product.arrived++; stat.product.installed++;
+                return;
+            }
+            // ⑥ 已焊接
+            if (state.indexOf('已焊接') !== -1) {
+                stat.product.arrived++; stat.product.welded++;
+                return;
+            }
+            // ⑦ 其他带"已" → 到货
+            if (state.indexOf('已') !== -1) {
+                stat.product.arrived++; stat.product.otherArrived++;
+                return;
+            }
+            // ⑧ 状态为空 / 识别不出 → 其他
+            stat.product.other++;
+            return;
+        }
+
+        // ========== 自制支架 ==========
+        if (isMade) {
+            stat.made.total++; stat.total++;
+
+            // ① 未预制
+            if (state.indexOf('未预制') !== -1) {
+                stat.made.notMade++;
+                return;
+            }
+            // ② 已焊接
+            if (state.indexOf('已焊接') !== -1) {
+                stat.made.welded++; stat.made.made++;
+                return;
+            }
+            // ③ 已预制
+            if (state.indexOf('已预制') !== -1) {
+                stat.made.made++; stat.made.preMade++;
+                return;
+            }
+            // ④ 已到现场
+            if (state.indexOf('已到') !== -1) {
+                stat.made.made++; stat.made.onSite++;
+                return;
+            }
+            // ⑤ 其他带"已" → 已预制-其他
+            if (state.indexOf('已') !== -1) {
+                stat.made.made++; stat.made.otherMade++;
+                return;
+            }
+            // ⑥ 状态为空 / 识别不出 → 其他
+            stat.made.other++;
+            return;
+        }
+    });
+
+    return stat;
+}
+
+function filterValveSpec() {
+    var q = (document.getElementById('valveSpecSearch').value || '').trim().toUpperCase();
+    var list = document.getElementById('valveSpecList');
+    if (!list) return;
+    var rows = list.querySelectorAll('[data-valve-id]');
+    var matchCount = 0;
+    rows.forEach(function(row) {
+        if (!q) { row.style.display = ''; matchCount++; return; }
+        var valveId = (row.dataset.valveId || '').toUpperCase();
+        var name = (row.dataset.name || '').toUpperCase();
+        var diameter = (row.dataset.diameter || '').toUpperCase();
+        if (valveId.indexOf(q) !== -1 || name.indexOf(q) !== -1 || diameter.indexOf(q) !== -1) {
+            row.style.display = ''; matchCount++;
+        } else { row.style.display = 'none'; }
+    });
+}
+
+// ============================================================
+//                    焊口信息
+// ============================================================
+function loadWeldInfoFromJson() {
+    var cached = lsGet('weldInfo', null);
+    if (cached) { weldInfoMap = cached; weldInfoLoaded = true; }
+    fetch(DATA3_URL + '?t=' + Date.now())
+        .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+        .then(function (data) {
+            weldInfoMap = data || {};
+            weldInfoLoaded = true;
+            lsSet('weldInfo', weldInfoMap);
+        })
+        .catch(function (err) { console.warn('data3.json 失败:', err.message); });
+}
+function ensureWeldInfoLoaded(callback) {
+    if (weldInfoLoaded) { callback(); return; }
+    if (weldInfoLoading) return;
+    weldInfoLoading = true;
+    showToast('正在加载焊口数据...');
+    fetch(DATA3_URL + '?t=' + Date.now())
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            weldInfoMap = data || {};
+            weldInfoLoaded = true;
+            weldInfoLoading = false;
+            lsSet('weldInfo', weldInfoMap);
+            callback();
+        })
+        .catch(function () { weldInfoLoading = false; showToast('焊口数据加载失败'); });
+}
+function parseWeldInfo(info) {
+    var result = { weldNo:'', pipeNo:'', size:'', jointType:'', status:'', part1:'', spec1:'', part2:'', spec2:'', welder:'', date:'' };
+    var weldStr = info['焊口信息'] || '';
+    var lines = weldStr.split('\n');
+    var head = (lines[0] || '').split('·').map(function (s) { return s.trim(); });
+    result.weldNo = head[0] || '';
+    result.pipeNo = head[1] || '';
+    result.size = head[2] || '';
+    result.jointType = head[3] || '';
+    var body = (lines[1] || '').split('→').map(function (s) { return s.trim(); });
+    if (body[0]) { var p1 = body[0].split('·').map(function (s) { return s.trim(); }); result.part1 = p1[0] || ''; result.spec1 = p1[1] || ''; }
+    if (body[1]) { var p2 = body[1].split('·').map(function (s) { return s.trim(); }); result.part2 = p2[0] || ''; result.spec2 = p2[1] || ''; }
+    var workerStr = (info['焊工信息'] || '').trim();
+    if (workerStr && workerStr.toLowerCase() !== 'nan') {
+        var w = workerStr.split('·').map(function (s) { return s.trim(); });
+        result.welder = w[0] || '';
+        result.date = w[1] || '';
+        result.status = w[2] || '';   // ✅ 新增：第三个字段是状态
+    }
+    return result;
+}
+function openWeldDialog(isoNo, weldNo) {
+    ensureWeldInfoLoaded(function () {
+        var key = isoNo + '_' + weldNo;
+        var info = weldInfoMap[key];
+        document.getElementById('weldDialogTitle').textContent = '🔍 焊口 ' + weldNo;
+        if (!info) {
+            document.getElementById('weldDialogBody').innerHTML =
+                '<div style="text-align:center;color:var(--text-secondary);padding:20px 0;">未找到该焊口信息<br><small style="font-size:12px;">' + escapeHtml(key) + '</small></div>';
+            document.getElementById('weldDialog').classList.add('active');
+            return;
+        }
+        var parsed = parseWeldInfo(info);
+        var rows = [
+            ['焊口编号', parsed.weldNo], ['管段号', parsed.pipeNo], ['寸径', parsed.size],
+            ['焊工', parsed.welder], ['焊接日期', parsed.date], ['状态', parsed.status], ['接头形式', parsed.jointType],
+            ['部件1', parsed.part1], ['规格1', parsed.spec1], ['部件2', parsed.part2], ['规格2', parsed.spec2]
+        ];
+        var html = '<div style="background:var(--bg-input);border-radius:4px;padding:6px 14px;">';
+        var lastIdx = -1;
+        rows.forEach(function (r, i) { if (r[1]) lastIdx = i; });
+        rows.forEach(function (r, i) {
+            if (!r[1]) return;
+            var border = (i === lastIdx) ? 'none' : '1px solid var(--border-inner)';
+            html += '<div style="display:flex;padding:9px 0;border-bottom:' + border + ';">' +
+                '<div style="width:82px;flex-shrink:0;color:var(--text-secondary);font-size:13px;">' + escapeHtml(r[0]) + '</div>' +
+                '<div style="flex:1;color:var(--text-value);font-size:14px;font-weight:600;word-break:break-all;">' + escapeHtml(r[1]) + '</div>' +
+                '</div>';
+        });
+        html += '</div>';
+        document.getElementById('weldDialogBody').innerHTML = html;
+        document.getElementById('weldDialog').classList.add('active');
+    });
+}
+function closeWeldDialog() { document.getElementById('weldDialog').classList.remove('active'); }
+
+// ============================================================
+//                    尾项
+// ============================================================
+function loadTailItemsFromServer() {
+    tailItemsCache = lsGet('tailItemsCache', {});
+    tailPendingMap = lsGet('tailPendingMap', {});
+    fetch(TAIL_ITEMS_API + '&t=' + Date.now())
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            if (data && typeof data === 'object') {
+                var normalized = {};
+                Object.keys(data).forEach(function (key) {
+                    var arr = data[key] || [];
+                    normalized[key] = arr.map(function (t) {
+                        return {
+                            id: t.id,
+                            content: t.content || '',
+                            time: t.createdAt || t.time || '',
+                            user: t.user || ''            // ✅ 补上
+                        };
+                    });
+                });
+                tailItemsCache = normalized;
+                Object.keys(tailPendingMap).forEach(function (key) {
+                    if (!tailItemsCache[key]) tailItemsCache[key] = [];
+                    var exist = {};
+                    tailItemsCache[key].forEach(function (t) { exist[(t.content || '') + '|' + (t.time || '')] = true; });
+                    tailPendingMap[key].forEach(function (t) {
+                        var sig = (t.content || '') + '|' + (t.time || '');
+                        if (!exist[sig]) tailItemsCache[key].push(t);
+                    });
+                });
+                lsSet('tailItemsCache', tailItemsCache);
+            }
+        })
+        .catch(function (err) { console.warn('尾项加载失败:', err); });
+}
+function openTailDialog(subItem, lineNo, safeId) {
+    tailDialogData.subItem = subItem;
+    tailDialogData.lineNo = lineNo;
+    tailDialogData.safeId = safeId;
+    document.getElementById('tailDialogInput').value = '';
+
+    // 👇 显示当前用户
+    updateTailDialogUser();
+
+    document.getElementById('tailDialog').classList.add('active');
+}
+
+// 👇 新增：刷新尾项弹框里的"录入人"显示
+function updateTailDialogUser() {
+    var userEl = document.getElementById('tailDialogUser');
+    if (!userEl) return;
+    if (currentUser) {
+        userEl.textContent = currentUser;
+        userEl.style.color = 'var(--green-primary)';
+    } else {
+        userEl.textContent = '（未设置，保存时会提示）';
+        userEl.style.color = '#f59e0b';
+    }
+}
+
+// 👇 新增：尾项弹框里修改姓名
+function changeTailUser() {
+    var name = prompt('请输入姓名', currentUser || '');
+    if (name !== null) {
+        setCurrentUser(name.trim());
+        updateTailDialogUser();
+    }
+}
+function closeTailDialog() { document.getElementById('tailDialog').classList.remove('active'); }
+function renderTailList(key, safeId) {
+    var area = document.getElementById('tail-area-' + safeId);
+    if (!area) return;
+    var list = tailItemsCache[key] || [];
+    var listHtml = list.map(function (t, i) {
+        var pendingTag = t._pending ? '<span style="color:#f59e0b;font-size:12px;margin-left:6px;">⏳ 待同步</span>' : '';
+        var userTag = t.user ? '<span style="color:var(--text-secondary);font-size:12px;margin-left:6px;">— ' + escapeHtml(t.user) + '</span>' : '';
+        return '<div style="font-size:14px;color:var(--text-value);padding:2px 0;">尾项' + (i + 1) + '  ' + escapeHtml(t.content) + pendingTag + userTag + '</div>';
+    }).join('');
+    var listEl = area.querySelector('.tail-list');
+    if (listEl) listEl.innerHTML = listHtml;
+}
+function saveTailFromDialog() {
+    var content = document.getElementById('tailDialogInput').value.trim();
+    if (!content) { showToast('尾项内容不能为空'); return; }
+    if (!currentUser) { showToast('请先在顶部设置姓名'); promptUserName(); return; }
+
+    var d = tailDialogData;
+    var key = d.subItem + '_' + d.lineNo;
+    var now = new Date().toLocaleString();
+    var item = { content: content, time: now, user: currentUser };
+
+    if (!tailItemsCache[key]) tailItemsCache[key] = [];
+    tailItemsCache[key].push(item);
+    lsSet('tailItemsCache', tailItemsCache);
+
+    if (!tailPendingMap[key]) tailPendingMap[key] = [];
+    tailPendingMap[key].push(item);
+    lsSet('tailPendingMap', tailPendingMap);
+
+    closeTailDialog();
+    showToast('✅ 已保存到本地');
+    renderTailList(key, d.safeId);
+    uploadTailToCloud(d.subItem, d.lineNo, content, now, d.safeId, currentUser);
+}
+function uploadTailToCloud(subItem, lineNo, content, time, safeId, user) {
+    if (!navigator.onLine) return;
+    var key = subItem + '_' + lineNo;
+    fetch(TAIL_SAVE_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subItem: subItem, lineNo: lineNo, content: content, time: time, user: user || '' })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+        if (res && res.success) {
+            if (tailPendingMap[key]) {
+                tailPendingMap[key] = tailPendingMap[key].filter(function (t) {
+                    return !(t.content === content && t.time === time);
+                });
+                if (tailPendingMap[key].length === 0) delete tailPendingMap[key];
+                lsSet('tailPendingMap', tailPendingMap);
+            }
+            if (safeId) refreshOneTail(subItem, lineNo, safeId);
+        }
+    })
+    .catch(function () {});
+}
+function refreshOneTail(subItem, lineNo, safeId) {
+    var key = subItem + '_' + lineNo;
+    fetch(TAIL_GET_API + '&subItem=' + encodeURIComponent(subItem) + '&lineNo=' + encodeURIComponent(lineNo) + '&t=' + Date.now())
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            var cloudList = (data && data.items) ? data.items.map(function (t) {
+                return {
+                    id: t.id,
+                    content: t.content || '',
+                    time: t.createdAt || t.time || '',
+                    user: t.user || ''            // ✅ 补上
+                };
+            }) : [];
+            var pendingList = tailPendingMap[key] || [];
+            var merged = cloudList.slice();
+            var exist = {};
+            cloudList.forEach(function (t) { exist[(t.content || '') + '|' + (t.time || '')] = true; });
+            pendingList.forEach(function (t) {
+                var sig = (t.content || '') + '|' + (t.time || '');
+                if (!exist[sig]) merged.push({ content: t.content, time: t.time, _pending: true });
+            });
+            if (merged.length > 0) tailItemsCache[key] = merged;
+            else delete tailItemsCache[key];
+            lsSet('tailItemsCache', tailItemsCache);
+            renderTailList(key, safeId);
+        })
+        .catch(function () {});
+}
+function syncPendingTails() {
+    if (!navigator.onLine) return;
+    Object.keys(tailPendingMap).forEach(function (key) {
+        var parts = key.split('_');
+        var lineNo = parts.pop();
+        var subItem = parts.join('_');
+        var list = tailPendingMap[key] || [];
+        list.forEach(function (t) { uploadTailToCloud(subItem, lineNo, t.content, t.time, null, t.user || ''); });
+    });
+}
+
+// ============================================================
+//                    复制单线图号
+// ============================================================
+function copyIsoNo(isoNo) {
+    if (!isoNo) return;
+    if (typeof plus !== 'undefined' && plus.clipboard) {
+        plus.clipboard.setData(isoNo);
+        showToast('✅ 已复制：' + isoNo);
+        return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(isoNo).then(function () {
+            showToast('✅ 已复制：' + isoNo);
+        }).catch(function () { fallbackCopy(isoNo); });
+    } else { fallbackCopy(isoNo); }
+}
+function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); showToast('✅ 已复制'); } catch (e) { showToast('❌ 复制失败'); }
+    document.body.removeChild(ta);
+}
+
+// ============================================================
+//                    键盘
+// ============================================================
+function buildKeyboard() {
+    var grid = document.getElementById('keyboardGrid');
+    if (!grid) return;
+    var rows = [
+        ['A','B','C','D','E','F','G','H'],
+        ['I','J','K','L','M','N','O','P'],
+        ['Q','R','S','T','U','V','W','X'],
+        ['Y','Z','0','1','2','3','4','5'],
+        ['6','7','8','9','-']
+    ];
+    var html = '';
+    rows.forEach(function(row) {
+        row.forEach(function(ch) {
+            html += '<button type="button" data-key="' + ch + '">' + ch + '</button>';
+        });
+    });
+    grid.innerHTML = html;
+
+    grid.addEventListener('click', function(e) {
+        var btn = e.target.closest('button[data-key]');
+        if (!btn) return;
+        appendToInput(btn.dataset.key);
+    });
+}
+function appendToInput(ch) {
+    var input = document.getElementById('pipelineInput');
+    input.value += ch;
+    input.scrollLeft = input.scrollWidth;
+}
+
+// ============================================================
+//                    加载管线数据
+// ============================================================
+function loadDataFromServer() {
+    var cached = lsGet('pipelineData', null);
+    if (Array.isArray(cached) && cached.length > 0) {
+        pipelineData = cached;
+        dataLoaded = true;
+    }
+    fetch(PIPELINE_URL + '?t=' + Date.now())
+        .then(function(response) { if (!response.ok) throw new Error('网络请求失败'); return response.json(); })
+        .then(function(data) {
+            if (Array.isArray(data) && data.length > 0) {
+                pipelineData = data;
+                dataLoaded = true;
+                lsSet('pipelineData', data);
+            }
+        })
+        .catch(function(err) {});
+}
+function showWelcomePipeline() {
+    if (currentPage !== 'pipeline') return;
+    resultAreaPipeline.innerHTML = '<div class="no-result"><span>📋</span>输入管线号开始查询<br><small style="font-size:13px;color:var(--text-tertiary);">共 ' + (pipelineData.length || 0) + ' 条管线数据</small></div>';
+}
+function showWelcomeBracket() {
+    if (currentPage !== 'bracket') return;
+    resultAreaBracket.innerHTML = '<div class="no-result"><span>🔧</span>输入支架号开始查询<br><small style="font-size:13px;color:var(--text-tertiary);">共 ' + (pipelineData.length || 0) + ' 条管线数据</small></div>';
+}
+function showWelcomeValve() {
+    if (currentPage !== 'valve') return;
+    resultAreaValve.innerHTML = '<div class="no-result"><span>🚪</span>输入阀门位号开始查询<br><small style="font-size:13px;color:var(--text-tertiary);">共 ' + Object.keys(valveDataMap).length + ' 个阀门数据</small></div>';
+}
+
+// ============================================================
+//                    支架状态
+// ============================================================
+function loadBracketStatusFromJson() {
+    var cached = lsGet('bracketStatus', null);
+    if (cached) bracketStatusMap = cached;
+    fetch(DATA1_URL + '?t=' + Date.now())
+        .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+        .then(function(data) {
+            bracketStatusMap = data || {};
+            lsSet('bracketStatus', bracketStatusMap);
+        })
+        .catch(function(err) {});
+}
+function getStatusFromLocal(bracketId, pipeNo) {
+    var key = bracketId + '_' + pipeNo;
+    if (bracketStatusMap[key] && bracketStatusMap[key].status) return bracketStatusMap[key].status;
+    return '';
+}
+function getStatusUserFromLocal(bracketId, pipeNo) {
+    var key = bracketId + '_' + pipeNo;
+    if (bracketStatusMap[key] && bracketStatusMap[key].user) return bracketStatusMap[key].user;
+    return '';
+}
+function getStatusClass(status) {
+    if (!status) return 'status-other';
+    if (status.indexOf('到货已领') !== -1 || status.indexOf('已安装') !== -1 || status.indexOf('已验收') !== -1 || status.indexOf('已预制') !== -1) return 'status-installed';
+    if (status.indexOf('到货未领') !== -1 || status.indexOf('待检验') !== -1 || status.indexOf('施工中') !== -1) return 'status-checking';
+    if (status.indexOf('未到货') !== -1 || status.indexOf('未安装') !== -1 || status.indexOf('未预制') !== -1) return 'status-not-installed';
+    return 'status-other';
+}
+
+// ============================================================
+//                    阀门数据
+// ============================================================
+function loadValveDataFromJson() {
+    var cached = lsGet('valveData', null);
+    if (cached) valveDataMap = cached;
+    fetch(DATA2_URL + '?t=' + Date.now())
+        .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+        .then(function(data) {
+            valveDataMap = data || {};
+            lsSet('valveData', valveDataMap);
+        })
+        .catch(function(err) {});
+}
+function loadValvePending() { valvePendingMap = lsGet('valvePending', {}); }
+function saveValvePending() { lsSet('valvePending', valvePendingMap); }
+function getValveData(valveTag) {
+    var base = valveDataMap[valveTag] || null;
+    if (!base) return null;
+    var pending = valvePendingMap[valveTag];
+    if (pending) {
+        return {
+            subItem: base.subItem || '', lineNo: base.lineNo || '', valveName: base.valveName || '',
+            valveTag: base.valveTag || valveTag, valveId: base.valveId || '',
+            diameter: base.diameter || '', pressure: base.pressure || '',
+            weldNo1: pending.weldNo1 !== undefined ? pending.weldNo1 : (base.weldNo1 || ''),
+            weldNo2: pending.weldNo2 !== undefined ? pending.weldNo2 : (base.weldNo2 || ''),
+            serialNo: pending.serialNo !== undefined ? pending.serialNo : (base.serialNo || ''),
+            user: pending.user || base.user || '',
+            _pending: true
+        };
+    }
+    return {
+        subItem: base.subItem || '', lineNo: base.lineNo || '', valveName: base.valveName || '',
+        valveTag: base.valveTag || valveTag, valveId: base.valveId || '',
+        diameter: base.diameter || '', pressure: base.pressure || '',
+        weldNo1: base.weldNo1 || '', weldNo2: base.weldNo2 || '', serialNo: base.serialNo || '',
+        user: base.user || '',
+        _pending: false
+    };
+}
+function uploadValveToCloud(valveTag, weldNo1, weldNo2, serialNo, user) {
+    if (!navigator.onLine) return;
+    fetch(API_BASE_URL + '/save-valve', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            valveTag: valveTag, weldNo1: weldNo1, weldNo2: weldNo2, serialNo: serialNo,
+            user: user || '',
+            timestamp: new Date().toLocaleString()
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res && res.success) {
+            if (valvePendingMap[valveTag]) { delete valvePendingMap[valveTag]; saveValvePending(); }
+        }
+    })
+    .catch(function() {});
+}
+function syncPendingValves() {
+    if (!navigator.onLine) return;
+    Object.keys(valvePendingMap).forEach(function(tag) {
+        var p = valvePendingMap[tag];
+        uploadValveToCloud(tag, p.weldNo1, p.weldNo2, p.serialNo, p.user || '');
+    });
+}
+function openValveDialog(valveTag) {
+    var data = getValveData(valveTag);
+    if (!data) return;
+    valveDialogTag = valveTag;
+    document.getElementById('valveDialogTag').textContent = '阀门位号：' + valveTag;
+    document.getElementById('valveWeld1').value = data.weldNo1 || '';
+    document.getElementById('valveWeld2').value = data.weldNo2 || '';
+    document.getElementById('valveSerial').value = data.serialNo || '';
+
+    // 👇 显示当前用户
+    updateValveDialogUser();
+
+    document.getElementById('valveDialog').classList.add('active');
+}
+
+// 👇 新增：刷新阀门弹框里的"录入人"显示
+function updateValveDialogUser() {
+    var userEl = document.getElementById('valveDialogUser');
+    if (!userEl) return;
+    if (currentUser) {
+        userEl.textContent = currentUser;
+        userEl.style.color = 'var(--green-primary)';
+    } else {
+        userEl.textContent = '（未设置，保存时会提示）';
+        userEl.style.color = '#f59e0b';
+    }
+}
+
+// 👇 新增：阀门弹框里修改姓名
+function changeValveUser() {
+    var name = prompt('请输入姓名', currentUser || '');
+    if (name !== null) {
+        setCurrentUser(name.trim());
+        updateValveDialogUser();
+    }
+}
+function closeValveDialog() { document.getElementById('valveDialog').classList.remove('active'); }
+function saveValveFromDialog() {
+    var valveTag = valveDialogTag;
+    if (!valveTag) return;
+    if (!currentUser) { showToast('请先在顶部设置姓名'); promptUserName(); return; }
+
+    var weldNo1 = document.getElementById('valveWeld1').value.trim();
+    var weldNo2 = document.getElementById('valveWeld2').value.trim();
+    var serialNo = document.getElementById('valveSerial').value.trim();
+    if (!weldNo1 && !weldNo2 && !serialNo) { showToast('请至少填写一项'); return; }
+
+    valvePendingMap[valveTag] = {
+        weldNo1: weldNo1, weldNo2: weldNo2, serialNo: serialNo,
+        user: currentUser,
+        updateTime: new Date().toLocaleString()
+    };
+    saveValvePending();
+    uploadValveToCloud(valveTag, weldNo1, weldNo2, serialNo, currentUser);
+    closeValveDialog();
+    showToast('✅ 已保存');
+    if (valveInput.value.trim()) doValveSearch(valveInput.value.trim());
+}
+
+// ============================================================
+//                    网络状态
+// ============================================================
+function updateNetworkStatus() {
+    if (navigator.onLine) { statusBadge.textContent = '✅ 在线'; statusBadge.className = 'status-badge online'; }
+    else { statusBadge.textContent = '📶 离线'; statusBadge.className = 'status-badge offline'; }
+}
+window.addEventListener('online', function() {
+    updateNetworkStatus();
+    setTimeout(function() {
+        syncPendingNotes();
+        syncPendingValves();
+        syncPendingTails();
+        setTimeout(fetchAllNotesFromCloud, 2000);
+        setTimeout(loadBracketStatusFromJson, 2500);
+    }, 1000);
+});
+window.addEventListener('offline', updateNetworkStatus);
+
+// ============================================================
+//                    备注
+// ============================================================
+function saveNoteToLocal(bracketId, pipeNo, note) {
+    var notes = lsGet('bracketNotes', {});
+    var key = bracketId + '_' + pipeNo;
+    notes[key] = {
+        bracketId: bracketId, pipeNo: pipeNo, note: note,
+        user: currentUser,
+        updateTime: new Date().toLocaleString(), synced: false
+    };
+    lsSet('bracketNotes', notes);
+}
+function getNoteFromLocal(bracketId, pipeNo) {
+    var notes = lsGet('bracketNotes', {});
+    var key = bracketId + '_' + pipeNo;
+    return (notes[key] && notes[key].note) || '';
+}
+function getNoteUser(bracketId, pipeNo) {
+    var notes = lsGet('bracketNotes', {});
+    var key = bracketId + '_' + pipeNo;
+    return (notes[key] && notes[key].user) || '';
+}
+function isNoteSynced(bracketId, pipeNo) {
+    var notes = lsGet('bracketNotes', {});
+    var key = bracketId + '_' + pipeNo;
+    return notes[key] ? notes[key].synced === true : true;
+}
+function uploadNoteToCloud(bracketId, pipeNo, note, user) {
+    if (!navigator.onLine) return;
+    fetch(API_BASE_URL + '/save-note', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            bracketId: bracketId, pipeNo: pipeNo, note: note,
+            user: user !== undefined ? user : currentUser,
+            timestamp: new Date().toLocaleString()
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res && res.success) {
+            var notes = lsGet('bracketNotes', {});
+            var key = bracketId + '_' + pipeNo;
+            if (notes[key]) { notes[key].synced = true; lsSet('bracketNotes', notes); }
+            var noteDisplayId = 'note-display-' + pipeNo.replace(/[^a-zA-Z0-9]/g, '_');
+            var displaySpan = document.getElementById(noteDisplayId);
+            if (displaySpan && displaySpan.parentNode) {
+                var pending = displaySpan.parentNode.querySelector('.remark-pending');
+                if (pending) pending.remove();
+            }
+        }
+    })
+    .catch(function() {});
+}
+function saveBracketNote(bracketId, pipeNo, note, callback) {
+    if (!note || note.trim() === '') return;
+    saveNoteToLocal(bracketId, pipeNo, note);
+    if (callback) callback();
+    uploadNoteToCloud(bracketId, pipeNo, note, currentUser);
+}
+function syncPendingNotes() {
+    var notes = lsGet('bracketNotes', {});
+    Object.keys(notes).forEach(function(key) {
+        var item = notes[key];
+        if (item && !item.synced && item.note && item.note.trim() !== '') {
+            uploadNoteToCloud(item.bracketId, item.pipeNo, item.note);
+        }
+    });
+}
+function fetchAllNotesFromCloud() {
+    if (!navigator.onLine) return;
+    fetch(API_BASE_URL + '/get-notes?t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(cloudNotes) {
+            var newNotes = {};
+            Object.keys(cloudNotes || {}).forEach(function(key) {
+                var item = cloudNotes[key];
+                if (item && item.notes && item.notes.length > 0) {
+                    item.notes.sort(function(a, b) { return (b.time || '').localeCompare(a.time || ''); });
+                    var latestNote = item.notes[0];
+                    newNotes[key] = {
+                        bracketId: item.bracketId,
+                        pipeNo: item.pipeNo,
+                        note: latestNote.note,
+                        updateTime: latestNote.time,
+                        user: latestNote.user || '',
+                        synced: true
+                    };
+                }
+            });
+            lsSet('bracketNotes', newNotes);
+            if (currentPage === 'bracket' && bracketInput.value.trim()) doBracketSearch(bracketInput.value.trim());
+        })
+        .catch(function() {});
+}
+function fetchNotesFromCloud(bracketId, pipelineItems) {
+    if (!navigator.onLine) return;
+    fetch(API_BASE_URL + '/get-notes?bracketId=' + encodeURIComponent(bracketId) + '&t=' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(cloudNotes) {
+            var notes = lsGet('bracketNotes', {});
+            Object.keys(notes).forEach(function(key) { if (key.indexOf(bracketId) === 0) delete notes[key]; });
+            Object.keys(cloudNotes || {}).forEach(function(key) {
+                var item = cloudNotes[key];
+                if (item && item.notes && item.notes.length > 0) {
+                    var latestNote = item.notes[item.notes.length - 1];
+                    notes[key] = {
+                        bracketId: item.bracketId,
+                        pipeNo: item.pipeNo,
+                        note: latestNote.note,
+                        updateTime: latestNote.time,
+                        user: latestNote.user || '',
+                        synced: true
+                    };
+                }
+            });
+            lsSet('bracketNotes', notes);
+            pipelineItems.forEach(function(pItem) {
+                var noteDisplayId = 'note-display-' + pItem.lineNo.replace(/[^a-zA-Z0-9]/g, '_');
+                var displaySpan = document.getElementById(noteDisplayId);
+                if (displaySpan) {
+                    var newNote = getNoteFromLocal(bracketId, pItem.lineNo);
+                    if (newNote) { displaySpan.textContent = newNote; displaySpan.className = 'remark-display'; var pending = displaySpan.parentNode.querySelector('.remark-pending'); if (pending) pending.remove(); }
+                    else { displaySpan.textContent = '暂无备注'; displaySpan.className = 'remark-empty'; }
+                }
+            });
+        })
+        .catch(function() {});
+}
+function openNoteDialog(bracketId, pipeNo, noteDisplayId) {
+    var savedNote = getNoteFromLocal(bracketId, pipeNo);
+    noteDialogData.bracketId = bracketId;
+    noteDialogData.pipeNo = pipeNo;
+    noteDialogData.noteDisplayId = noteDisplayId;
+    document.getElementById('noteDialogInput').value = savedNote || '';
+
+    // 👇 显示当前用户
+    var userEl = document.getElementById('noteDialogUser');
+    if (userEl) {
+        userEl.textContent = currentUser || '（未设置，保存时会提示）';
+        userEl.style.color = currentUser ? 'var(--green-primary)' : '#f59e0b';
+    }
+
+    document.getElementById('noteDialog').classList.add('active');
+}
+
+// 👇 新增：弹框里修改姓名
+function changeNoteUser() {
+    var name = prompt('请输入姓名', currentUser || '');
+    if (name !== null) {
+        setCurrentUser(name.trim());
+        var userEl = document.getElementById('noteDialogUser');
+        if (userEl) {
+            userEl.textContent = currentUser || '（未设置）';
+            userEl.style.color = currentUser ? 'var(--green-primary)' : '#f59e0b';
+        }
+    }
+}
+function closeNoteDialog() { document.getElementById('noteDialog').classList.remove('active'); }
+function saveNoteFromDialog() {
+    var note = document.getElementById('noteDialogInput').value.trim();
+    if (!note) { showToast('备注内容不能为空'); return; }
+    if (!currentUser) { showToast('请先在顶部设置姓名'); promptUserName(); return; }
+
+    var data = noteDialogData;
+    saveBracketNote(data.bracketId, data.pipeNo, note, function() {
+        var displaySpan = document.getElementById(data.noteDisplayId);
+        if (displaySpan) {
+            displaySpan.innerHTML = escapeHtml(note) +
+                '<span style="color:var(--text-secondary);font-size:12px;margin-left:8px;">— ' + escapeHtml(currentUser) + '</span>';
+            displaySpan.className = 'remark-display';
+        }
+        closeNoteDialog();
+    });
+}
+function deleteNoteFromDialog() {
+    var data = noteDialogData;
+    saveNoteToLocal(data.bracketId, data.pipeNo, '');
+    if (navigator.onLine) uploadNoteToCloud(data.bracketId, data.pipeNo, '');
+    var displaySpan = document.getElementById(data.noteDisplayId);
+    if (displaySpan) { displaySpan.textContent = '暂无备注'; displaySpan.className = 'remark-empty'; }
+    closeNoteDialog();
+    showToast('✅ 备注已删除');
+}
+
+// ============================================================
+//                    管线查询
+// ============================================================
+function searchPipeline() {
+    var q = pipelineInput.value.trim();
+    var subItem = document.getElementById('subItemSelect').value;
+    if (!q && !subItem) { showWelcomePipeline(); return; }
+    if (!dataLoaded || pipelineData.length === 0) { resultAreaPipeline.innerHTML = '<div class="no-result"><span>⏳</span>数据加载中...</div>'; return; }
+    doPipelineSearch(q, subItem);
+}
+function doPipelineSearch(q, subItem) {
+    var lower = q ? q.toUpperCase() : '';
+    var matched = pipelineData.filter(function (item) {
+        if (subItem && item.subItem !== subItem) return false;
+        if (!lower) return true;
+        var lineMatch = item.lineNo && item.lineNo.toUpperCase().indexOf(lower) !== -1;
+        var weldMatch = item.welds && item.welds.toUpperCase().indexOf(lower) !== -1;
+        return lineMatch || weldMatch;
+    });
+    if (matched.length === 0) { resultAreaPipeline.innerHTML = '<div class="no-result"><span>🔎</span>未找到</div>'; return; }
+    var html = '<div class="stats">📌 找到 ' + matched.length + ' 条结果</div>';
+    matched.forEach(function (item) {
+        var safeId = item.lineNo.replace(/[^a-zA-Z0-9]/g, '_');
+        var welds = item.welds ? item.welds.split(/\s+/).filter(function (w) { return w.length > 0; }) : [];
+        var badges = welds.map(function (w) {
+            var isHighlight = lower && w.toUpperCase().indexOf(lower) !== -1;
+            return '<span class="badge' + (isHighlight ? ' highlight' : '') + '" onclick="openWeldDialog(\'' + escapeJs(item.isoNo) + '\', \'' + escapeJs(w) + '\')">' + escapeHtml(w) + ' 🔍</span>';
+        }).join('');
+        var tailKey = item.subItem + '_' + item.lineNo;
+        var tails = tailItemsCache[tailKey] || [];
+        var tailHtml = tails.map(function (t, i) {
+            var pendingTag = t._pending ? '<span style="color:#f59e0b;font-size:12px;margin-left:6px;">⏳ 待同步</span>' : '';
+            var userTag = t.user ? '<span style="color:var(--text-secondary);font-size:12px;margin-left:6px;">— ' + escapeHtml(t.user) + '</span>' : '';
+            return '<div style="font-size:14px;color:var(--text-value);padding:2px 0;">尾项' + (i + 1) + '  ' + escapeHtml(t.content) + pendingTag + userTag + '</div>';
+        }).join('');
+        html += '<div class="result-card">' +
+            '<div class="card-row"><div class="label">子项号</div><div class="value" style="color:#7c3aed;">' + escapeHtml(item.subItem) + '</div></div>' +
+            '<div class="card-row"><div class="label">管线号</div><div class="value" style="color:#1a5fb0;">' + escapeHtml(item.lineNo) + '</div></div>' +
+            '<div class="card-row"><div class="label">单线图号</div><div class="value" style="font-size:13px;display:flex;align-items:center;gap:8px;">' + escapeHtml(item.isoNo) +
+            '<button onclick="copyIsoNo(\'' + escapeJs(item.isoNo) + '\')" style="padding:3px 10px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:4px;font-size:11px;color:var(--text-primary);cursor:pointer;">📋 复制</button></div></div>' +
+            '<div class="card-row"><div class="label">图纸版本</div><div class="value">' + escapeHtml(item.version) + '</div></div>' +
+            '<div class="card-row"><div class="label">探伤比例</div><div class="value">' + escapeHtml(item.testRatio || '未设置') + '</div></div>' +
+            '<div class="card-row"><div class="label">保温厚度</div><div class="value">' + escapeHtml(item.insulationThickness || '未设置') + '</div></div>' +
+            '<div style="padding:10px 0;border-top:1px solid var(--border-light);">' +
+                '<div id="tail-area-' + safeId + '">' +
+                    '<div class="tail-list">' + tailHtml + '</div>' +
+                    '<button onclick="openTailDialog(\'' + escapeJs(item.subItem) + '\', \'' + escapeJs(item.lineNo) + '\', \'' + safeId + '\')" style="margin-top:6px;padding:6px 16px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:13px;cursor:pointer;">➕ 添加尾项</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="card-row"><div class="label">已焊接焊口</div><div class="value" style="display:flex;flex-wrap:wrap;gap:4px;">' + (badges || '<span style="color:var(--text-tertiary);">无</span>') + '</div></div>' +
+            '</div>';
+    });
+    resultAreaPipeline.innerHTML = html;
+}
+
+// ============================================================
+//                    支架查询
+// ============================================================
+function searchBracket() {
+    var q = bracketInput.value.trim();
+    if (!q) { showWelcomeBracket(); return; }
+    if (!dataLoaded || pipelineData.length === 0) { resultAreaBracket.innerHTML = '<div class="no-result"><span>⏳</span>数据加载中...</div>'; return; }
+    doBracketSearch(q);
+}
+function doBracketSearch(q) {
+    var lower = q.toUpperCase();
+    var matched = pipelineData.filter(function(item) { return item.brackets && item.brackets.toUpperCase().indexOf(lower) !== -1; });
+    if (matched.length === 0) { resultAreaBracket.innerHTML = '<div class="no-result"><span>🔎</span>未找到支架</div>'; return; }
+    var matchedBracket = '';
+    matched.forEach(function(item) {
+        if (matchedBracket) return;
+        var brackets = item.brackets.split(/[,，\s]+/);
+        brackets.forEach(function(b) { if (!matchedBracket && b.toUpperCase() === lower) matchedBracket = b; });
+    });
+    if (!matchedBracket) {
+        matched.forEach(function(item) {
+            if (matchedBracket) return;
+            var brackets = item.brackets.split(/[,，\s]+/);
+            brackets.forEach(function(b) { if (!matchedBracket && b.toUpperCase().indexOf(lower) !== -1) matchedBracket = b; });
+        });
+    }
+    if (!matchedBracket && matched.length > 0) matchedBracket = matched[0].brackets.split(/[,，\s]+/)[0];
+    var exactMatched = pipelineData.filter(function(item) { return item.brackets && item.brackets.toUpperCase().indexOf(matchedBracket.toUpperCase()) !== -1; });
+    renderBracketResults(exactMatched, matchedBracket, q);
+    fetchNotesFromCloud(matchedBracket, exactMatched);
+}
+function renderBracketResults(exactMatched, matchedBracket, q) {
+    var html = '<div class="stats">🔧 支架 "<strong>' + escapeHtml(matchedBracket) + '</strong>" 对应 ' + exactMatched.length + ' 条管线</div>';
+    exactMatched.forEach(function(item) {
+        var savedNote = getNoteFromLocal(matchedBracket, item.lineNo);
+        var synced = isNoteSynced(matchedBracket, item.lineNo);
+		var savedUser = getNoteUser(matchedBracket, item.lineNo);
+        var noteDisplayId = 'note-display-' + item.lineNo.replace(/[^a-zA-Z0-9]/g, '_');
+        var cachedStatus = getStatusFromLocal(matchedBracket, item.lineNo);
+		var statusUser = getStatusUserFromLocal(matchedBracket, item.lineNo);
+        var remarkHtml = savedNote
+            ? '<span id="' + noteDisplayId + '" class="remark-display">' + escapeHtml(savedNote) +
+              (savedUser ? '<span style="color:var(--text-secondary);font-size:12px;margin-left:8px;">— ' + escapeHtml(savedUser) + '</span>' : '') +
+              '</span>' + (!synced ? '<span class="remark-pending">⏳ 待同步</span>' : '')
+            : '<span id="' + noteDisplayId + '" class="remark-empty">暂无备注</span>';
+        var statusHtml = cachedStatus
+            ? '<span class="status-badge ' + getStatusClass(cachedStatus) + '">' + escapeHtml(cachedStatus) + '</span>' +
+              (statusUser ? '<span style="color:var(--text-secondary);font-size:12px;margin-left:8px;">— ' + escapeHtml(statusUser) + '</span>' : '')
+            : '<span class="status-empty">未设置</span>';
+        html += '<div class="result-card">' +
+            '<div class="card-row"><div class="label">管线号</div><div class="value" style="color:#1a5fb0;">' + escapeHtml(item.lineNo) + '</div></div>' +
+            '<div class="card-row"><div class="label">子项号</div><div class="value">' + escapeHtml(item.subItem) + '</div></div>' +
+            '<div class="card-row"><div class="label">单线图号</div><div class="value" style="font-size:13px;">' + escapeHtml(item.isoNo) + '</div></div>' +
+            '<div class="card-row"><div class="label">支架号</div><div class="value" style="color:#5b21b6;">' + escapeHtml(matchedBracket) + '</div></div>' +
+            '<div class="card-row"><div class="label">📊 状态</div><div class="value">' + statusHtml + '</div></div>' +
+            '<div class="card-row" style="flex-wrap:wrap;gap:8px;background:var(--bg-input);border-radius:4px;padding:8px 12px;">' +
+                '<div class="label" style="width:70px;">📝 备注</div>' + remarkHtml +
+                '<button onclick="openNoteDialog(\'' + matchedBracket + '\', \'' + item.lineNo + '\', \'' + noteDisplayId + '\')" style="padding:6px 16px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:13px;cursor:pointer;">✏️ 备注</button>' +
+            '</div>' +
+        '</div>';
+    });
+    resultAreaBracket.innerHTML = html;
+}
+
+// ============================================================
+//                    阀门查询
+// ============================================================
+function searchValve() {
+    var q = valveInput.value.trim();
+    if (!q) { showWelcomeValve(); return; }
+    doValveSearch(q);
+}
+function doValveSearch(q) {
+    var data = getValveData(q);
+    if (!data) {
+        resultAreaValve.innerHTML = '<div class="no-result"><span>🔎</span>未找到阀门位号 "<strong>' + escapeHtml(q) + '</strong>"<div style="font-size:13px;margin-top:8px;color:var(--text-tertiary);">💡 请检查阀门位号是否完整</div></div>';
+        return;
+    }
+    var statusHtml = data._pending ? ' <span style="color:#f59e0b;font-size:12px;">⏳ 待上传</span>' : '';
+    var html = '<div class="stats">🚪 阀门位号：<strong>' + escapeHtml(q) + '</strong>' + statusHtml + '</div>';
+    html += '<div class="result-card">' +
+        '<div class="card-row"><div class="label">子项号</div><div class="value">' + escapeHtml(data.subItem) + '</div></div>' +
+        '<div class="card-row"><div class="label">管线号</div><div class="value" style="color:#1a5fb0;">' + escapeHtml(data.lineNo) + '</div></div>' +
+        '<div class="card-row"><div class="label">阀门名称</div><div class="value">' + escapeHtml(data.valveName) + '</div></div>' +
+        '<div class="card-row"><div class="label">阀门位号</div><div class="value" style="color:#065f46;">' + escapeHtml(data.valveTag) + '</div></div>' +
+        '<div class="card-row"><div class="label">阀门ID</div><div class="value">' + escapeHtml(data.valveId) + '</div></div>' +
+        '<div class="card-row"><div class="label">直径</div><div class="value">' + escapeHtml(data.diameter) + '</div></div>' +
+        '<div class="card-row"><div class="label">公称压力</div><div class="value">' + escapeHtml(data.pressure) + '</div></div>' +
+        '<div class="card-row"><div class="label">焊口号1</div><div class="value">' + (data.weldNo1 ? escapeHtml(data.weldNo1) : '<span style="color:var(--text-tertiary);">未录入</span>') + '</div></div>' +
+        '<div class="card-row"><div class="label">焊口号2</div><div class="value">' + (data.weldNo2 ? escapeHtml(data.weldNo2) : '<span style="color:var(--text-tertiary);">未录入</span>') + '</div></div>' +
+        '<div class="card-row"><div class="label">阀门序列号</div><div class="value">' + (data.serialNo ? escapeHtml(data.serialNo) : '<span style="color:var(--text-tertiary);">未录入</span>') + '</div></div>' +
+        '<div class="card-row"><div class="label">录入人</div><div class="value">' + (data.user ? escapeHtml(data.user) : '<span style="color:var(--text-tertiary);">未记录</span>') + '</div></div>' +
+		'<div class="card-row" style="background:var(--green-bg);border-radius:4px;padding:10px 12px;">' +
+            '<div class="label" style="width:70px;">📝 录入</div>' +
+            '<button onclick="openValveDialog(\'' + escapeJs(q) + '\')" style="padding:8px 20px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:13px;cursor:pointer;">✏️ 录入数据</button>' +
+        '</div></div>';
+    resultAreaValve.innerHTML = html;
+}
+
+// ============================================================
+//                    壁厚查询
+// ============================================================
+function searchSchedule() {
+    var inputVal = scheduleInput.value.trim();
+    if (!inputVal) { scheduleResult.innerHTML = '<div class="no-result" style="margin:8px 0;">请输入公称直径</div>'; return; }
+    var dnKey = inputVal.toUpperCase().startsWith('DN') ? inputVal.toUpperCase() : 'DN' + inputVal.toUpperCase();
+    var data = scheduleData[dnKey];
+    if (!data) { scheduleResult.innerHTML = '<div class="no-result" style="margin:8px 0;">未找到 ' + escapeHtml(dnKey) + '</div>'; return; }
+    selectedDN = dnKey;
+    renderScheduleResult(dnKey, data);
+}
+function renderScheduleResult(dnKey, data) {
+    var schKey = selectedSCH;
+    var thickness = (schKey && data[schKey] !== undefined) ? data[schKey] : '';
+    var html = '<div class="result-card-schedule">';
+    html += '<div style="display:flex;justify-content:space-between;margin-bottom:12px;">';
+    html += '<div><span style="font-size:13px;color:var(--text-secondary);">公称直径</span><div class="big-number">' + escapeHtml(dnKey) + '<span>mm</span></div></div>';
+    html += '<div><span style="font-size:13px;color:var(--text-secondary);">外径</span><div class="big-number">' + data.外径 + '<span>mm</span></div></div>';
+    html += '</div>';
+    html += '<div class="result-row"><span class="rlabel">壁厚代码</span><span class="rvalue">' + (schKey || '请选择') + '</span></div>';
+    if (thickness !== '') html += '<div class="result-row"><span class="rlabel">壁厚</span><span class="rvalue">' + thickness + '<span class="unit">mm</span></span></div>';
+    html += '</div>';
+    scheduleResult.innerHTML = html;
+    setTimeout(function() {
+        try { scheduleResult.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+        catch(e) { scheduleResult.scrollIntoView(); }
+    }, 100);
+}
+function selectDN(dn) {
+    selectedDN = dn;
+    document.querySelectorAll('#dnQuickGrid button').forEach(function(btn) {
+        btn.classList.remove('active');
+        if (btn.dataset.dn === dn) btn.classList.add('active');
+    });
+    scheduleInput.value = dn;
+    if (scheduleData[dn]) renderScheduleResult(dn, scheduleData[dn]);
+}
+function selectSCH(sch) {
+    selectedSCH = sch;
+    document.querySelectorAll('#scheduleGrid button').forEach(function(btn) {
+        btn.classList.remove('active');
+        if (btn.dataset.sch === sch) btn.classList.add('active');
+    });
+    if (selectedDN && scheduleData[selectedDN]) renderScheduleResult(selectedDN, scheduleData[selectedDN]);
+}
+
+// ============================================================
+//                    事件绑定
+// ============================================================
+pipelineBtn.addEventListener('click', searchPipeline);
+pipelineInput.addEventListener('keyup', function(e) { if (e.key === 'Enter') searchPipeline(); });
+bracketBtn.addEventListener('click', searchBracket);
+bracketInput.addEventListener('keyup', function(e) { if (e.key === 'Enter') searchBracket(); });
+valveBtn.addEventListener('click', searchValve);
+valveInput.addEventListener('keyup', function(e) { if (e.key === 'Enter') searchValve(); });
+scheduleBtn.addEventListener('click', searchSchedule);
+scheduleInput.addEventListener('keyup', function(e) { if (e.key === 'Enter') searchSchedule(); });
+
+document.querySelectorAll('#bracketQuick button').forEach(function(b) {
+    b.addEventListener('click', function() { bracketInput.value = this.dataset.bracket; bracketInput.focus(); });
+});
+document.querySelectorAll('#valveQuick button').forEach(function(b) {
+    b.addEventListener('click', function() { valveInput.value = this.dataset.valve; valveInput.focus(); });
+});
+document.querySelectorAll('#dnQuickGrid button').forEach(function(b) {
+    b.addEventListener('click', function() { selectDN(this.dataset.dn); });
+});
+document.querySelectorAll('#scheduleGrid button').forEach(function(b) {
+    b.addEventListener('click', function() { selectSCH(this.dataset.sch); });
+});
+
+// ============================================================
+//                    弯头计算器
+// ============================================================
+function initBendCalculator() {
+    var npsSelect = document.getElementById('npsSelect');
+    var customNpsInput = document.getElementById('customNpsInput');
+    var angleInput = document.getElementById('angleInput');
+    var calcBtn = document.getElementById('calcBtn');
+    var resetBtn = document.getElementById('resetBtn');
+    var resultAEl = document.getElementById('bendResultA');
+    var resultLEl = document.getElementById('bendResultL');
+    var bendRadiusBadge = document.getElementById('bendRadiusBadge');
+    var errorMsgEl = document.getElementById('bendErrorMsg');
+    if (!calcBtn || !npsSelect) return;
+
+    function toRadians(deg) { return deg * Math.PI / 180; }
+    function formatNumber(num) { return Number(num.toFixed(2)).toString(); }
+
+    function parseNpsInput(input) {
+        if (!input) return null;
+        var str = input.trim().replace(/["']/g, '');
+        if (elbowData[str] !== undefined) return { type: 'standard', key: str, value: elbowData[str] };
+        if (str.indexOf('/') !== -1 && str.indexOf('-') === -1) {
+            var parts = str.split('/');
+            if (parts.length === 2) {
+                var num = parseFloat(parts[0]), den = parseFloat(parts[1]);
+                if (!isNaN(num) && !isNaN(den) && den !== 0) {
+                    var val = num / den;
+                    for (var k in elbowData) {
+                        var kv = parseFloat(k);
+                        if (!isNaN(kv) && Math.abs(kv - val) < 0.001) return { type: 'standard', key: k, value: elbowData[k] };
+                    }
+                    return { type: 'custom', value: val, display: str };
+                }
+            }
+        }
+        if (str.indexOf('-') !== -1 && str.indexOf('/') !== -1) {
+            var parts2 = str.split('-');
+            if (parts2.length === 2) {
+                var whole = parseFloat(parts2[0]);
+                var fracParts = parts2[1].split('/');
+                if (fracParts.length === 2) {
+                    var n2 = parseFloat(fracParts[0]), d2 = parseFloat(fracParts[1]);
+                    if (!isNaN(whole) && !isNaN(n2) && !isNaN(d2) && d2 !== 0) {
+                        var val2 = whole + n2 / d2;
+                        for (var k2 in elbowData) {
+                            var kv2 = parseFloat(k2);
+                            if (!isNaN(kv2) && Math.abs(kv2 - val2) < 0.001) return { type: 'standard', key: k2, value: elbowData[k2] };
+                        }
+                        return { type: 'custom', value: val2, display: str };
+                    }
+                }
+            }
+        }
+        var numVal = parseFloat(str);
+        if (!isNaN(numVal) && numVal > 0) {
+            for (var k3 in elbowData) {
+                var kv3 = parseFloat(k3);
+                if (!isNaN(kv3) && Math.abs(kv3 - numVal) < 0.001) return { type: 'standard', key: k3, value: elbowData[k3] };
+            }
+            return { type: 'custom', value: numVal, display: str };
+        }
+        return null;
+    }
+    function getBendRadiusFromInch(inchValue) { return 1.5 * inchValue * 25.4; }
+    function calculate() {
+        errorMsgEl.style.display = 'none';
+        var npsInfo = null;
+        var customVal = customNpsInput.value.trim();
+        if (customVal !== '') {
+            npsInfo = parseNpsInput(customVal);
+            if (!npsInfo) { showError('无法解析'); return; }
+        } else {
+            var selectedKey = npsSelect.value;
+            var R = elbowData[selectedKey];
+            if (R === undefined) { showError('数据异常'); return; }
+            npsInfo = { type: 'standard', key: selectedKey, value: R };
+        }
+        var R2 = npsInfo.type === 'standard' ? npsInfo.value : getBendRadiusFromInch(npsInfo.value);
+        var angleStr = angleInput.value.trim();
+        if (angleStr === '') { showError('请输入角度'); return; }
+        var angle = parseFloat(angleStr);
+        if (isNaN(angle) || angle <= 0 || angle >= 180) { showError('角度需在 0°~180° 之间'); return; }
+        var angleRad = toRadians(angle);
+        var A = R2 * Math.tan(angleRad / 2);
+        var L = R2 * angleRad;
+        resultAEl.innerHTML = formatNumber(A) + '<span class="bend-result-unit">mm</span>';
+        resultLEl.innerHTML = formatNumber(L) + '<span class="bend-result-unit">mm</span>';
+        var isCustom = npsInfo.type === 'custom';
+        bendRadiusBadge.textContent = 'R = ' + formatNumber(R2) + ' mm' + (isCustom ? ' (自定义)' : '');
+        if (isCustom) { bendRadiusBadge.style.background = '#fff3e0'; bendRadiusBadge.style.borderColor = '#ffb74d'; bendRadiusBadge.style.color = '#e65100'; }
+        else { bendRadiusBadge.style.background = 'var(--bg-card)'; bendRadiusBadge.style.borderColor = 'var(--border-light)'; bendRadiusBadge.style.color = 'var(--green-primary)'; }
+    }
+    function showError(msg) {
+        errorMsgEl.textContent = msg;
+        errorMsgEl.style.display = 'block';
+        resultAEl.innerHTML = '—<span class="bend-result-unit">mm</span>';
+        resultLEl.innerHTML = '—<span class="bend-result-unit">mm</span>';
+        bendRadiusBadge.textContent = 'R = —';
+    }
+    function resetToDefault() {
+        npsSelect.value = '4';
+        customNpsInput.value = '';
+        angleInput.value = '90';
+        errorMsgEl.style.display = 'none';
+        calculate();
+    }
+    calcBtn.addEventListener('click', calculate);
+    resetBtn.addEventListener('click', resetToDefault);
+    angleInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') { e.preventDefault(); calculate(); } });
+    customNpsInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') { e.preventDefault(); calculate(); } });
+    npsSelect.addEventListener('change', function() {
+        customNpsInput.value = '';
+        if (angleInput.value.trim() !== '' && !isNaN(parseFloat(angleInput.value))) calculate();
+    });
+    var debounceTimer;
+    function autoCalculate() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function() {
+            var angleVal = angleInput.value.trim();
+            if (angleVal !== '' && !isNaN(parseFloat(angleVal))) {
+                var angle = parseFloat(angleVal);
+                if (angle > 0 && angle < 180) calculate();
+            }
+        }, 300);
+    }
+    angleInput.addEventListener('input', autoCalculate);
+    customNpsInput.addEventListener('input', autoCalculate);
+    calculate();
+}
+
+/// ============================================================
+//                    热更新
+// ============================================================
+function checkHotUpdate() {
+    if (typeof plus !== 'undefined') {
+        plus.runtime.getProperty(plus.runtime.appid, function(widgetInfo) {
+            currentVersion = widgetInfo.version;
+            currentVersionEl.textContent = currentVersion;
+            checkRemoteVersion();
+        });
+    } else {
+        currentVersionEl.textContent = APP_VERSION;
+        checkRemoteVersion();
+    }
+}
+
+function checkRemoteVersion() {
+    fetch(UPDATE_URL + '?' + Date.now())
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var remoteVersion = data.version;
+            var wgtUrl = data.wgtUrl;
+            var updateLog = data.updateLog || '更新了数据';
+            if (compareVersion(currentVersion, remoteVersion)) {
+                if (typeof plus !== 'undefined') {
+                    plus.nativeUI.confirm('发现新版本 v' + remoteVersion + '\n\n' + updateLog + '\n\n是否立即更新？',
+                        function(e) { if (e.index === 0) downloadWgt(wgtUrl); },
+                        '🔄 发现新版本', ['立即更新', '稍后']);
+                } else {
+                    if (confirm('发现新版本 v' + remoteVersion + '\n' + updateLog + '\n\n是否立即更新？')) downloadWgt(wgtUrl);
+                }
+            }
+        })
+        .catch(function(err) { console.log('检查更新失败:', err); });
+}
+
+function compareVersion(current, remote) {
+    if (!current || !remote) return false;
+    var cv = current.split('.');
+    var rv = remote.split('.');
+    for (var i = 0; i < Math.max(cv.length, rv.length); i++) {
+        var c = parseInt(cv[i] || 0);
+        var r = parseInt(rv[i] || 0);
+        if (r > c) return true;
+        if (r < c) return false;
+    }
+    return false;
+}
+
+function downloadWgt(wgtUrl) { deleteWgtFile(function() { startDownload(wgtUrl); }); }
+
+function startDownload(wgtUrl) {
+    plus.nativeUI.showWaiting('正在下载更新...', { modal: true });
+    var dtask = plus.downloader.createDownload(wgtUrl + '?t=' + new Date().getTime(), { filename: '_doc/update.wgt', method: 'GET' });
+    dtask.addEventListener('statechanged', function(task, status) {
+        if (task.state === 4) {
+            plus.io.resolveLocalFileSystemURL('_doc/update.wgt', function(entry) {
+                plus.nativeUI.closeWaiting();
+                installWgt(entry.fullPath);
+            }, function() { plus.nativeUI.closeWaiting(); plus.nativeUI.toast('下载失败'); });
+        }
+    });
+    dtask.addEventListener('error', function(e) { plus.nativeUI.closeWaiting(); plus.nativeUI.toast('下载错误'); });
+    dtask.start();
+}
+
+function installWgt(filePath) {
+    plus.nativeUI.showWaiting('正在安装...', { modal: true });
+    var installPath = filePath.indexOf('file://') !== 0 ? 'file://' + filePath : filePath;
+    plus.runtime.install(installPath, { force: false },
+        function() { plus.nativeUI.closeWaiting(); plus.nativeUI.alert('✅ 更新成功！即将重启', function() { plus.runtime.restart(); }); },
+        function(e) { plus.nativeUI.closeWaiting(); plus.nativeUI.toast('安装失败: ' + e.message); });
+}
+
+function deleteWgtFile(callback) {
+    plus.io.resolveLocalFileSystemURL('_doc/update.wgt', function(entry) {
+        entry.remove(function() { if (callback) callback(); }, function() { if (callback) callback(); });
+    }, function() { if (callback) callback(); });
+}
+
+// ============================================================
+//                    启动
+// ============================================================
+console.log('🚀 APP 启动...');
+
+// 加载设置
+loadSettings();
+
+currentUser = getCurrentUser();
+updateUserBadge();
+
+updateNetworkStatus();
+buildKeyboard();
+
+loadStaticLibs().then(function() {
+    initBendCalculator();
+});
+
+loadDataFromServer();
+loadSubItems();
+loadBracketStatusFromJson();
+loadValvePending();
+loadValveDataFromJson();
+loadWeldInfoFromJson();
+loadTailItemsFromServer();
+renderBracketTotalArea();   // ✅ 预加载支架总量
+renderValveTotalArea();   // ✅ 预加载阀门总量
+
+setTimeout(fetchAllNotesFromCloud, 1500);
+setTimeout(syncPendingTails, 3000);
+
+// 默认进入工作量页
+switchPage('work');
+
+if (typeof plus !== 'undefined') {
+    document.addEventListener('plusready', function() {
+        setTimeout(checkHotUpdate, 3000);
+        setTimeout(syncPendingNotes, 5000);
+        setTimeout(syncPendingValves, 5500);
+        setTimeout(syncPendingTails, 5700);
+        setTimeout(fetchAllNotesFromCloud, 6000);
+        setTimeout(loadBracketStatusFromJson, 6500);
+    });
+} else {
+    setTimeout(checkHotUpdate, 2000);
+    setTimeout(fetchAllNotesFromCloud, 2500);
+    setTimeout(loadBracketStatusFromJson, 3000);
+}
+
+console.log('🚀 APP 启动完成');
+</script>
+</body>
+</html>
