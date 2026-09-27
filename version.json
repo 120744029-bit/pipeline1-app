@@ -3,6 +3,6 @@
     "updateTime": "2026-09-21 16:00:00",
     "dataFile": "data.json",
     "dataCount": 1039,
-    "wgtUrl": "https://app-rho-nine-41.vercel.app/update.wgt",
+    "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
     "updateLog": "支架阀门都增加了刷新按钮，查看状态前先刷新下"
 }

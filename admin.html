@@ -753,19 +753,21 @@ body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: c
 // ============================================================
 //                    配置
 // ============================================================
-var API_BASE = 'https://app-rho-nine-41.vercel.app/api';
+var BASE = 'https://pipeline1-app-sjb7zjvz.edgeone.dev';
+var API_BASE = BASE + '/api';
+var KV_API = API_BASE + '/kv';   // ← 新增：统一入口
 
-var GET_NOTES_API   = API_BASE + '/get-notes';
-var SAVE_NOTE_API   = API_BASE + '/save-note';
-var DELETE_NOTE_API = API_BASE + '/delete-note';
-var GET_VALVES_API  = API_BASE + '/get-valves';
-var SAVE_VALVE_API  = API_BASE + '/save-valve';
-var DELETE_VALVE_API= API_BASE + '/delete-valve';
-var FLUSH_DB_API    = API_BASE + '/flush-db';
+var GET_NOTES_API   = KV_API + '?action=get-notes';
+var SAVE_NOTE_API   = KV_API + '?action=save-note';
+var DELETE_NOTE_API = KV_API + '?action=delete-note';
+var GET_VALVES_API  = KV_API + '?action=get-valves';
+var SAVE_VALVE_API  = KV_API + '?action=save-valve';
+var DELETE_VALVE_API= KV_API + '?action=delete-valve';
+var FLUSH_DB_API    = KV_API + '?action=flush-db';
 
-var DATA1_URL = 'https://app-rho-nine-41.vercel.app/data1.json';
-var DATA2_URL = 'https://app-rho-nine-41.vercel.app/data2.json';
-var DATA4_URL = 'https://app-rho-nine-41.vercel.app/data4.json';
+var DATA1_URL = BASE + '/data1.json';
+var DATA2_URL = BASE + '/data2.json';
+var DATA4_URL = BASE + '/data4.json';
 var TOTAL_CACHE_KEY = 'totalDataCache';
 
 var TAIL_ITEMS_API  = API_BASE + '/tails?action=get-all';
@@ -825,7 +827,7 @@ function doLogin() {
     adminPassword = pwd;
     loadWorkLocalCache();
 
-    fetch(GET_NOTES_API + '?t=' + Date.now())
+    fetch(GET_NOTES_API + '&t=' + Date.now())
         .then(function(res) { return res.json(); })
         .then(function() {
             document.getElementById('loginPage').style.display = 'none';
@@ -874,14 +876,14 @@ function refreshAllStatus() {
         })
         .catch(function() { document.getElementById('gsValveData').innerHTML = '—'; });
 
-    fetch(GET_NOTES_API + '?t=' + Date.now())
+    fetch(GET_NOTES_API + '&t=' + Date.now())
         .then(function(r) { return r.json(); })
         .then(function(data) {
             document.getElementById('gsNotes').innerHTML = Object.keys(data || {}).length + '<small>条</small>';
         })
         .catch(function() { document.getElementById('gsNotes').innerHTML = '—'; });
 
-    fetch(GET_VALVES_API + '?t=' + Date.now())
+    fetch(GET_VALVES_API + '&t=' + Date.now())
         .then(function(r) { return r.json(); })
         .then(function(data) {
             var count = (data && data.data) ? data.data.length : 0;
@@ -1026,7 +1028,7 @@ function renderUserRow(user) {
 // ============================================================
 function refreshNotesLive() {
     showStatus('🔄 正在刷新...', 'loading');
-    fetch(GET_NOTES_API + '?t=' + Date.now())
+    fetch(GET_NOTES_API + '&t=' + Date.now())
         .then(function(res) { return res.json(); })
         .then(function(obj) {
             notesLiveData = [];
@@ -1079,7 +1081,7 @@ function renderNotesLiveTable() {
 function deleteNoteItem(bracketId, pipeNo) {
     if (!confirm('确认删除该支架所有备注？\n' + bracketId + ' _ ' + pipeNo)) return;
     showStatus('🗑️ 正在删除...', 'loading');
-    fetch(DELETE_NOTE_API + '?bracketId=' + encodeURIComponent(bracketId) + '&pipeNo=' + encodeURIComponent(pipeNo), { method: 'DELETE' })
+    fetch(DELETE_NOTE_API + '&bracketId=' + encodeURIComponent(bracketId) + '&pipeNo=' + encodeURIComponent(pipeNo), { method: 'DELETE' })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.success) { showStatus('✅ ' + (data.message || '已删除'), 'success'); refreshNotesLive(); }
@@ -1115,7 +1117,7 @@ function doEditNote() {
     showStatus('📤 正在保存修改...', 'loading');
 
     // 方案 A：先删旧备注 → 再写新备注（保留原 user）
-    fetch(DELETE_NOTE_API + '?bracketId=' + encodeURIComponent(d.bracketId) +
+    fetch(DELETE_NOTE_API + '&bracketId=' + encodeURIComponent(d.bracketId) +
           '&pipeNo=' + encodeURIComponent(d.pipeNo), { method: 'DELETE' })
         .then(function(r) { return r.json(); })
         .then(function(delRes) {
@@ -1251,7 +1253,7 @@ async function doBatchDeleteNotes() {
     var success = 0, failed = 0;
     for (var i = 0; i < items.length; i++) {
         try {
-            var res = await fetch(DELETE_NOTE_API + '?bracketId=' + encodeURIComponent(items[i].bracketId) +
+            var res = await fetch(DELETE_NOTE_API + '&bracketId=' + encodeURIComponent(items[i].bracketId) +
                 '&pipeNo=' + encodeURIComponent(items[i].pipeNo), { method: 'DELETE' });
             var data = await res.json();
             if (data.success) success++; else failed++;
@@ -2414,7 +2416,7 @@ async function exportData1Json() {
     if (!confirm('生成并导出 data1.json？')) return;
     showStatus('📥 正在生成...', 'loading');
     try {
-        var notesRes = await fetch(GET_NOTES_API + '?t=' + Date.now());
+        var notesRes = await fetch(GET_NOTES_API + '&t=' + Date.now());
         var notesObj = await notesRes.json();
         var data1Res = await fetch(DATA1_URL + '?t=' + Date.now());
         var oldStatusMap = await data1Res.json();
@@ -2449,7 +2451,7 @@ async function exportData1Json() {
 // ============================================================
 function refreshValveLive() {
     showStatus('🔄 正在刷新阀门动态库...', 'loading');
-    fetch(GET_VALVES_API + '?t=' + Date.now())
+    fetch(GET_VALVES_API + '&t=' + Date.now())
         .then(function(res) { return res.json(); })
         .then(function(data) {
             valveLiveData = (data && data.success && Array.isArray(data.data)) ? data.data : [];
@@ -2489,7 +2491,7 @@ function renderValveLiveTable() {
 function deleteValveLiveItem(valveTag) {
     if (!confirm('确认删除该阀门所有录入？\n' + valveTag)) return;
     showStatus('🗑️ 正在删除...', 'loading');
-    fetch(DELETE_VALVE_API + '?key=' + encodeURIComponent('阀门_' + valveTag), { method: 'DELETE' })
+    fetch(DELETE_VALVE_API + '&key=' + encodeURIComponent('阀门_' + valveTag), { method: 'DELETE' })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.success) { showStatus('✅ ' + (data.message || '已删除'), 'success'); refreshValveLive(); }
@@ -2723,7 +2725,7 @@ async function exportData2Json() {
     try {
         var staticRes = await fetch(DATA2_URL + '?t=' + Date.now());
         var staticMap = await staticRes.json();
-        var upstashRes = await fetch(GET_VALVES_API + '?t=' + Date.now());
+        var upstashRes = await fetch(GET_VALVES_API + '&t=' + Date.now());
         var upstashData = await upstashRes.json();
         var upstashList = (upstashData && upstashData.data) ? upstashData.data : [];
         var newMap = JSON.parse(JSON.stringify(staticMap));
@@ -2757,7 +2759,7 @@ async function deleteAllValves() {
     if (!confirm('⚠️⚠️ 再次确认？')) return;
     showStatus('🗑️ 正在清空...', 'loading');
     try {
-        var res = await fetch(DELETE_VALVE_API + '?all=1', { method: 'DELETE' });
+        var res = await fetch(DELETE_VALVE_API + '&all=1', { method: 'DELETE' });
         var data = await res.json();
         if (data.success) {
             showStatus('✅ ' + data.message, 'success');

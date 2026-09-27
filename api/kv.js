@@ -3,8 +3,8 @@
 //        整合：备注 + 阀门 + 清库
 //        用法：/api/kv?action=save-note | get-notes | ...
 // ============================================================
-const https = require('https');
-const { URL } = require('url');
+import https from 'https';
+import { URL } from 'url';
 
 // ---------- 通用请求封装 ----------
 function httpsReq(method, url, headers, body) {
@@ -38,7 +38,7 @@ function getKvEnv() {
     return { url, token };
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
