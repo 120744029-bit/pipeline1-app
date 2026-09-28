@@ -1,14 +1,14 @@
 import https from 'https';
 import { URL } from 'url';
 
-function httpsGet(url, headers) {
+function httpsReq(method, url, headers, body) {
     return new Promise((resolve, reject) => {
         const parsedUrl = new URL(url);
         const options = {
             hostname: parsedUrl.hostname,
             port: 443,
             path: parsedUrl.pathname + parsedUrl.search,
-            method: 'GET',
+            method: method,
             headers: headers
         };
         const req = https.request(options, (res) => {
@@ -17,6 +17,7 @@ function httpsGet(url, headers) {
             res.on('end', () => resolve({ status: res.statusCode, body: data }));
         });
         req.on('error', reject);
+        if (body) req.write(body);
         req.end();
     });
 }
@@ -24,46 +25,55 @@ function httpsGet(url, headers) {
 export async function onRequest(context) {
     const UPSTASH_URL = process.env.KV_REST_API_URL;
     const UPSTASH_TOKEN = process.env.KV_REST_API_TOKEN;
-    const authHeaders = { 'Authorization': `Bearer ${UPSTASH_TOKEN}` };
+
+    const result = {
+        envUrl: UPSTASH_URL || '(未设置)',
+        envTokenPrefix: UPSTASH_TOKEN ? UPSTASH_TOKEN.substring(0, 20) + '...' : '(未设置)',
+        tests: {}
+    };
 
     try {
-        // 1. 列出所有 备注_ 开头的 key
-        const keysRes = await httpsGet(
-            `${UPSTASH_URL}/keys/${encodeURIComponent('备注_*')}`,
-            authHeaders
+        const authHeaders = { 'Authorization': `Bearer ${UPSTASH_TOKEN}` };
+
+        // 测试 1：PING
+        const pingRes = await httpsReq('GET', `${UPSTASH_URL}/ping`, authHeaders);
+        result.tests.ping = {
+            status: pingRes.status,
+            body: pingRes.body
+        };
+
+        // 测试 2：SET 一个测试 key
+        const testKey = '调试测试_' + Date.now();
+        const testData = { hello: 'world', time: new Date().toISOString() };
+        const setRes = await httpsReq(
+            'POST',
+            `${UPSTASH_URL}/set/${encodeURIComponent(testKey)}`,
+            { ...authHeaders, 'Content-Type': 'application/json' },
+            JSON.stringify(JSON.stringify(testData))
         );
-        const keysData = JSON.parse(keysRes.body);
-        const allKeys = (keysData.result && Array.isArray(keysData.result)) ? keysData.result : [];
+        result.tests.set = {
+            key: testKey,
+            status: setRes.status,
+            body: setRes.body
+        };
 
-        // 2. 取前 5 个 key，分别查它们的 value
-        const sampleKeys = allKeys.slice(0, 5);
-        const details = [];
-        for (const key of sampleKeys) {
-            try {
-                const valRes = await httpsGet(
-                    `${UPSTASH_URL}/get/${encodeURIComponent(key)}`,
-                    authHeaders
-                );
-                const valData = JSON.parse(valRes.body);
-                details.push({
-                    key: key,
-                    rawValue: valData.result
-                });
-            } catch (e) {
-                details.push({ key: key, error: e.message });
-            }
-        }
+        // 测试 3：GET 刚才的 key
+        const getRes = await httpsReq('GET', `${UPSTASH_URL}/get/${encodeURIComponent(testKey)}`, authHeaders);
+        result.tests.get = {
+            status: getRes.status,
+            body: getRes.body
+        };
 
-        return new Response(JSON.stringify({
-            totalKeys: allKeys.length,
-            allKeysPreview: allKeys.slice(0, 10),
-            sampleDetails: details
-        }, null, 2), {
+        // 测试 4：清理
+        await httpsReq('GET', `${UPSTASH_URL}/del/${encodeURIComponent(testKey)}`, authHeaders);
+
+        return new Response(JSON.stringify(result, null, 2), {
             status: 200,
             headers: { 'Content-Type': 'application/json; charset=utf-8' }
         });
     } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
+        result.error = error.message;
+        return new Response(JSON.stringify(result, null, 2), {
             status: 500,
             headers: { 'Content-Type': 'application/json; charset=utf-8' }
         });
