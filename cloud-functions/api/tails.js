@@ -1,12 +1,62 @@
 // ============================================================
-//              Vercel Serverless Function - 尾项接口（Neon 合并版）
-//              根据 ?action= 区分操作
-//              save / get / get-all / update / delete
-//              ✅ 新增：记录录入人 user（存到 user_name 列）
+//        cloud-functions/api/tails.js —— 尾项接口（Neon）
 // ============================================================
 import { neon } from '@neondatabase/serverless';
 
-export default async function handler(req, res) {
+// ============================================================
+//              EdgeOne 入口（必须叫 onRequest）
+// ============================================================
+export async function onRequest(context) {
+    const { request } = context;
+    const url = new URL(request.url);
+
+    if (request.method === 'OPTIONS') {
+        return new Response(null, {
+            status: 200,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            }
+        });
+    }
+
+    let body = {};
+    if (request.method === 'POST' || request.method === 'DELETE') {
+        try { body = await request.json(); } catch (e) { body = {}; }
+    }
+
+    const req = {
+        method: request.method,
+        query: Object.fromEntries(url.searchParams.entries()),
+        body: body,
+        headers: Object.fromEntries(request.headers.entries())
+    };
+
+    let _responseData = null;
+    let _responseStatus = 200;
+    const res = {
+        setHeader: () => {},
+        status: (code) => { _responseStatus = code; return res; },
+        json: (data) => { _responseData = data; return res; },
+        end: () => { return res; }
+    };
+
+    await originalHandler(req, res);
+
+    return new Response(_responseData !== null ? JSON.stringify(_responseData) : '', {
+        status: _responseStatus,
+        headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Access-Control-Allow-Origin': '*'
+        }
+    });
+}
+
+// ============================================================
+//              以下是你原来的业务逻辑，一行都不改
+// ============================================================
+async function originalHandler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -19,12 +69,9 @@ export default async function handler(req, res) {
 
     // ============================================================
     // 1. 保存尾项
-    //    POST /api/tails?action=save
-    //    body: { subItem, lineNo, content, user }
     // ============================================================
     if (action === 'save') {
       if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-      // ✅ 接收 user
       const { subItem, lineNo, content, user } = req.body || {};
       if (!subItem || !lineNo || !content) {
         return res.status(400).json({ error: 'subItem, lineNo, content required' });
@@ -40,14 +87,13 @@ export default async function handler(req, res) {
           id: result[0].id,
           content: result[0].content,
           createdAt: result[0].created_at,
-          user: result[0].user_name || ''          // ✅ 返回给前端
+          user: result[0].user_name || ''
         }
       });
     }
 
     // ============================================================
     // 2. 查询某管线的尾项
-    //    GET /api/tails?action=get&subItem=xxx&lineNo=yyy
     // ============================================================
     if (action === 'get') {
       if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -66,14 +112,13 @@ export default async function handler(req, res) {
           id: r.id,
           content: r.content,
           createdAt: r.created_at,
-          user: r.user_name || ''                  // ✅
+          user: r.user_name || ''
         }))
       });
     }
 
     // ============================================================
     // 3. 查询所有尾项（按 subItem_lineNo 分组）
-    //    GET /api/tails?action=get-all
     // ============================================================
     if (action === 'get-all') {
       if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -90,7 +135,7 @@ export default async function handler(req, res) {
           id: r.id,
           content: r.content,
           createdAt: r.created_at,
-          user: r.user_name || ''                  // ✅
+          user: r.user_name || ''
         });
       });
       return res.status(200).json(grouped);
@@ -98,8 +143,6 @@ export default async function handler(req, res) {
 
     // ============================================================
     // 4. 修改尾项
-    //    POST /api/tails?action=update
-    //    body: { id, content }
     // ============================================================
     if (action === 'update') {
       if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -122,13 +165,13 @@ export default async function handler(req, res) {
           id: result[0].id,
           content: result[0].content,
           createdAt: result[0].created_at,
-          user: result[0].user_name || ''          // ✅
+          user: result[0].user_name || ''
         }
       });
     }
 
     // ============================================================
-    // 5. 删除尾项（逻辑不变）
+    // 5. 删除尾项
     // ============================================================
     if (action === 'delete') {
       const body = req.body || {};
