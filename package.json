@@ -1,6 +1,13 @@
 {
+  "name": "edgeone-makers-api",
+  "version": "1.0.0",
+  "description": "EdgeOne Makers static + edge api backend",
   "type": "module",
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0"
+    "@neondatabase/serverless": "^0.10.0",
+    "@upstash/redis": "^1.34.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }

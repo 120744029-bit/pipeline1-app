@@ -1,5 +1,7 @@
 {
   "functions": {
-    "directory": "functions"
-  }
+    "runtime": "edge‑functions",
+    "include": ["/api/*"]
+  },
+  "buildCommand": "npm install && npx esbuild edge‑functions/index.js --bundle --format=esm --outfile=.edgeone/functions/index.js --platform=browser"
 }
