@@ -74,7 +74,6 @@ export async function onRequest(context) {
 //                records-range-summary  ← 日期范围汇总（按班组+列）
 //                init                   ← 一次性建表 + 写入默认列
 // ============================================================
-import { neon } from '@neondatabase/serverless';
 
 async function originalHandler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

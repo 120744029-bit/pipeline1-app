@@ -52,7 +52,6 @@ export async function onRequest(context) {
 //              save / get / get-all / update / delete
 //              ✅ 新增：记录录入人 user（存到 user_name 列）
 // ============================================================
-import { neon } from '@neondatabase/serverless';
 
 async function originalHandler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
