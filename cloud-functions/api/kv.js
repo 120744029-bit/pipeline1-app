@@ -1,5 +1,5 @@
 // ============================================================
-//        api/kv.js —— Upstash Redis 统一入口
+//        cloud-functions/api/kv.js —— Upstash Redis 统一入口
 //        整合：备注 + 阀门 + 清库
 //        用法：/api/kv?action=save-note | get-notes | ...
 // ============================================================
@@ -38,7 +38,60 @@ function getKvEnv() {
     return { url, token };
 }
 
-export default async function handler(req, res) {
+// ============================================================
+//              EdgeOne 入口（必须叫 onRequest）
+// ============================================================
+export async function onRequest(context) {
+    const { request } = context;
+    const url = new URL(request.url);
+
+    if (request.method === 'OPTIONS') {
+        return new Response(null, {
+            status: 200,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            }
+        });
+    }
+
+    let body = {};
+    if (request.method === 'POST') {
+        try { body = await request.json(); } catch (e) { body = {}; }
+    }
+
+    const req = {
+        method: request.method,
+        query: Object.fromEntries(url.searchParams.entries()),
+        body: body,
+        headers: Object.fromEntries(request.headers.entries())
+    };
+
+    let _responseData = null;
+    let _responseStatus = 200;
+    const res = {
+        setHeader: () => {},
+        status: (code) => { _responseStatus = code; return res; },
+        json: (data) => { _responseData = data; return res; },
+        end: () => { return res; }
+    };
+
+    await originalHandler(req, res);
+
+    return new Response(_responseData !== null ? JSON.stringify(_responseData) : '', {
+        status: _responseStatus,
+        headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Access-Control-Allow-Origin': '*'
+        }
+    });
+}
+
+// ============================================================
+//              以下是你原来的业务逻辑，一行都不改
+// ============================================================
+async function originalHandler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -236,4 +289,4 @@ export default async function handler(req, res) {
         console.error('KV 操作失败:', error);
         return res.status(500).json({ success: false, message: '服务器错误: ' + error.message });
     }
-};
+}
