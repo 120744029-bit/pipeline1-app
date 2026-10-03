@@ -1,6 +1,5 @@
 // ============================================================
-//        cloud-functions/api/admin-notes.js —— 备注管理接口
-//        改造：导出 originalHandler 供 Layero 复用
+//        Layero 备用后端 —— admin-notes 接口（Upstash Redis）
 // ============================================================
 import https from 'https';
 import { URL } from 'url';
@@ -34,10 +33,7 @@ function safeJsonParse(str) {
     try { return JSON.parse(str); } catch(e) { return null; }
 }
 
-// ============================================================
-//        ★ 导出业务逻辑（EdgeOne 和 Layero 共用）
-// ============================================================
-export async function originalHandler(req, res) {
+export async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Password');
@@ -216,54 +212,4 @@ export async function originalHandler(req, res) {
         console.error('❌ 管理操作失败:', error);
         return res.status(500).json({ success: false, message: '服务器错误: ' + error.message });
     }
-}
-
-// ============================================================
-//        EdgeOne 入口（保持不变）
-// ============================================================
-export async function onRequest(context) {
-    const { request } = context;
-    const url = new URL(request.url);
-
-    if (request.method === 'OPTIONS') {
-        return new Response(null, {
-            status: 200,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Password'
-            }
-        });
-    }
-
-    let body = {};
-    if (request.method === 'POST' || request.method === 'DELETE') {
-        try { body = await request.json(); } catch (e) { body = {}; }
-    }
-
-    const req = {
-        method: request.method,
-        query: Object.fromEntries(url.searchParams.entries()),
-        body: body,
-        headers: Object.fromEntries(request.headers.entries())
-    };
-
-    let _responseData = null;
-    let _responseStatus = 200;
-    const res = {
-        setHeader: () => {},
-        status: (code) => { _responseStatus = code; return res; },
-        json: (data) => { _responseData = data; return res; },
-        end: () => { return res; }
-    };
-
-    await originalHandler(req, res);
-
-    return new Response(_responseData !== null ? JSON.stringify(_responseData) : '', {
-        status: _responseStatus,
-        headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Access-Control-Allow-Origin': '*'
-        }
-    });
 }

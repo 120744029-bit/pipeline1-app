@@ -1,13 +1,9 @@
 // ============================================================
-//        cloud-functions/api/work.js —— 工作量接口
-//        改造：导出 originalHandler 供 Layero 复用
+//        Layero 备用后端 —— work 接口（Neon Postgres）
 // ============================================================
 import { neon } from '@neondatabase/serverless';
 
-// ============================================================
-//        ★ 导出业务逻辑（EdgeOne 和 Layero 共用）
-// ============================================================
-export async function originalHandler(req, res) {
+export async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -73,8 +69,7 @@ export async function originalHandler(req, res) {
 
       const tables = await sql`
         SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public'
-        ORDER BY table_name
+        WHERE table_schema = 'public' ORDER BY table_name
       `;
       const cols = await sql`
         SELECT id, col_key, col_name, sort_order
@@ -157,7 +152,6 @@ export async function originalHandler(req, res) {
     if (action === 'records-get') {
       const { date, from, to, teamId } = req.query;
       let rows;
-
       if (date && teamId) {
         rows = await sql`
           SELECT id, team_id, work_date, unit, quantity, note FROM work_records
@@ -206,8 +200,7 @@ export async function originalHandler(req, res) {
       const records = await sql`
         SELECT team_id, unit, SUM(quantity) AS quantity FROM work_records
         WHERE work_date >= ${from} AND work_date <= ${to}
-        GROUP BY team_id, unit
-        ORDER BY team_id ASC, unit ASC
+        GROUP BY team_id, unit ORDER BY team_id ASC, unit ASC
       `;
       return res.status(200).json({ success: true, data: { teams, columns, records } });
     }
@@ -218,7 +211,6 @@ export async function originalHandler(req, res) {
       if (!team_id || !work_date || !unit) {
         return res.status(400).json({ error: 'team_id, work_date, unit required' });
       }
-
       const r = await sql`
         INSERT INTO work_records (team_id, work_date, unit, quantity, note)
         VALUES (${team_id}, ${work_date}, ${unit}, ${quantity || 0}, ${note || ''})
@@ -235,7 +227,6 @@ export async function originalHandler(req, res) {
       if (!Array.isArray(records) || records.length === 0) {
         return res.status(400).json({ error: 'records array required' });
       }
-
       let saved = 0;
       for (const r of records) {
         if (!r.team_id || !r.work_date || !r.unit) continue;
@@ -253,7 +244,6 @@ export async function originalHandler(req, res) {
     if (action === 'records-delete') {
       if (req.method !== 'DELETE') return res.status(405).json({ error: 'Method not allowed' });
       const { id, date } = req.query;
-
       if (id) {
         await sql`DELETE FROM work_records WHERE id = ${id}`;
         return res.status(200).json({ success: true, message: '已删除该记录' });
@@ -327,54 +317,4 @@ export async function originalHandler(req, res) {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-}
-
-// ============================================================
-//        EdgeOne 入口（保持不变）
-// ============================================================
-export async function onRequest(context) {
-    const { request } = context;
-    const url = new URL(request.url);
-
-    if (request.method === 'OPTIONS') {
-        return new Response(null, {
-            status: 200,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type'
-            }
-        });
-    }
-
-    let body = {};
-    if (request.method === 'POST' || request.method === 'PUT' || request.method === 'DELETE') {
-        try { body = await request.json(); } catch (e) { body = {}; }
-    }
-
-    const req = {
-        method: request.method,
-        query: Object.fromEntries(url.searchParams.entries()),
-        body: body,
-        headers: Object.fromEntries(request.headers.entries())
-    };
-
-    let _responseData = null;
-    let _responseStatus = 200;
-    const res = {
-        setHeader: () => {},
-        status: (code) => { _responseStatus = code; return res; },
-        json: (data) => { _responseData = data; return res; },
-        end: () => { return res; }
-    };
-
-    await originalHandler(req, res);
-
-    return new Response(_responseData !== null ? JSON.stringify(_responseData) : '', {
-        status: _responseStatus,
-        headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Access-Control-Allow-Origin': '*'
-        }
-    });
 }

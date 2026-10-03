@@ -1,6 +1,5 @@
 // ============================================================
-//        cloud-functions/api/kv.js —— Upstash Redis 统一入口
-//        改造：导出 originalHandler 供 Layero 复用
+//        Layero 备用后端 —— kv 接口（Upstash Redis）
 // ============================================================
 import https from 'https';
 import { URL } from 'url';
@@ -35,10 +34,7 @@ function getKvEnv() {
     return { url, token };
 }
 
-// ============================================================
-//        ★ 导出业务逻辑（EdgeOne 和 Layero 共用）
-// ============================================================
-export async function originalHandler(req, res) {
+export async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -50,9 +46,7 @@ export async function originalHandler(req, res) {
         const { url: UPSTASH_URL, token: UPSTASH_TOKEN } = getKvEnv();
         const authHeaders = { 'Authorization': `Bearer ${UPSTASH_TOKEN}` };
 
-        // ============================================================
-        // 备注相关
-        // ============================================================
+        // ============ 备注相关 ============
         if (action === 'save-note') {
             if (req.method !== 'POST') return res.status(405).json({ success: false, message: '仅支持 POST' });
             const { bracketId, pipeNo, note, timestamp, user } = req.body || {};
@@ -150,9 +144,7 @@ export async function originalHandler(req, res) {
             return res.status(200).json({ success: true, message: '已删除 ' + deleted + ' 条备注', deleted });
         }
 
-        // ============================================================
-        // 阀门相关
-        // ============================================================
+        // ============ 阀门相关 ============
         if (action === 'save-valve') {
             if (req.method !== 'POST') return res.status(405).json({ success: false, message: '仅支持 POST' });
             const { valveTag, weldNo1, weldNo2, serialNo, timestamp, user } = req.body || {};
@@ -211,9 +203,7 @@ export async function originalHandler(req, res) {
             return res.status(200).json({ success: true, message: '已删除', key });
         }
 
-        // ============================================================
-        // 清空整库
-        // ============================================================
+        // ============ 清空整库 ============
         if (action === 'flush-db') {
             if (req.method !== 'POST') return res.status(405).json({ success: false, message: '仅支持 POST' });
             const { confirm } = req.body || {};
@@ -234,54 +224,4 @@ export async function originalHandler(req, res) {
         console.error('KV 操作失败:', error);
         return res.status(500).json({ success: false, message: '服务器错误: ' + error.message });
     }
-}
-
-// ============================================================
-//        EdgeOne 入口（保持不变）
-// ============================================================
-export async function onRequest(context) {
-    const { request } = context;
-    const url = new URL(request.url);
-
-    if (request.method === 'OPTIONS') {
-        return new Response(null, {
-            status: 200,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type'
-            }
-        });
-    }
-
-    let body = {};
-    if (request.method === 'POST') {
-        try { body = await request.json(); } catch (e) { body = {}; }
-    }
-
-    const req = {
-        method: request.method,
-        query: Object.fromEntries(url.searchParams.entries()),
-        body: body,
-        headers: Object.fromEntries(request.headers.entries())
-    };
-
-    let _responseData = null;
-    let _responseStatus = 200;
-    const res = {
-        setHeader: () => {},
-        status: (code) => { _responseStatus = code; return res; },
-        json: (data) => { _responseData = data; return res; },
-        end: () => { return res; }
-    };
-
-    await originalHandler(req, res);
-
-    return new Response(_responseData !== null ? JSON.stringify(_responseData) : '', {
-        status: _responseStatus,
-        headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Access-Control-Allow-Origin': '*'
-        }
-    });
 }
