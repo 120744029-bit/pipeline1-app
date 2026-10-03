@@ -1,59 +1,13 @@
 // ============================================================
-//              cloud-functions/api/work.js —— EdgeOne 版本
+//        cloud-functions/api/work.js —— 工作量接口
+//        改造：导出 originalHandler 供 Layero 复用
 // ============================================================
 import { neon } from '@neondatabase/serverless';
 
-export async function onRequest(context) {
-    const { request } = context;
-    const url = new URL(request.url);
-
-    if (request.method === 'OPTIONS') {
-        return new Response(null, {
-            status: 200,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type'
-            }
-        });
-    }
-
-    let body = {};
-    if (request.method === 'POST' || request.method === 'PUT' || request.method === 'DELETE') {
-        try { body = await request.json(); } catch (e) { body = {}; }
-    }
-
-    const req = {
-        method: request.method,
-        query: Object.fromEntries(url.searchParams.entries()),
-        body: body,
-        headers: Object.fromEntries(request.headers.entries())
-    };
-
-    let _responseData = null;
-    let _responseStatus = 200;
-    const res = {
-        setHeader: () => {},
-        status: (code) => { _responseStatus = code; return res; },
-        json: (data) => { _responseData = data; return res; },
-        end: () => { return res; }
-    };
-
-    await originalHandler(req, res);
-
-    return new Response(_responseData !== null ? JSON.stringify(_responseData) : '', {
-        status: _responseStatus,
-        headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Access-Control-Allow-Origin': '*'
-        }
-    });
-}
-
 // ============================================================
-//              以下是你原来的业务逻辑，一行都不用改
+//        ★ 导出业务逻辑（EdgeOne 和 Layero 共用）
 // ============================================================
-async function originalHandler(req, res) {
+export async function originalHandler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -135,47 +89,30 @@ async function originalHandler(req, res) {
     }
 
     if (action === 'latest-date-get') {
-      const rows = await sql`
-        SELECT MAX(work_date)::text AS latest_date FROM work_records
-      `;
+      const rows = await sql`SELECT MAX(work_date)::text AS latest_date FROM work_records`;
       const latest = (rows[0] && rows[0].latest_date) || '';
       return res.status(200).json({ success: true, date: latest });
     }
 
     if (action === 'latest-records-get') {
-      const dateRows = await sql`
-        SELECT MAX(work_date)::text AS latest_date FROM work_records
-      `;
+      const dateRows = await sql`SELECT MAX(work_date)::text AS latest_date FROM work_records`;
       let latest = (dateRows[0] && dateRows[0].latest_date) || '';
-
       if (!latest) {
         latest = new Date().toISOString().slice(0, 10);
-        return res.status(200).json({
-          success: true,
-          date: latest,
-          records: []
-        });
+        return res.status(200).json({ success: true, date: latest, records: [] });
       }
-
       const rows = await sql`
         SELECT id, team_id, work_date, unit, quantity, note
-        FROM work_records
-        WHERE work_date = ${latest}
+        FROM work_records WHERE work_date = ${latest}
         ORDER BY team_id ASC, unit ASC
       `;
-
-      return res.status(200).json({
-        success: true,
-        date: latest,
-        records: rows
-      });
+      return res.status(200).json({ success: true, date: latest, records: rows });
     }
 
     if (action === 'teams-get') {
       const rows = await sql`
         SELECT id, area, fitter, welder, helper, sort_order
-        FROM work_teams
-        ORDER BY sort_order ASC, id ASC
+        FROM work_teams ORDER BY sort_order ASC, id ASC
       `;
       return res.status(200).json({ success: true, data: rows });
     }
@@ -201,10 +138,7 @@ async function originalHandler(req, res) {
 
       const r = await sql`
         UPDATE work_teams
-        SET area = ${area},
-            fitter = ${fitter || ''},
-            welder = ${welder || ''},
-            helper = ${helper || ''}
+        SET area = ${area}, fitter = ${fitter || ''}, welder = ${welder || ''}, helper = ${helper || ''}
         WHERE id = ${id}
         RETURNING id, area, fitter, welder, helper, sort_order
       `;
@@ -216,7 +150,6 @@ async function originalHandler(req, res) {
       if (req.method !== 'DELETE') return res.status(405).json({ error: 'Method not allowed' });
       const { id } = req.query;
       if (!id) return res.status(400).json({ error: 'id required' });
-
       await sql`DELETE FROM work_teams WHERE id = ${id}`;
       return res.status(200).json({ success: true, message: '已删除班组及其所有工作量记录' });
     }
@@ -227,36 +160,31 @@ async function originalHandler(req, res) {
 
       if (date && teamId) {
         rows = await sql`
-          SELECT id, team_id, work_date, unit, quantity, note
-          FROM work_records
+          SELECT id, team_id, work_date, unit, quantity, note FROM work_records
           WHERE work_date = ${date} AND team_id = ${teamId}
           ORDER BY team_id ASC, unit ASC
         `;
       } else if (date) {
         rows = await sql`
-          SELECT id, team_id, work_date, unit, quantity, note
-          FROM work_records
+          SELECT id, team_id, work_date, unit, quantity, note FROM work_records
           WHERE work_date = ${date}
           ORDER BY team_id ASC, unit ASC
         `;
       } else if (from && to && teamId) {
         rows = await sql`
-          SELECT id, team_id, work_date, unit, quantity, note
-          FROM work_records
+          SELECT id, team_id, work_date, unit, quantity, note FROM work_records
           WHERE work_date >= ${from} AND work_date <= ${to} AND team_id = ${teamId}
           ORDER BY work_date ASC, team_id ASC, unit ASC
         `;
       } else if (from && to) {
         rows = await sql`
-          SELECT id, team_id, work_date, unit, quantity, note
-          FROM work_records
+          SELECT id, team_id, work_date, unit, quantity, note FROM work_records
           WHERE work_date >= ${from} AND work_date <= ${to}
           ORDER BY work_date ASC, team_id ASC, unit ASC
         `;
       } else {
         rows = await sql`
-          SELECT id, team_id, work_date, unit, quantity, note
-          FROM work_records
+          SELECT id, team_id, work_date, unit, quantity, note FROM work_records
           ORDER BY work_date ASC, team_id ASC, unit ASC
         `;
       }
@@ -268,29 +196,20 @@ async function originalHandler(req, res) {
       if (!from || !to) return res.status(400).json({ error: 'from, to required' });
 
       const teams = await sql`
-        SELECT id, area, fitter, welder, helper
-        FROM work_teams
+        SELECT id, area, fitter, welder, helper FROM work_teams
         ORDER BY sort_order ASC, id ASC
       `;
-
       const columns = await sql`
-        SELECT id, col_key, col_name, sort_order
-        FROM work_columns
+        SELECT id, col_key, col_name, sort_order FROM work_columns
         ORDER BY sort_order ASC, id ASC
       `;
-
       const records = await sql`
-        SELECT team_id, unit, SUM(quantity) AS quantity
-        FROM work_records
+        SELECT team_id, unit, SUM(quantity) AS quantity FROM work_records
         WHERE work_date >= ${from} AND work_date <= ${to}
         GROUP BY team_id, unit
         ORDER BY team_id ASC, unit ASC
       `;
-
-      return res.status(200).json({
-        success: true,
-        data: { teams, columns, records }
-      });
+      return res.status(200).json({ success: true, data: { teams, columns, records } });
     }
 
     if (action === 'records-save') {
@@ -304,9 +223,7 @@ async function originalHandler(req, res) {
         INSERT INTO work_records (team_id, work_date, unit, quantity, note)
         VALUES (${team_id}, ${work_date}, ${unit}, ${quantity || 0}, ${note || ''})
         ON CONFLICT (team_id, work_date, unit)
-        DO UPDATE SET quantity = EXCLUDED.quantity,
-                      note = EXCLUDED.note,
-                      updated_at = NOW()
+        DO UPDATE SET quantity = EXCLUDED.quantity, note = EXCLUDED.note, updated_at = NOW()
         RETURNING id, team_id, work_date, unit, quantity, note
       `;
       return res.status(200).json({ success: true, data: r[0] });
@@ -326,9 +243,7 @@ async function originalHandler(req, res) {
           INSERT INTO work_records (team_id, work_date, unit, quantity, note)
           VALUES (${r.team_id}, ${r.work_date}, ${r.unit}, ${r.quantity || 0}, ${r.note || ''})
           ON CONFLICT (team_id, work_date, unit)
-          DO UPDATE SET quantity = EXCLUDED.quantity,
-                        note = EXCLUDED.note,
-                        updated_at = NOW()
+          DO UPDATE SET quantity = EXCLUDED.quantity, note = EXCLUDED.note, updated_at = NOW()
         `;
         saved++;
       }
@@ -345,19 +260,14 @@ async function originalHandler(req, res) {
       }
       if (date) {
         const r = await sql`DELETE FROM work_records WHERE work_date = ${date} RETURNING id`;
-        return res.status(200).json({
-          success: true,
-          deleted: r.length,
-          message: '已删除 ' + r.length + ' 条 ' + date + ' 的记录'
-        });
+        return res.status(200).json({ success: true, deleted: r.length, message: '已删除 ' + r.length + ' 条 ' + date + ' 的记录' });
       }
       return res.status(400).json({ error: 'id or date required' });
     }
 
     if (action === 'columns-get') {
       const rows = await sql`
-        SELECT id, col_key, col_name, sort_order
-        FROM work_columns
+        SELECT id, col_key, col_name, sort_order FROM work_columns
         ORDER BY sort_order ASC, id ASC
       `;
       return res.status(200).json({ success: true, data: rows });
@@ -417,4 +327,54 @@ async function originalHandler(req, res) {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+}
+
+// ============================================================
+//        EdgeOne 入口（保持不变）
+// ============================================================
+export async function onRequest(context) {
+    const { request } = context;
+    const url = new URL(request.url);
+
+    if (request.method === 'OPTIONS') {
+        return new Response(null, {
+            status: 200,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            }
+        });
+    }
+
+    let body = {};
+    if (request.method === 'POST' || request.method === 'PUT' || request.method === 'DELETE') {
+        try { body = await request.json(); } catch (e) { body = {}; }
+    }
+
+    const req = {
+        method: request.method,
+        query: Object.fromEntries(url.searchParams.entries()),
+        body: body,
+        headers: Object.fromEntries(request.headers.entries())
+    };
+
+    let _responseData = null;
+    let _responseStatus = 200;
+    const res = {
+        setHeader: () => {},
+        status: (code) => { _responseStatus = code; return res; },
+        json: (data) => { _responseData = data; return res; },
+        end: () => { return res; }
+    };
+
+    await originalHandler(req, res);
+
+    return new Response(_responseData !== null ? JSON.stringify(_responseData) : '', {
+        status: _responseStatus,
+        headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Access-Control-Allow-Origin': '*'
+        }
+    });
 }

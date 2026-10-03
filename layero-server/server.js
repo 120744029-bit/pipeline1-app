@@ -1,14 +1,18 @@
 // ============================================================
 //        Layero 备用后端主入口
-//        复用 cloud-functions 里的业务逻辑
+//        业务代码在 ./api/ 下（复制自 cloud-functions）
 // ============================================================
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// 引入 EdgeOne 的业务逻辑（已导出 originalHandler）
-import { originalHandler as kvHandler } from '../cloud-functions/api/kv.js';
-import { originalHandler as workHandler } from '../cloud-functions/api/work.js';
-import { originalHandler as tailsHandler } from '../cloud-functions/api/tails.js';
-import { originalHandler as adminNotesHandler } from '../cloud-functions/api/admin-notes.js';
+// 引入本地 api/ 里的业务逻辑
+import { handler as kvHandler }         from './api/kv.js';
+import { handler as workHandler }       from './api/work.js';
+import { handler as tailsHandler }      from './api/tails.js';
+import { handler as adminNotesHandler } from './api/admin-notes.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -22,10 +26,9 @@ app.use((req, res, next) => {
     next();
 });
 
-// ---------- 适配器：把 Express 的 req/res 包装成 EdgeOne 格式 ----------
+// ---------- 适配器 ----------
 function adapt(handler) {
     return async (req, res) => {
-        // Express 的 req.query 是 getter，转成普通对象
         const reqObj = {
             method: req.method,
             query: { ...req.query },
@@ -33,7 +36,6 @@ function adapt(handler) {
             headers: req.headers
         };
 
-        // 收集响应
         let responseData = null;
         let responseStatus = 200;
         const resObj = {
@@ -59,15 +61,24 @@ function adapt(handler) {
     };
 }
 
-// ---------- 挂载路由 ----------
+// ---------- 挂载路由（保留 /api 前缀）----------
 app.all('/api/kv', adapt(kvHandler));
 app.all('/api/work', adapt(workHandler));
 app.all('/api/tails', adapt(tailsHandler));
 app.all('/api/admin-notes', adapt(adminNotesHandler));
 
 // ---------- 健康检查 ----------
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
+// ---------- 静态前端（可选：Layero 也托管前端）----------
+// 前端文件在仓库根目录，容器里路径是 ../ （相对于 layero-server/）
+app.use(express.static(path.join(__dirname, '..')));
+
+// 未匹配的请求返回 index.html
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
 // ---------- 启动 ----------
