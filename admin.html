@@ -401,7 +401,10 @@ body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: c
     <div class="navbar">
         <button class="nav-btn left" onclick="refreshAllStatus()">🔄</button>
         <h1 id="navTitle">📋 控制台</h1>
-        <button class="nav-btn right" onclick="logout()">退出</button>
+        <div style="display:flex;gap:4px;align-items:center;">
+            <button class="nav-btn" id="backendSwitchBtn" onclick="toggleBackend()" style="background:#F2F2F2;border-radius:4px;font-size:12px;padding:4px 10px;color:#333;">🌐 主站</button>
+            <button class="nav-btn right" onclick="logout()">退出</button>
+        </div>
     </div>
 
     <div class="global-status">
@@ -753,9 +756,55 @@ body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: c
 // ============================================================
 //                    配置
 // ============================================================
-var BASE = 'https://pipeline1-app-sjb7zjvz.edgeone.dev';
+var BACKENDS = {
+    primary: 'https://pipeline1-app-sjb7zjvz.edgeone.dev',
+    backup:  'https://pipeline1-app.layero.app'
+};
+
+// 判断当前环境：Layero 域名下强制备用，其他用 localStorage
+var activeBackend;
+if (location.origin.indexOf('pipeline1-app.layero.app') !== -1) {
+    activeBackend = 'backup';
+} else {
+    activeBackend = localStorage.getItem('admin_active_backend') || 'primary';
+}
+if (!BACKENDS[activeBackend]) activeBackend = 'primary';
+var BASE = BACKENDS[activeBackend];
+
+console.log('🌐 控制台后端: ' + activeBackend + ' → ' + BASE);
+
+// 切换后端
+function switchBackend(name) {
+    if (!BACKENDS[name]) return;
+    if (name === activeBackend) { alert('已经是当前后端'); return; }
+    if (!confirm('切换到' + (name === 'primary' ? '主站' : '备用站') + '？\n\n当前后端：' + activeBackend + '\n切换后：' + name + '\n\n切换会重新加载页面。')) return;
+    localStorage.setItem('admin_active_backend', name);
+    location.reload();
+}
+
+// 一键切换（在主站 ↔ 备用 之间切换）
+function toggleBackend() {
+    var next = activeBackend === 'primary' ? 'backup' : 'primary';
+    switchBackend(next);
+}
+
+// 刷新顶部按钮显示当前后端
+function updateBackendBtn() {
+    var btn = document.getElementById('backendSwitchBtn');
+    if (!btn) return;
+    if (activeBackend === 'primary') {
+        btn.textContent = '🌐 主站';
+        btn.style.background = '#d1fae5';
+        btn.style.color = '#065f46';
+    } else {
+        btn.textContent = '🌐 备用';
+        btn.style.background = '#fef3c7';
+        btn.style.color = '#92400e';
+    }
+}
+
 var API_BASE = BASE + '/api';
-var KV_API = API_BASE + '/kv';   // ← 新增：统一入口
+var KV_API = API_BASE + '/kv';
 
 var GET_NOTES_API   = KV_API + '?action=get-notes';
 var SAVE_NOTE_API   = KV_API + '?action=save-note';
@@ -832,7 +881,8 @@ function doLogin() {
         .then(function() {
             document.getElementById('loginPage').style.display = 'none';
             document.getElementById('mainPage').style.display = 'block';
-			switchTab('work');
+            updateBackendBtn();			
+			switchTab('work');		
             refreshAllStatus();
             refreshNotesLive();
             refreshValveLive();
@@ -3025,6 +3075,12 @@ window.addEventListener('beforeunload', function() {
 document.getElementById('passwordInput').addEventListener('keyup', function(e) {
     if (e.key === 'Enter') doLogin();
 });
+// 页面加载时如果已经登录过（有密码），刷新按钮状态
+setTimeout(function() {
+    if (document.getElementById('mainPage').style.display === 'block') {
+        updateBackendBtn();
+    }
+}, 100);
 </script>
 </body>
 </html>
