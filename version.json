@@ -1,8 +1,6 @@
 {
-    "version": "4.0.5",
-    "updateTime": "2026-09-28 16:00:00",
-    "dataFile": "data.json",
-    "dataCount": 1039,
+    "version": "4.0.6",
+    "updateTime": "2026-10-03 16:00:00",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "更新服务器"
+    "updateLog": "增加了备用服务器"
 }

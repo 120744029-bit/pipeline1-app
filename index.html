@@ -716,7 +716,7 @@
             </div>
 
             <div id="workDailyContent">
-                <div class="no-result"><span>⏳</span>正在加载工作量...</div>
+                <div class="no-result"><span>⏳</span>正在加载工作量...<br><small style="font-size:12px;color:var(--text-tertiary);" id="loadProgressText">正在连接服务器...</small></div>
             </div>
         </div>
 
@@ -1093,7 +1093,7 @@
             </div>
         </div>
 
-        <!-- 数据后端切换 -->
+        <!-- 后端切换 -->
         <div class="settings-row">
             <div>
                 <div class="settings-label">🌐 数据后端</div>
@@ -1103,11 +1103,12 @@
                 <button id="backendPrimaryBtn" onclick="switchBackend('primary')" style="padding:8px 14px;border-radius:6px;border:1px solid var(--border-light);background:var(--bg-card);color:var(--text-primary);font-size:13px;cursor:pointer;">主站</button>
                 <button id="backendBackupBtn" onclick="switchBackend('backup')" style="padding:8px 14px;border-radius:6px;border:1px solid var(--border-light);background:var(--bg-card);color:var(--text-primary);font-size:13px;cursor:pointer;">备用</button>
             </div>
-        </div>
+        </div>	
+		
         <!-- 恢复默认 -->
         <div class="settings-row" style="border-bottom:none;justify-content:center;padding-top:20px;">
             <button onclick="resetAllSettings()" style="padding:10px 28px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:6px;font-size:14px;cursor:pointer;color:var(--text-primary);font-weight:500;">恢复默认设置</button>
-        </div>
+        </div>	       
     </div>
 </div>
 
@@ -1116,22 +1117,228 @@
 
 <script>
 // ============================================================
+//  把 console 输出到页面（调试用）
+// ============================================================
+(function () {
+    var oldLog = console.log;
+    var oldWarn = console.warn;
+    var oldErr = console.error;
+
+    var box = document.createElement('div');
+    box.style.cssText = 'position:fixed;left:0;right:0;bottom:80px;max-height:45vh;overflow:auto;background:rgba(0,0,0,0.88);color:#0f0;font-size:11px;line-height:1.5;padding:8px;z-index:99999;white-space:pre-wrap;font-family:Consolas,monospace;display:none;';
+    box.id = 'debugBox';
+
+    function ensureBox() {
+        if (!document.getElementById('debugBox')) {
+            document.body.appendChild(box);
+        }
+    }
+    if (document.body) ensureBox();
+    else document.addEventListener('DOMContentLoaded', ensureBox);
+
+    function ts() {
+        var d = new Date();
+        function p(n){ return n < 10 ? '0'+n : ''+n; }
+        return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())+'.'+String(d.getMilliseconds()).padStart(3,'0');
+    }
+
+    function print(prefix, color, args) {
+        ensureBox();
+        var s = '[' + ts() + '] ' + prefix + ' ' + Array.from(args).map(function(x){
+            try { return typeof x === 'object' ? JSON.stringify(x) : String(x); } catch(e){ return String(x); }
+        }).join(' ');
+        var line = document.createElement('div');
+        line.style.color = color;
+        line.textContent = s;
+        box.appendChild(line);
+        box.scrollTop = box.scrollHeight;
+        // 最多保留 500 行
+        while (box.childNodes.length > 500) box.removeChild(box.firstChild);
+    }
+
+    console.log   = function () { print('[LOG]',  '#0f0', arguments); oldLog.apply(console, arguments); };
+    console.warn  = function () { print('[WARN]', '#fbbf24', arguments); oldWarn.apply(console, arguments); };
+    console.error = function () { print('[ERR]',  '#f87171', arguments); oldErr.apply(console, arguments); };
+
+    // 双击左上角「在线」徽章显示/隐藏调试面板
+    window.__toggleDebug = function () {
+        ensureBox();
+        box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    };
+    setTimeout(function () {
+        var badge = document.getElementById('statusBadge');
+        if (!badge) return;
+        var t = 0;
+        badge.addEventListener('click', function () {
+            var now = Date.now();
+            if (now - t < 400) { window.__toggleDebug(); t = 0; }
+            else { t = now; }
+        });
+        console.log('📱 调试面板已就绪（双击左上角"在线"徽章开关）');
+    }, 500);
+})();
+
+// ============================================================
+//  修复 H5+ App 中 file:// 页面 fetch 失败问题（函数版，plusready 后调用）
+// ============================================================
+function installFetchPolyfill(retry) {
+    retry = retry || 0;
+    if (typeof plus === 'undefined' || !plus.net) {
+        if (retry < 30) {
+            console.warn('⚠️ plus.net 未就绪，' + (retry + 1) + '/30 次重试...');
+            setTimeout(function () { installFetchPolyfill(retry + 1); }, 100);
+        } else {
+            console.error('❌ plus.net 30 次重试后仍未就绪，放弃 polyfill');
+        }
+        return;
+    }
+
+    var nativeFetch = window.fetch;
+    console.log('🔧 正在安装 fetch polyfill...');
+
+    window.fetch = function (url, options) {
+        var t0 = Date.now();
+        var shortUrl = (typeof url === 'string' ? url : String(url)).replace(/^https?:\/\/[^\/]+/, '');
+        options = options || {};
+
+        // 只代理 http/https 请求
+        if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
+            return nativeFetch.apply(this, arguments);
+        }
+
+        return new Promise(function (resolve, reject) {
+            var xhr = new plus.net.XMLHttpRequest();
+            xhr.open(options.method || 'GET', url, true);
+            xhr.timeout = 120000;
+
+            if (options.headers) {
+                Object.keys(options.headers).forEach(function (k) {
+                    xhr.setRequestHeader(k, options.headers[k]);
+                });
+            }
+
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4) {
+                    var response = {
+                        ok: xhr.status >= 200 && xhr.status < 300,
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        url: url,
+                        headers: { get: function () { return null; } },
+                        json: function () {
+                            return new Promise(function (res, rej) {
+                                try { res(JSON.parse(xhr.responseText)); }
+                                catch (e) { rej(e); }
+                            });
+                        },
+                        text: function () {
+                            return Promise.resolve(xhr.responseText);
+                        }
+                    };
+					console.log('  ✅ ' + shortUrl + ' (' + (Date.now()-t0) + 'ms, ' + (xhr.responseText ? xhr.responseText.length : 0) + 'B)');
+                    resolve(response);
+                }
+            };
+
+            xhr.onerror = function () {
+                console.error('  ❌ ' + shortUrl + ' (' + (Date.now()-t0) + 'ms) 请求失败');
+                reject(new TypeError('Failed to fetch (native)'));
+            };
+            xhr.ontimeout = function () {
+                console.error('  ⏱️ ' + shortUrl + ' (' + (Date.now()-t0) + 'ms) 超时');
+                reject(new Error('Request timeout'));
+            };
+
+            xhr.send(options.body != null ? options.body : null);
+        });
+    };
+
+    console.log('✅ 已注入 plus.net.XMLHttpRequest fetch polyfill');
+}
+	
+// ============================================================
 //                    配置
 // ============================================================
 var APP_VERSION = '4.0.0';
 var currentVersion = APP_VERSION;
 // ============================================================
-//                    主站 / 备用站 配置
+//  主后端 + 备用后端配置
 // ============================================================
 var BACKENDS = {
     primary: 'https://pipeline1-app-sjb7zjvz.edgeone.dev',
-    backup:  'https://pipeline1-app.layero.app'
+    backup: 'https://pipeline1-app.layero.app'
 };
 
-var activeBackend = lsGet('active_backend', 'primary');
+// 判断当前页面部署在哪个后端（网页版靠域名判断，APP 靠 localStorage）
+function detectBackendFromHost() {
+    var host = location.origin || '';
+    if (host.indexOf('pipeline1-app.layero.app') !== -1) return 'backup';
+    if (host.indexOf('edgeone.dev') !== -1) return 'primary';
+    // 本地调试 / APP 环境，用 localStorage
+    return lsGet('active_backend', 'primary');
+}
+
+var activeBackend = detectBackendFromHost();
 var BASE = BACKENDS[activeBackend] || BACKENDS.primary;
 
-console.log('🌐 当前后端: ' + activeBackend + ' → ' + BASE);
+console.log('🌐 当前环境: ' + (typeof plus === 'undefined' ? '网页' : 'APP') + '，后端: ' + activeBackend + ' → ' + BASE);
+
+// 手动切换后端
+function switchBackend(name) {
+    if (!BACKENDS[name]) return;
+    var target = BACKENDS[name].replace(/\/$/, '');
+    var currentHost = (location.origin || '').replace(/\/$/, '');
+
+    // APP 环境：没有域名，直接切 API + 重启
+    if (typeof plus !== 'undefined' && plus.runtime) {
+        activeBackend = name;
+        lsSet('active_backend', name);
+        showToast('✅ 已切换到' + (name === 'primary' ? '主站' : '备用站') + '，即将重启...');
+        setTimeout(function() {
+            plus.runtime.restart();
+        }, 800);
+        return;
+    }
+
+    // 网页版：如果当前已经在该域名下，就只刷新；否则跳转
+    if (currentHost === target) {
+        activeBackend = name;
+        lsSet('active_backend', name);
+        showToast('✅ 已切换，即将刷新...');
+        setTimeout(function() { location.reload(); }, 800);
+        return;
+    }
+
+    lsSet('active_backend', name);
+    showToast('✅ 正在跳转到' + (name === 'primary' ? '主站' : '备用站') + '...');
+    setTimeout(function() {
+        location.href = target + '/';
+    }, 800);
+}
+
+// 自动检测主后端健康状态（仅网页版 + 主站模式下检查）
+function checkBackendHealth() {
+    // APP 环境不自动跳，避免意外
+    if (typeof plus !== 'undefined') return;
+    if (activeBackend !== 'primary') return;
+
+    var controller = new AbortController();
+    var timer = setTimeout(function() { controller.abort(); }, 3000);
+    fetch(BACKENDS.primary + '/version.json?t=' + Date.now(), { signal: controller.signal })
+        .then(function(r) {
+            clearTimeout(timer);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            console.log('✅ 主后端健康检查通过');
+        })
+        .catch(function() {
+            clearTimeout(timer);
+            console.warn('⚠️ 主后端无响应，3 秒后自动跳转到备用站');
+            lsSet('active_backend', 'backup');
+            setTimeout(function() {
+                location.href = BACKENDS.backup + '/';
+            }, 3000);
+        });
+}
 
 var UPDATE_URL   = BASE + '/version.json';
 var API_BASE_URL = BASE + '/api';
@@ -1145,58 +1352,12 @@ var ELBOW_URL    = BASE + '/elbow.json';
 var SUBITEMS_URL = BASE + '/subitems.json';
 var PIPELINE_URL = BASE + '/data.json';
 
-var KV_API         = API_BASE_URL + '/kv';
+var KV_API         = API_BASE_URL + '/kv';      // ← 新增：KV 统一入口
 var WORK_API       = API_BASE_URL + '/work';
 var TAIL_ITEMS_API = API_BASE_URL + '/tails?action=get-all';
 var TAIL_GET_API   = API_BASE_URL + '/tails?action=get';
 var TAIL_SAVE_API  = API_BASE_URL + '/tails?action=save';
 
-// ============================================================
-//                    切换后端
-// ============================================================
-function switchBackend(name) {
-    if (!BACKENDS[name]) return;
-    if (name === activeBackend) {
-        showToast('已经是当前后端');
-        return;
-    }
-    activeBackend = name;
-    lsSet('active_backend', name);
-    showToast('✅ 已切换到' + (name === 'primary' ? '主站' : '备用站') + '，即将刷新...');
-    setTimeout(function() {
-        if (typeof plus !== 'undefined' && plus.runtime) {
-            plus.runtime.restart();
-        } else {
-            location.reload();
-        }
-    }, 800);
-}
-
-// 自动检测主站健康（只在使用主站时检查）
-function checkBackendHealth() {
-    if (activeBackend !== 'primary') return;
-    var controller = new AbortController();
-    var timer = setTimeout(function() { controller.abort(); }, 3000);
-    fetch(BACKENDS.primary + '/version.json?t=' + Date.now(), { signal: controller.signal })
-        .then(function(r) {
-            clearTimeout(timer);
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            console.log('✅ 主站健康检查通过');
-        })
-        .catch(function() {
-            clearTimeout(timer);
-            console.warn('⚠️ 主站无响应，3 秒后自动切换到备用站');
-            showToast('⚠️ 主站无响应，即将自动切换备用站');
-            lsSet('active_backend', 'backup');
-            setTimeout(function() {
-                if (typeof plus !== 'undefined' && plus.runtime) {
-                    plus.runtime.restart();
-                } else {
-                    location.reload();
-                }
-            }, 3000);
-        });
-}
 // ============================================================
 //                    全局状态
 // ============================================================
@@ -1486,8 +1647,8 @@ function switchSubTab(tab) {
 function loadStaticLibs() {
     var cachedSchedule = lsGet('staticScheduleCache', null);
     var cachedElbow = lsGet('staticElbowCache', null);
-    if (cachedSchedule) scheduleData = cachedSchedule;
-    if (cachedElbow) elbowData = cachedElbow;
+    if (cachedSchedule) { scheduleData = cachedSchedule; console.log('  💾 壁厚库命中缓存'); }
+    if (cachedElbow) { elbowData = cachedElbow; console.log('  💾 弯头库命中缓存'); }
 
     return Promise.all([
         fetch(SCHEDULE_URL + '?t=' + Date.now()).then(function(r) { return r.json(); }).catch(function() { return null; }),
@@ -1963,6 +2124,7 @@ function renderBracketTotalHTML(data1) {
     html += '<div class="total-row"><span class="row-label">　└ ✅ 已预制</span><span class="row-value">' + bStat.made.made + '<span class="unit">个</span></span></div>';
     html += '<div class="total-row"><span class="row-label">　　　已预制</span><span class="row-value" style="font-weight:400;">' + bStat.made.preMade + '<span class="unit">个</span></span></div>';
     html += '<div class="total-row"><span class="row-label">　　　已到现场</span><span class="row-value" style="font-weight:400;">' + bStat.made.onSite + '<span class="unit">个</span></span></div>';
+	    html += '<div class="total-row"><span class="row-label">　　　已安装</span><span class="row-value" style="font-weight:400;">' + bStat.made.installed + '<span class="unit">个</span></span></div>';
     html += '<div class="total-row"><span class="row-label">　　　已焊接</span><span class="row-value" style="font-weight:400;">' + bStat.made.welded + '<span class="unit">个</span></span></div>';
     html += '<div class="total-row"><span class="row-label">　　　其他</span><span class="row-value" style="font-weight:400;">' + bStat.made.otherMade + '<span class="unit">个</span></span></div>';
     html += '<div class="total-row"><span class="row-label">　└ ❌ 未预制</span><span class="row-value" style="color:#FA5151;">' + bStat.made.notMade + '<span class="unit">个</span></span></div>';
@@ -2199,6 +2361,7 @@ function computeBracketStats(data1) {
             made: 0,
             preMade: 0,
             onSite: 0,
+            installed: 0,         // ← 新增：已安装
             welded: 0,
             otherMade: 0,         // 其他带"已"
             notMade: 0,
@@ -2291,12 +2454,17 @@ function computeBracketStats(data1) {
                 stat.made.made++; stat.made.preMade++;
                 return;
             }
+            // ③.5 已安装 ← 新增
+            if (state.indexOf('已安装') !== -1) {
+                stat.made.made++; stat.made.installed++;
+                return;
+            }
             // ④ 已到现场
             if (state.indexOf('已到') !== -1) {
                 stat.made.made++; stat.made.onSite++;
                 return;
             }
-            // ⑤ 其他带"已" → 已预制-其他
+            // ⑤ 其他带"已"
             if (state.indexOf('已') !== -1) {
                 stat.made.made++; stat.made.otherMade++;
                 return;
@@ -2646,17 +2814,28 @@ function loadDataFromServer() {
     if (Array.isArray(cached) && cached.length > 0) {
         pipelineData = cached;
         dataLoaded = true;
+        console.log('  💾 管线数据命中缓存：' + cached.length + ' 条');
+    } else {
+        console.log('  🌐 管线数据无缓存，走网络');
     }
-    fetch(PIPELINE_URL + '?t=' + Date.now())
-        .then(function(response) { if (!response.ok) throw new Error('网络请求失败'); return response.json(); })
+    // ★ 关键：return 出去，让队列等它
+    return fetch(PIPELINE_URL + '?t=' + Date.now())
+        .then(function(response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
         .then(function(data) {
             if (Array.isArray(data) && data.length > 0) {
                 pipelineData = data;
                 dataLoaded = true;
                 lsSet('pipelineData', data);
+                console.log('  ✅ 管线数据已更新：' + data.length + ' 条');
             }
         })
-        .catch(function(err) {});
+        .catch(function(err) {
+            console.error('  ❌ 管线数据加载失败：' + (err && err.message ? err.message : err));
+            // 不让队列挂掉
+        });
 }
 function showWelcomePipeline() {
     if (currentPage !== 'pipeline') return;
@@ -3474,49 +3653,148 @@ function deleteWgtFile(callback) {
 // ============================================================
 console.log('🚀 APP 启动...');
 
-// 加载设置
-loadSettings();
-checkBackendHealth();
+// ① 等待 plus.net 就绪（最多等 5 秒）
+function waitForPlusNet(cb, retry) {
+    retry = retry || 0;
+    if (typeof plus !== 'undefined' && plus.net) {
+        console.log('✅ plus.net 已就绪');
+        cb();
+        return;
+    }
+    if (retry > 50) {
+        console.warn('⚠️ plus.net 5 秒内未就绪，强行继续');
+        cb();
+        return;
+    }
+    if (retry === 0 || retry % 10 === 0) {
+        console.log('⏳ 等待 plus.net... (' + (retry * 100) + 'ms)');
+    }
+    setTimeout(function () { waitForPlusNet(cb, retry + 1); }, 100);
+}
 
-currentUser = getCurrentUser();
-updateUserBadge();
+// ② 入口：先等 plus.net，再装 polyfill，最后启动
+function bootstrap() {
+    console.log('');
+    console.log('========================================');
+    console.log('🚀 bootstrap() 开始执行');
+    console.log('   时间：' + new Date().toLocaleString());
+    console.log('========================================');
 
-updateNetworkStatus();
-buildKeyboard();
-
-loadStaticLibs().then(function() {
-    initBendCalculator();
-});
-
-loadDataFromServer();
-loadSubItems();
-loadBracketStatusFromJson();
-loadValvePending();
-loadValveDataFromJson();
-loadWeldInfoFromJson();
-loadTailItemsFromServer();
-renderBracketTotalArea();   // ✅ 预加载支架总量
-renderValveTotalArea();   // ✅ 预加载阀门总量
-
-setTimeout(fetchAllNotesFromCloud, 1500);
-setTimeout(syncPendingTails, 3000);
-
-// 默认进入工作量页
-switchPage('work');
-
-if (typeof plus !== 'undefined') {
-    document.addEventListener('plusready', function() {
-        setTimeout(checkHotUpdate, 3000);
-        setTimeout(syncPendingNotes, 5000);
-        setTimeout(syncPendingValves, 5500);
-        setTimeout(syncPendingTails, 5700);
-        setTimeout(fetchAllNotesFromCloud, 6000);
-        setTimeout(loadBracketStatusFromJson, 6500);
+    waitForPlusNet(function () {
+        installFetchPolyfill();
+        // polyfill 装好后，再启动主流程
+        setTimeout(startApp, 50);
     });
+}
+
+// ③ 主流程
+function startApp() {
+    console.log('🎬 startApp() 开始');
+    // 加载本地设置
+    console.log('⚙️ 加载本地设置...');
+    loadSettings();
+    currentUser = getCurrentUser();
+    updateUserBadge();
+    updateNetworkStatus();
+    buildKeyboard();
+    checkBackendHealth();
+    console.log('  ✅ 设置完成，当前用户：' + (currentUser || '（未设置）'));
+
+    // 立即切换页面（先用缓存展示）
+    console.log('📄 立即切换到工作量页（先用缓存秒显）...');
+    switchPage('work');
+
+    // 串行队列
+    var queue = [
+        { name: '管线数据',       fn: loadDataFromServer },
+        { name: '子项列表',       fn: loadSubItems },
+        { name: '支架状态',       fn: loadBracketStatusFromJson },
+        { name: '阀门本地缓存',   fn: loadValvePending },
+        { name: '阀门数据',       fn: loadValveDataFromJson },
+        { name: '焊口数据',       fn: loadWeldInfoFromJson },
+        { name: '尾项数据',       fn: loadTailItemsFromServer },
+        { name: '静态库',         fn: function () { return loadStaticLibs().then(function(){ initBendCalculator(); }); } },
+        { name: '支架总量',       fn: renderBracketTotalArea },
+        { name: '阀门总量',       fn: renderValveTotalArea }
+    ];
+
+    var idx = 0;
+    var queueStartTime = Date.now();
+
+    function runNext() {
+        if (idx >= queue.length) {
+            console.log('');
+            console.log('✅ 队列全部完成，总耗时 ' + (Date.now() - queueStartTime) + 'ms');
+            console.log('========================================');
+            onQueueDone();
+            return;
+        }
+        var task = queue[idx++];
+        var taskStart = Date.now();
+        console.log('▶ [' + idx + '/' + queue.length + '] 开始：' + task.name);
+
+        try {
+            var ret = task.fn();
+            if (ret && typeof ret.then === 'function') {
+                ret.then(function () {
+                    console.log('  ✔ [' + idx + '/' + queue.length + '] ' + task.name + ' 完成（' + (Date.now()-taskStart) + 'ms）');
+                    setTimeout(runNext, 150);
+                }).catch(function (err) {
+                    console.error('  ✘ [' + idx + '/' + queue.length + '] ' + task.name + ' 失败：' + (err && err.message ? err.message : err));
+                    setTimeout(runNext, 150);
+                });
+            } else {
+                console.log('  ✔ [' + idx + '/' + queue.length + '] ' + task.name + ' 完成（同步，' + (Date.now()-taskStart) + 'ms）');
+                setTimeout(runNext, 150);
+            }
+        } catch (e) {
+            console.error('  ✘ [' + idx + '/' + queue.length + '] ' + task.name + ' 异常：' + e.message);
+            setTimeout(runNext, 150);
+        }
+    }
+
+    function onQueueDone() {
+        console.log('🔄 启动后台任务（备注/同步/热更新）...');
+        setTimeout(function () { console.log('  → fetchAllNotesFromCloud'); fetchAllNotesFromCloud(); }, 1000);
+        setTimeout(function () { console.log('  → syncPendingTails');      syncPendingTails();      }, 2000);
+        setTimeout(function () { console.log('  → checkHotUpdate');       checkHotUpdate();        }, 3000);
+        setTimeout(function () { console.log('  → syncPendingNotes');     syncPendingNotes();      }, 5000);
+        setTimeout(function () { console.log('  → syncPendingValves');    syncPendingValves();     }, 5500);
+        setTimeout(function () { console.log('  → syncPendingTails');     syncPendingTails();      }, 5700);
+    }
+
+    console.log('🚦 启动串行加载队列（共 ' + queue.length + ' 项）');
+    runNext();
+}
+
+// ============================================================
+//  启动判断：加超时兜底，确保 plus 已经注入再启动
+// ============================================================
+var __started = false;
+function __startOnce() {
+    if (__started) return;
+    __started = true;
+    bootstrap();
+}
+
+if (typeof plus !== 'undefined' && window.plus) {
+    // 情况 1：脚本加载时 plus 已就绪
+    console.log('✅ 启动时 plus 已就绪，立即 bootstrap');
+    __startOnce();
 } else {
-    setTimeout(checkHotUpdate, 2000);
-    setTimeout(fetchAllNotesFromCloud, 2500);
-    setTimeout(loadBracketStatusFromJson, 3000);
+    // 情况 2：监听 plusready（App 环境）
+    document.addEventListener('plusready', function () {
+        console.log('📢 收到 plusready 事件');
+        __startOnce();
+    }, false);
+
+    // 情况 3：兜底 —— 3 秒后强制启动（纯浏览器环境）
+    setTimeout(function () {
+        if (!__started) {
+            console.log('🌐 3 秒内未收到 plusready，按浏览器环境启动');
+            __startOnce();
+        }
+    }, 3000);
 }
 
 console.log('🚀 APP 启动完成');
