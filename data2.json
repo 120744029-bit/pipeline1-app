@@ -16550,9 +16550,10 @@
     "valveId": "VABL0EP0",
     "diameter": "25",
     "pressure": "CL300",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S19",
+    "weldNo2": "S18",
+    "serialNo": "B0024040030-6-48",
+    "user": "邵申涛"
   },
   "565-GV-0111": {
     "subItem": "12600-20-3311",
@@ -16586,9 +16587,10 @@
     "valveId": "VABL0EP0",
     "diameter": "25",
     "pressure": "CL300",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S20",
+    "weldNo2": "S19",
+    "serialNo": "B0024040030-6-155",
+    "user": "邵申涛"
   },
   "568-GV-0257": {
     "subItem": "12600-20-3311",
