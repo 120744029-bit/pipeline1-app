@@ -12504,9 +12504,10 @@
     "valveId": "VAZC0XR0",
     "diameter": "100",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S08",
+    "weldNo2": "F01",
+    "serialNo": "B24110054-63-2",
+    "user": "李雷敏"
   },
   "568-GLV-0003": {
     "subItem": "12600-20-3311",
@@ -12516,9 +12517,10 @@
     "valveId": "VBZC17T0",
     "diameter": "80",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "F12",
+    "weldNo2": "S34",
+    "serialNo": "B24040031-157-1",
+    "user": "李雷敏"
   },
   "568-GV-0327": {
     "subItem": "12600-20-3311",
