@@ -6251,9 +6251,10 @@
     "valveId": "VAZC1FG0",
     "diameter": "25",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "F50",
+    "weldNo2": "S51",
+    "serialNo": "B24040030-26-99",
+    "user": "邵申涛"
   },
   "571-BV-0194": {
     "subItem": "12600-20-3311",
@@ -10807,9 +10808,10 @@
     "valveId": "VLYL0NAB",
     "diameter": "50",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S05",
+    "weldNo2": "S11",
+    "serialNo": "BS25040152-60",
+    "user": "尚振胜"
   },
   "569-BV-0083": {
     "subItem": "12600-20-3311",
@@ -10819,9 +10821,10 @@
     "valveId": "VLYL0RJB",
     "diameter": "25",
     "pressure": "CL150",
-    "weldNo1": "",
+    "weldNo1": "S15",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "BS25040182-104",
+    "user": "尚振胜"
   },
   "569-GLV-0017": {
     "subItem": "12600-20-3311",
@@ -10831,9 +10834,10 @@
     "valveId": "VBZC17T0",
     "diameter": "50",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S12",
+    "weldNo2": "S01",
+    "serialNo": "B24040031-156-30",
+    "user": "尚振胜"
   },
   "567-GLV-0024": {
     "subItem": "12600-20-3311",
@@ -11683,9 +11687,10 @@
     "valveId": "VAZC0XS0",
     "diameter": "400",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S71",
+    "weldNo2": "S72",
+    "serialNo": "B25040007-16",
+    "user": "侯举"
   },
   "568-GV-0074": {
     "subItem": "12600-20-3311",
@@ -13344,9 +13349,10 @@
     "valveId": "VLYL0NAB",
     "diameter": "50",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S94",
+    "weldNo2": "S21",
+    "serialNo": "BS25040152-14",
+    "user": "尚振胜"
   },
   "569-GLV-0021": {
     "subItem": "12600-20-3311",
@@ -17264,9 +17270,10 @@
     "valveId": "VAZC1UP0",
     "diameter": "25",
     "pressure": "CL800",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S02",
+    "weldNo2": "S03",
+    "serialNo": "B24040030-61-471",
+    "user": "赵本宏"
   },
   "554-GV-7027A": {
     "subItem": "12600-20-3311",
