@@ -778,9 +778,10 @@
     "valveId": "VCZL0NW0",
     "diameter": "300",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S22",
+    "weldNo2": "S27",
+    "serialNo": "B24040031-202-1",
+    "user": "王利建"
   },
   "551-GV-0017": {
     "subItem": "12600-12-3314",
@@ -13143,9 +13144,10 @@
     "valveId": "VLYL0NAB",
     "diameter": "50",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S31",
+    "weldNo2": "S32",
+    "serialNo": "BS25040152-72",
+    "user": "尚振胜"
   },
   "569-BV-0129": {
     "subItem": "12600-20-3311",
@@ -13167,9 +13169,10 @@
     "valveId": "VLYL0NAB",
     "diameter": "50",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S35CW",
+    "weldNo2": "S36",
+    "serialNo": "BS25040152-45",
+    "user": "尚振胜"
   },
   "569-BV-0004": {
     "subItem": "12600-20-3311",
@@ -13179,9 +13182,10 @@
     "valveId": "VLYL0RJB",
     "diameter": "25",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "F110",
+    "weldNo2": "S111",
+    "serialNo": "BS25040182-60",
+    "user": "尚振胜"
   },
   "569-BV-0137": {
     "subItem": "12600-20-3311",
@@ -13191,9 +13195,10 @@
     "valveId": "VLYL0RJB",
     "diameter": "25",
     "pressure": "CL150",
-    "weldNo1": "",
+    "weldNo1": "S116",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "BS25040182-71",
+    "user": "尚振胜"
   },
   "569-BV-0136": {
     "subItem": "12600-20-3311",
@@ -13203,9 +13208,10 @@
     "valveId": "VLYL0NAB",
     "diameter": "50",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S59",
+    "weldNo2": "S102",
+    "serialNo": "BS25040152-67",
+    "user": "尚振胜"
   },
   "569-BV-0062": {
     "subItem": "12600-20-3311",
@@ -13279,9 +13285,10 @@
     "valveId": "VLYL0NAB",
     "diameter": "50",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S47",
+    "weldNo2": "S01",
+    "serialNo": "BS25040152-15",
+    "user": "尚振胜"
   },
   "569-GLV-0010": {
     "subItem": "12600-20-3311",
@@ -13356,9 +13363,10 @@
     "valveId": "VLYL0RJB",
     "diameter": "25",
     "pressure": "CL150",
-    "weldNo1": "",
+    "weldNo1": "S97",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "BS25040182-15",
+    "user": "尚振胜"
   },
   "569-BV-0133": {
     "subItem": "12600-20-3311",
@@ -13368,9 +13376,10 @@
     "valveId": "VLYL0RJB",
     "diameter": "25",
     "pressure": "CL150",
-    "weldNo1": "",
+    "weldNo1": "S100",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "BS25040182-67",
+    "user": "尚振胜"
   },
   "569-BV-0132": {
     "subItem": "12600-20-3311",
@@ -16326,9 +16335,9 @@
     "valveId": "VAZC0X90",
     "diameter": "50",
     "pressure": "CL300",
-    "weldNo1": "S26",
-    "weldNo2": "",
-    "serialNo": "B24040030-6-55",
+    "weldNo1": "S21",
+    "weldNo2": "S22",
+    "serialNo": "B24110054-4-32",
     "user": "李洪兵"
   },
   "565-GV-0083": {
@@ -16339,9 +16348,9 @@
     "valveId": "VABL0EP0",
     "diameter": "25",
     "pressure": "CL300",
-    "weldNo1": "s25",
+    "weldNo1": "S26",
     "weldNo2": "",
-    "serialNo": "24040030-6-55",
+    "serialNo": "B24040030-6-55",
     "user": "李洪兵"
   },
   "565-GV-0057": {
