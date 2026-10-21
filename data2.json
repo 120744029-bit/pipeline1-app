@@ -3850,10 +3850,10 @@
     "valveId": "VCZL00Y0",
     "diameter": "50",
     "pressure": "CL150",
-    "weldNo1": "F07",
-    "weldNo2": "S08",
-    "serialNo": "B24110054-200-6",
-    "user": "崔建"
+    "weldNo1": "",
+    "weldNo2": "",
+    "serialNo": "",
+    "user": ""
   },
   "565-GV-1002": {
     "subItem": "12600-13-3312",
@@ -10123,7 +10123,7 @@
     "pressure": "CL300",
     "weldNo1": "S38",
     "weldNo2": "S39",
-    "serialNo": "B24110054-171-2"
+    "serialNo": "B24110054-171-20"
   },
   "567-GV-0080": {
     "subItem": "12600-20-3311",
