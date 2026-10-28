@@ -514,9 +514,10 @@
     "valveId": "VCZL0W80",
     "diameter": "40",
     "pressure": "CL800",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "F16",
+    "weldNo2": "F17",
+    "serialNo": "B24040030-173-14",
+    "user": "王利建"
   },
   "552-GV-0354": {
     "subItem": "12600-12-3307",
@@ -574,9 +575,10 @@
     "valveId": "VCZL0W80",
     "diameter": "40",
     "pressure": "CL800",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "F20",
+    "weldNo2": "F21",
+    "serialNo": "B24040030-173-1",
+    "user": "王利建"
   },
   "552-GV-0476": {
     "subItem": "12600-12-3307",
@@ -16798,9 +16800,10 @@
     "valveId": "VAZC0XR0",
     "diameter": "50",
     "pressure": "CL150",
-    "weldNo1": "",
-    "weldNo2": "",
-    "serialNo": ""
+    "weldNo1": "S42",
+    "weldNo2": "S43",
+    "serialNo": "B0024040031-11-80",
+    "user": "尚振胜"
   },
   "571-GV-0014": {
     "subItem": "12600-20-3311",
@@ -16810,9 +16813,10 @@
     "valveId": "VAAL08K0",
     "diameter": "25",
     "pressure": "CL150",
-    "weldNo1": "",
+    "weldNo1": "S48",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "B24040031-2-57",
+    "user": "尚振胜"
   },
   "571-GLV-0001": {
     "subItem": "12600-20-3311",
@@ -18540,7 +18544,8 @@
     "pressure": "CL300",
     "weldNo1": "",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "B0024040030-6-104",
+    "user": "郑宁宁"
   },
   "569-GV-0001": {
     "subItem": "12600-20-3311",
@@ -18552,7 +18557,8 @@
     "pressure": "CL300",
     "weldNo1": "",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "B0024040030-6-172",
+    "user": "郑宁宁"
   },
   "569-GV-0030": {
     "subItem": "12600-20-3311",
@@ -18564,7 +18570,8 @@
     "pressure": "CL300",
     "weldNo1": "",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "B0024040030-6-53",
+    "user": "郑宁宁"
   },
   "569-GV-0050": {
     "subItem": "12600-20-3311",
@@ -18576,7 +18583,8 @@
     "pressure": "CL300",
     "weldNo1": "",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "B0024040030-6-100",
+    "user": "郑宁宁"
   },
   "569-BV-0021": {
     "subItem": "12600-20-3311",
@@ -18588,7 +18596,8 @@
     "pressure": "CL300",
     "weldNo1": "",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "B0024050013-65-134",
+    "user": "郑宁宁"
   },
   "569-BV-0060": {
     "subItem": "12600-20-3311",
@@ -18612,7 +18621,8 @@
     "pressure": "CL300",
     "weldNo1": "",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "B0024050013-65-206",
+    "user": "郑宁宁"
   },
   "569-BV-0069": {
     "subItem": "12600-20-3311",
@@ -18636,7 +18646,8 @@
     "pressure": "CL300",
     "weldNo1": "",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "B0024050013-65-214",
+    "user": "郑宁宁"
   },
   "569-BV-0123": {
     "subItem": "12600-20-3311",
@@ -18660,7 +18671,8 @@
     "pressure": "CL300",
     "weldNo1": "",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "B0024050013-65-77",
+    "user": "郑宁宁"
   },
   "569-BV-0086": {
     "subItem": "12600-20-3311",
@@ -18684,7 +18696,8 @@
     "pressure": "CL300",
     "weldNo1": "",
     "weldNo2": "",
-    "serialNo": ""
+    "serialNo": "B0024050013-65-222",
+    "user": "郑宁宁"
   },
   "569-BV-0032": {
     "subItem": "12600-20-3311",
