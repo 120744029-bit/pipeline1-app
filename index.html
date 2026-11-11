@@ -740,6 +740,12 @@
             <input type="text" id="pipelineInput" placeholder="输入管线号或点下方按键">
             <button id="pipelineBtn">查询</button>
         </div>
+
+        <!-- 👇 新增：刷新管线数据按钮 -->
+        <div style="padding: 10px 16px 0;">
+            <button onclick="refreshPipelineData()" id="pipelineRefreshBtn" style="width:100%;padding:12px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:15px;font-weight:600;cursor:pointer;">🔄 刷新管线数据</button>
+        </div>
+        <!-- 👆 新增结束 -->
         <div class="keyboard-panel">
             <div class="keyboard-title">
                 <span>⌨️ 快捷输入</span>
@@ -1594,7 +1600,31 @@ function showInfo() {
 // ============================================================
 //                    页面切换
 // ============================================================
+// 五个页面共用 document 滚动，以前切 Tab 会继承上一个页面的滚动位置。
+// 现在每个底部 Tab、以及工作量的两个子 Tab 各记各的位置：切走时保存，
+// 切回时恢复，彼此互不影响；首次进入某个页面一律从顶部开始。
+var pageScrollTop = { work: 0, pipeline: 0, bracket: 0, valve: 0, schedule: 0 };
+var subTabScrollTop = { work: 0, total: 0 };
+function currentScrollTop() {
+    return window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+}
+function restoreScrollTop(pos) {
+    // DOM 显示/隐藏会改变文档高度，等两帧布局稳定后再定位。
+    // 若这一页内容变短（例如切回来时结果被重置），原来记的位置已不可达，
+    // 就直接回顶部，别让浏览器 clamp 到一个不上不下的位置。
+    function apply() {
+        var max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        window.scrollTo(0, (pos > max + 2) ? 0 : pos);
+    }
+    requestAnimationFrame(function () {
+        apply();
+        requestAnimationFrame(apply);
+    });
+}
 function switchPage(page) {
+    // 先把「正在离开的页面」的位置存起来（含底部 Tab 与它的子 Tab）
+    pageScrollTop[currentPage] = currentScrollTop();
+    if (currentPage === 'work') subTabScrollTop[currentSubTab] = currentScrollTop();
     currentPage = page;
     document.querySelectorAll('.page-mode').forEach(function(el) { el.classList.remove('active'); });
     document.querySelectorAll('.bottom-tabs .tab-item').forEach(function(el) { el.classList.remove('active'); });
@@ -1630,15 +1660,18 @@ function switchPage(page) {
         document.getElementById('pageSchedule').classList.add('active');
         document.getElementById('tabSchedule').classList.add('active');
     }
+    restoreScrollTop(pageScrollTop[page] || 0);
 }
 
 function switchSubTab(tab) {
+    subTabScrollTop[currentSubTab] = currentScrollTop();
     currentSubTab = tab;
     document.getElementById('subTabWork').classList.toggle('active', tab === 'work');
     document.getElementById('subTabTotal').classList.toggle('active', tab === 'total');
     document.getElementById('subPageWork').style.display = tab === 'work' ? 'block' : 'none';
     document.getElementById('subPageTotal').style.display = tab === 'total' ? 'block' : 'none';
     if (tab === 'total') initTotalPage();
+    restoreScrollTop(subTabScrollTop[tab] || 0);
 }
 
 // ============================================================
@@ -2031,6 +2064,63 @@ function renderTotalHTML(data4, data1, data2, d5Map) {
 
     // 支架、阀门部分已分别移到「支架」页和「阀门」页展示
     return html;
+}
+
+// ============================================================
+//     管线页：刷新管线数据（重拉 data.json）
+// ============================================================
+function refreshPipelineData() {
+    var btn = document.getElementById('pipelineRefreshBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 刷新中...'; }
+
+    // 1. 清掉管线数据缓存 + 子项号缓存
+    try {
+        localStorage.removeItem('pipelineData');
+        localStorage.removeItem('staticSubItemsCache');
+    } catch(e) {}
+
+    // 2. 重新拉 data.json
+    fetch(PIPELINE_URL + '?t=' + Date.now(), { cache: 'no-store' })
+        .then(function(res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        })
+        .then(function(data) {
+            if (!Array.isArray(data) || data.length === 0) {
+                throw new Error('数据为空或格式不对');
+            }
+
+            // 3. 写入内存 + 缓存
+            pipelineData = data;
+            dataLoaded = true;
+            lsSet('pipelineData', data);
+            console.log('✅ 管线数据已刷新：' + data.length + ' 条');
+
+            // 4. 重新加载子项号列表（因为子项也可能变了）
+            return loadSubItems().then(function() {
+                // 5. 如果当前有搜索词，重新渲染结果
+                var q = pipelineInput.value.trim();
+                var subItem = document.getElementById('subItemSelect').value;
+                if (q || subItem) {
+                    doPipelineSearch(q, subItem);
+                } else {
+                    showWelcomePipeline();
+                }
+
+                // 6. 如果当前在支架页且有搜索词，也刷新一下
+                var bq = bracketInput.value.trim();
+                if (bq && currentPage === 'bracket') doBracketSearch(bq);
+
+                showToast('✅ 管线数据已刷新（' + data.length + ' 条）');
+            });
+        })
+        .catch(function(err) {
+            console.error('❌ 管线数据刷新失败：', err);
+            showToast('❌ 刷新失败：' + (err.message || '网络错误'));
+        })
+        .then(function() {
+            if (btn) { btn.disabled = false; btn.textContent = '🔄 刷新管线数据'; }
+        });
 }
 
 // ============================================================
@@ -3232,7 +3322,10 @@ function doPipelineSearch(q, subItem) {
     });
     if (matched.length === 0) { resultAreaPipeline.innerHTML = '<div class="no-result"><span>🔎</span>未找到</div>'; return; }
     var html = '<div class="stats">📌 找到 ' + matched.length + ' 条结果</div>';
-    matched.forEach(function (item) {
+    // 结果项按索引存起来，按钮用索引取数据，避免把长字符串塞进 onclick 造成转义问题
+    window.__boItems = {};
+    matched.forEach(function (item, idx) {
+        window.__boItems[idx] = item;
         var safeId = item.lineNo.replace(/[^a-zA-Z0-9]/g, '_');
         var welds = item.welds ? item.welds.split(/\s+/).filter(function (w) { return w.length > 0; }) : [];
         var badges = welds.map(function (w) {
@@ -3248,9 +3341,10 @@ function doPipelineSearch(q, subItem) {
         }).join('');
         html += '<div class="result-card">' +
             '<div class="card-row"><div class="label">子项号</div><div class="value" style="color:#7c3aed;">' + escapeHtml(item.subItem) + '</div></div>' +
-            '<div class="card-row"><div class="label">管线号</div><div class="value" style="color:#1a5fb0;">' + escapeHtml(item.lineNo) + '</div></div>' +
-            '<div class="card-row"><div class="label">单线图号</div><div class="value" style="font-size:13px;display:flex;align-items:center;gap:8px;">' + escapeHtml(item.isoNo) +
-            '<button onclick="copyIsoNo(\'' + escapeJs(item.isoNo) + '\')" style="padding:3px 10px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:4px;font-size:11px;color:var(--text-primary);cursor:pointer;">📋 复制</button></div></div>' +
+            '<div class="card-row"><div class="label">管线号</div><div class="value" style="color:#1a5fb0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + escapeHtml(item.lineNo) +
+                '<button onclick="showAllBracketStatus(' + idx + ')" style="padding:3px 10px;background:var(--green-bg);border:1px solid var(--green-primary);border-radius:4px;font-size:11px;color:var(--green-text);cursor:pointer;white-space:nowrap;">📊 所有支架状态</button></div></div>' +
+            '<div class="card-row"><div class="label">单线图号</div><div class="value" style="font-size:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + escapeHtml(item.isoNo) +
+            '<button onclick="copyIsoNo(\'' + escapeJs(item.isoNo) + '\')" style="padding:3px 10px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:4px;font-size:11px;color:var(--text-primary);cursor:pointer;white-space:nowrap;flex-shrink:0;">📋 复制</button>' + (window.MobileDrawings ? MobileDrawings.button(item.isoNo, item.version || '') : '') + '</div></div>' +
             '<div class="card-row"><div class="label">图纸版本</div><div class="value">' + escapeHtml(item.version) + '</div></div>' +
             '<div class="card-row"><div class="label">探伤比例</div><div class="value">' + escapeHtml(item.testRatio || '未设置') + '</div></div>' +
             '<div class="card-row"><div class="label">保温厚度</div><div class="value">' + escapeHtml(item.insulationThickness || '未设置') + '</div></div>' +
@@ -3265,6 +3359,281 @@ function doPipelineSearch(q, subItem) {
     });
     resultAreaPipeline.innerHTML = html;
 }
+
+// ============================================================
+//        📊 所有支架状态：管线查线 → 管线号后的按钮
+//   数据来自 data1.json（每天由动态库转出的静态库），键为「支架号_管线号」。
+//   取并集：单线图 brackets 字段 + 状态库里所有以 _管线号 结尾的记录，
+//           这样即使 brackets 没写全，也不会漏掉已录状态的支架。
+//   网页版 / 桌面版同样可用（桌面版读的是本地 data1 快照）。
+// ============================================================
+(function () {
+    'use strict';
+
+    var CSS = [
+        '.bo-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:100000;background:rgba(0,0,0,.45)}',
+        '.bo-overlay.active{display:flex;align-items:stretch;justify-content:center}',
+        '.bo-panel{width:100%;max-width:560px;height:100%;background:var(--bg-page);display:flex;flex-direction:column;box-shadow:0 0 24px rgba(0,0,0,.25)}',
+        '.bo-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 16px;background:var(--bg-card);border-bottom:1px solid var(--border-light)}',
+        '.bo-title{font-size:calc(17px * var(--font-scale));font-weight:600;color:var(--text-primary)}',
+        '.bo-sub{font-size:calc(11px * var(--font-scale));color:var(--text-secondary);margin-top:4px;word-break:break-all;line-height:1.5}',
+        '.bo-x{border:0;background:transparent;color:var(--text-secondary);font-size:22px;line-height:1;padding:2px 8px;cursor:pointer}',
+        '.bo-summary{padding:10px 16px;background:var(--bg-card);border-bottom:1px solid var(--border-light);font-size:calc(13px * var(--font-scale));color:var(--text-primary)}',
+        '.bo-total{margin-bottom:8px}',
+        '.bo-chips{display:flex;flex-wrap:wrap;gap:6px}',
+        '.bo-chip{padding:2px 8px;border-radius:10px;font-size:calc(11px * var(--font-scale));background:var(--bg-hover);color:var(--text-secondary)}',
+        '.bo-chip.ok{background:var(--green-bg);color:var(--green-text)}',
+        '.bo-chip.bad{background:var(--red-bg);color:var(--red-text)}',
+        '.bo-chip.warn{background:var(--amber-bg);color:var(--amber-text)}',
+        '.bo-warn{margin:10px 12px 0;padding:9px 12px;border-radius:6px;background:var(--amber-bg);color:var(--amber-text);font-size:calc(12px * var(--font-scale));line-height:1.6}',
+        '.bo-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px 12px}',
+        '.bo-item{background:var(--bg-card);border:1px solid var(--border-light);border-radius:8px;padding:11px 12px;margin-bottom:9px;cursor:pointer}',
+        '.bo-row1{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap}',
+        '.bo-id{font-size:calc(14px * var(--font-scale));font-weight:600;color:var(--text-value);word-break:break-all}',
+        '.bo-badge{font-size:calc(12px * var(--font-scale));padding:3px 8px;border-radius:4px;word-break:break-all;max-width:100%}',
+        '.bo-badge.status-installed{background:var(--green-bg);color:var(--green-text)}',
+        '.bo-badge.status-checking{background:var(--amber-bg);color:var(--amber-text)}',
+        '.bo-badge.status-not-installed{background:var(--red-bg);color:var(--red-text)}',
+        '.bo-badge.status-other{background:var(--purple-bg);color:var(--purple-text)}',
+        '.bo-badge.status-none{background:var(--bg-hover);color:var(--text-secondary)}',
+        '.bo-info{margin-top:6px;font-size:calc(11px * var(--font-scale));color:var(--text-secondary);word-break:break-all}',
+        '.bo-empty{padding:36px 18px;text-align:center;color:var(--text-secondary);font-size:calc(14px * var(--font-scale));line-height:1.9}',
+        '.bo-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 16px calc(12px + env(safe-area-inset-bottom));background:var(--bg-card);border-top:1px solid var(--border-light)}',
+        '.bo-btn{border:0;border-radius:6px;background:var(--green-primary);color:#fff;padding:9px 14px;font-size:calc(13px * var(--font-scale));cursor:pointer;white-space:nowrap}',
+        '.bo-btn.ghost{background:var(--bg-hover);color:var(--text-primary);border:1px solid var(--border-light)}',
+        '.bo-meta{flex:1;min-width:90px;text-align:right;white-space:nowrap;color:var(--text-secondary);font-size:calc(11px * var(--font-scale))}'
+    ].join('\n');
+
+    var panel = null;
+    var current = null;   // { line, iso, sub, rows:[], setCount, mapSize }
+    var curItem = null;
+    var autoRefreshed = false;
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c];
+        });
+    }
+    function toast(msg) {
+        try {
+            if (typeof plus !== 'undefined' && plus.nativeUI) plus.nativeUI.toast(msg);
+            else if (typeof showToast === 'function') showToast(msg);
+        } catch (e) {}
+    }
+    function mapNow() {
+        if (bracketStatusMap && Object.keys(bracketStatusMap).length) return bracketStatusMap;
+        try {
+            var c = lsGet('bracketStatus', null);
+            if (c && Object.keys(c).length) { bracketStatusMap = c; return c; }
+        } catch (e) {}
+        return bracketStatusMap || {};
+    }
+    function cleanId(s) {
+        return String(s == null ? '' : s)
+            .replace(/[^\x00-\x7F].*$/, '')     // 去掉「有护板」之类的中文补充
+            .replace(/[^0-9A-Za-z\-]/g, '')
+            .trim();
+    }
+    function collect(item) {
+        var line = item.lineNo || '';
+        var map = mapNow();
+        var seen = {}, ids = [];
+        function add(raw) {
+            var id = cleanId(raw);
+            if (!id || seen[id]) return;
+            seen[id] = 1; ids.push(id);
+        }
+        (item.brackets || '').split(/[,，\s]+/).forEach(add);
+        var suffix = '_' + line;
+        Object.keys(map).forEach(function (k) {
+            if (k.length > suffix.length && k.slice(-suffix.length) === suffix) {
+                add(k.slice(0, -suffix.length));
+            }
+        });
+        ids.sort(function (a, b) { return a < b ? -1 : (a > b ? 1 : 0); });
+        var rows = ids.map(function (id) {
+            var rec = map[id + '_' + line] || {};
+            return { id: id, status: rec.status || '', user: rec.user || '', time: rec.updateTime || '' };
+        });
+        var setCount = rows.filter(function (r) { return !!r.status; }).length;
+        return { line: line, iso: item.isoNo || '', sub: item.subItem || '', rows: rows,
+                 setCount: setCount, mapSize: Object.keys(map).length };
+    }
+    function category(s) {
+        if (!s) return '未设置';
+        if (s.indexOf('已安装') !== -1 || s.indexOf('已验收') !== -1) return '已安装';
+        if (s.indexOf('已到现场') !== -1) return '已到现场';
+        if (s.indexOf('到货已领') !== -1 || s.indexOf('到货未领') !== -1 || s.indexOf('已到货') !== -1) return '到货';
+        if (s.indexOf('已预制') !== -1) return '已预制';
+        if (s.indexOf('未预制') !== -1 || s.indexOf('未到货') !== -1 || s.indexOf('未安装') !== -1) return '未预制/未到货';
+        return '其他';
+    }
+    // 状态标签配色与上面的分类保持一致（不用 getStatusClass，它把「已到现场」归成紫色 other）
+    function badgeClass(s) {
+        var c = category(s);
+        if (c === '已安装' || c === '已预制') return 'status-installed';
+        if (c === '已到现场' || c === '到货') return 'status-checking';
+        if (c === '未预制/未到货') return 'status-not-installed';
+        if (c === '未设置') return 'status-none';
+        return 'status-other';
+    }
+    function render(data) {
+        current = data;
+        document.getElementById('boTitle').textContent = '📊 ' + data.line + ' · 所有支架状态';
+        document.getElementById('boSub').textContent =
+            (data.iso ? data.iso + ' ｜ ' : '') + (data.sub ? '子项 ' + data.sub + ' ｜ ' : '') +
+            '共 ' + data.rows.length + ' 个支架';
+
+        var counts = {}, order = ['已安装', '已到现场', '已预制', '到货', '未预制/未到货', '其他', '未设置'];
+        data.rows.forEach(function (r) {
+            var c = category(r.status);
+            counts[c] = (counts[c] || 0) + 1;
+        });
+        var chips = '';
+        order.forEach(function (c) {
+            if (!counts[c]) return;
+            var cls = (c === '已安装' || c === '已预制') ? 'ok' :
+                      (c === '未预制/未到货' || c === '未设置') ? 'bad' :
+                      (c === '已到现场' || c === '到货') ? 'warn' : '';
+            chips += '<span class="bo-chip ' + cls + '">' + esc(c) + ' ' + counts[c] + '</span>';
+        });
+        document.getElementById('boSummary').innerHTML =
+            '<div class="bo-total">共 <b>' + data.rows.length + '</b> 个支架，已录状态 <b>' + data.setCount +
+            '</b> 个，未设置 <b>' + (data.rows.length - data.setCount) + '</b> 个</div>' +
+            '<div class="bo-chips">' + (chips || '<span class="bo-chip">暂无状态</span>') + '</div>';
+
+        var warn = document.getElementById('boWarn');
+        if (!data.mapSize) {
+            warn.style.display = 'block';
+            warn.innerHTML = '⚠️ 支架状态库还没加载好，下面只有支架清单。点下方「🔄 刷新状态」拉取 data1.json。';
+        } else { warn.style.display = 'none'; warn.innerHTML = ''; }
+
+        var list = document.getElementById('boList');
+        if (!data.rows.length) {
+            list.innerHTML = '<div class="bo-empty">这条管线没有登记支架。<br>（data.json 的 brackets 字段为空，状态库里也没有该管线号的记录）</div>';
+        } else {
+            list.innerHTML = data.rows.map(function (r, i) {
+                var cls = badgeClass(r.status);
+                var info = [];
+                if (r.user) info.push('录入：' + esc(r.user));
+                if (r.time) info.push(esc(r.time));
+                return '<div class="bo-item" data-bid="' + esc(r.id) + '">' +
+                         '<div class="bo-row1"><span class="bo-id">' + (i + 1) + '. ' + esc(r.id) + '</span>' +
+                           '<span class="bo-badge ' + cls + '">' + esc(r.status || '未设置') + '</span></div>' +
+                         (info.length ? '<div class="bo-info">' + info.join(' · ') + ' · 点此查该支架</div>' :
+                                        '<div class="bo-info">点此查该支架</div>') +
+                       '</div>';
+            }).join('');
+        }
+        list.scrollTop = 0;
+        document.getElementById('boMeta').textContent =
+            data.mapSize ? ('状态库 ' + data.mapSize + ' 条') : '状态库未加载';
+    }
+    function build() {
+        if (panel) return panel;
+        var st = document.createElement('style');
+        st.id = 'boStyle';
+        st.textContent = CSS;
+        document.head.appendChild(st);
+
+        panel = document.createElement('div');
+        panel.id = 'boOverlay';
+        panel.className = 'bo-overlay';
+        panel.innerHTML =
+            '<div class="bo-panel">' +
+              '<div class="bo-head"><div style="min-width:0"><div class="bo-title" id="boTitle">📊 所有支架状态</div>' +
+                '<div class="bo-sub" id="boSub"></div></div>' +
+                '<button class="bo-x" id="boClose" aria-label="关闭">✕</button></div>' +
+              '<div class="bo-summary" id="boSummary"></div>' +
+              '<div class="bo-warn" id="boWarn" style="display:none"></div>' +
+              '<div class="bo-list" id="boList"></div>' +
+              '<div class="bo-foot">' +
+                '<button class="bo-btn" id="boCopy">📋 复制全部</button>' +
+                '<button class="bo-btn ghost" id="boRefresh">🔄 刷新状态</button>' +
+                '<span class="bo-meta" id="boMeta"></span>' +
+              '</div>' +
+            '</div>';
+        document.body.appendChild(panel);
+
+        document.getElementById('boClose').addEventListener('click', close);
+        panel.addEventListener('click', function (e) { if (e.target === panel) close(); });
+        panel.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+        document.getElementById('boList').addEventListener('click', function (e) {
+            var el = e.target;
+            while (el && el !== panel && !(el.getAttribute && el.getAttribute('data-bid'))) el = el.parentNode;
+            if (el && el.getAttribute) jump(el.getAttribute('data-bid'));
+        });
+        document.getElementById('boCopy').addEventListener('click', copyAll);
+        document.getElementById('boRefresh').addEventListener('click', refresh);
+        return panel;
+    }
+    function jump(bid) {
+        if (!bid) return;
+        close();
+        try { switchPage('bracket'); } catch (e) {}
+        try {
+            var inp = document.getElementById('bracketInput') || window.bracketInput;
+            if (inp) inp.value = bid;
+            if (typeof doBracketSearch === 'function') doBracketSearch(bid);
+            else if (typeof searchBracket === 'function') searchBracket();
+        } catch (e) { toast('跳转失败：' + e.message); }
+    }
+    function copyAll() {
+        if (!current) return;
+        var lines = [current.line + ' 全部支架状态（' + current.rows.length + ' 个）'];
+        if (current.iso) lines.push('单线图号：' + current.iso);
+        lines.push('');
+        current.rows.forEach(function (r, i) {
+            lines.push((i + 1) + '. ' + r.id + ' — ' + (r.status || '未设置') +
+                       (r.user || r.time ? '（' + [r.user, r.time].filter(Boolean).join(' ') + '）' : ''));
+        });
+        var text = lines.join('\n');
+        try {
+            if (typeof plus !== 'undefined' && plus.clipboard) {
+                plus.clipboard.setData(text);
+                toast('✅ 已复制 ' + current.rows.length + ' 个支架状态');
+            } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function () { toast('✅ 已复制全部状态'); },
+                                                          function () { toast('❌ 复制失败'); });
+            } else { toast('❌ 当前环境不支持复制'); }
+        } catch (e) { toast('❌ 复制失败：' + e.message); }
+    }
+    function refresh() {
+        var meta = document.getElementById('boMeta');
+        if (meta) meta.textContent = '正在刷新…';
+        fetch(DATA1_URL + '?t=' + Date.now(), { cache: 'no-store' })
+            .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+            .then(function (d) {
+                bracketStatusMap = d || {};
+                try { lsSet('bracketStatus', bracketStatusMap); } catch (e) {}
+                if (curItem) render(collect(curItem));
+                toast('✅ 支架状态已刷新');
+            })
+            .catch(function (e) {
+                if (meta) meta.textContent = '刷新失败，显示的是本地缓存';
+                toast('❌ 刷新失败：' + (e.message || '网络错误'));
+            });
+    }
+    function open(idx) {
+        var item = window.__boItems && window.__boItems[idx];
+        if (!item) { toast('查询结果已变化，请重新查一次'); return; }
+        curItem = item;
+        build().classList.add('active');
+        var data = collect(item);
+        render(data);
+        // 启动队列还没把 data1 拉回来时，自动补一次，别让用户看到一堆「未设置」
+        if (!data.mapSize && !autoRefreshed) { autoRefreshed = true; refresh(); }
+    }
+    function close() { if (panel) panel.classList.remove('active'); }
+    function state() {
+        return { open: !!(panel && panel.classList.contains('active')),
+                 line: current ? current.line : '', rows: current ? current.rows : [] };
+    }
+
+    // 暴露给结果卡片的 onclick，以及真机 CDP 自检
+    window.showAllBracketStatus = open;
+    window.BracketOverview = { open: open, close: close, collect: collect, state: state, refresh: refresh };
+})();
 
 // ============================================================
 //                    支架查询
@@ -3318,7 +3687,7 @@ function renderBracketResults(exactMatched, matchedBracket, q) {
         html += '<div class="result-card">' +
             '<div class="card-row"><div class="label">管线号</div><div class="value" style="color:#1a5fb0;">' + escapeHtml(item.lineNo) + '</div></div>' +
             '<div class="card-row"><div class="label">子项号</div><div class="value">' + escapeHtml(item.subItem) + '</div></div>' +
-            '<div class="card-row"><div class="label">单线图号</div><div class="value" style="font-size:13px;">' + escapeHtml(item.isoNo) + '</div></div>' +
+            '<div class="card-row"><div class="label">单线图号</div><div class="value" style="font-size:13px;">' + escapeHtml(item.isoNo) + ' ' + (window.MobileDrawings ? MobileDrawings.button(item.isoNo, item.version || '') : '') + '</div></div>' +
             '<div class="card-row"><div class="label">支架号</div><div class="value" style="color:#5b21b6;">' + escapeHtml(matchedBracket) + '</div></div>' +
             '<div class="card-row"><div class="label">📊 状态</div><div class="value">' + statusHtml + '</div></div>' +
             '<div class="card-row" style="flex-wrap:wrap;gap:8px;background:var(--bg-input);border-radius:4px;padding:8px 12px;">' +
@@ -3591,6 +3960,25 @@ function checkRemoteVersion() {
             var remoteVersion = data.version;
             var wgtUrl = data.wgtUrl;
             var updateLog = data.updateLog || '更新了数据';
+
+            // ★ 关键：把 wgtUrl 拼成当前后端的绝对地址
+            if (wgtUrl) {
+                // 情况 1：相对路径（推荐，version.json 里写 "/update.wgt"）
+                if (wgtUrl.charAt(0) === '/') {
+                    wgtUrl = BASE + wgtUrl;
+                }
+                // 情况 2：写死了 EdgeOne 主站地址，但当前用的是备用 → 替换域名
+                else if (typeof BACKENDS !== 'undefined' && BACKENDS.primary && BACKENDS[activeBackend]) {
+                    var primaryHost = BACKENDS.primary.replace(/\/$/, '');
+                    var currentHost = BACKENDS[activeBackend].replace(/\/$/, '');
+                    if (wgtUrl.indexOf(primaryHost) === 0 && currentHost !== primaryHost) {
+                        wgtUrl = currentHost + wgtUrl.slice(primaryHost.length);
+                    }
+                }
+            }
+
+            console.log('📦 更新包地址: ' + wgtUrl);
+
             if (compareVersion(currentVersion, remoteVersion)) {
                 if (typeof plus !== 'undefined') {
                     plus.nativeUI.confirm('发现新版本 v' + remoteVersion + '\n\n' + updateLog + '\n\n是否立即更新？',
@@ -3799,5 +4187,6 @@ if (typeof plus !== 'undefined' && window.plus) {
 
 console.log('🚀 APP 启动完成');
 </script>
+<script src="drawing-mobile.js"></script>
 </body>
 </html>

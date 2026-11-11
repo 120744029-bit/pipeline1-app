@@ -1,6 +1,6 @@
 {
-    "version": "4.0.7",
-    "updateTime": "2026-10-014 16:00:00",
+    "version": "4.0.8",
+    "updateTime": "2026-11-11 21:03:52",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "增加了管线页面刷新按钮"
+    "updateLog": "新增按图号搜索本机图纸；管线号后「所有支架状态」汇总；各界面滚动位置独立"
 }
