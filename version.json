@@ -1,6 +1,6 @@
 {
-    "version": "4.0.8",
-    "updateTime": "2026-11-11 21:03:52",
+    "version": "4.0.9",
+    "updateTime": "2026-11-12 07:37:01",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "新增按图号搜索本机图纸；管线号后「所有支架状态」汇总；各界面滚动位置独立"
+    "updateLog": "图纸搜索不再折叠，列出全部文件（修复索引数量虚高、重复项）；新增「所有阀门状态」，按图号汇总全部阀门录入状态"
 }

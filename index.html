@@ -3345,6 +3345,9 @@ function doPipelineSearch(q, subItem) {
                 '<button onclick="showAllBracketStatus(' + idx + ')" style="padding:3px 10px;background:var(--green-bg);border:1px solid var(--green-primary);border-radius:4px;font-size:11px;color:var(--green-text);cursor:pointer;white-space:nowrap;">📊 所有支架状态</button></div></div>' +
             '<div class="card-row"><div class="label">单线图号</div><div class="value" style="font-size:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + escapeHtml(item.isoNo) +
             '<button onclick="copyIsoNo(\'' + escapeJs(item.isoNo) + '\')" style="padding:3px 10px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:4px;font-size:11px;color:var(--text-primary);cursor:pointer;white-space:nowrap;flex-shrink:0;">📋 复制</button>' + (window.MobileDrawings ? MobileDrawings.button(item.isoNo, item.version || '') : '') + '</div></div>' +
+            '<div class="card-row"><div class="label">阀门</div><div class="value" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+                '<button onclick="showAllValveStatus(' + idx + ')" style="padding:3px 10px;background:var(--green-bg);border:1px solid var(--green-primary);border-radius:4px;font-size:11px;color:var(--green-text);cursor:pointer;white-space:nowrap;flex-shrink:0;">🚪 所有阀门状态</button>' +
+                '<span style="font-size:11px;color:var(--text-secondary)">本图号全部阀门录入状态</span></div></div>' +
             '<div class="card-row"><div class="label">图纸版本</div><div class="value">' + escapeHtml(item.version) + '</div></div>' +
             '<div class="card-row"><div class="label">探伤比例</div><div class="value">' + escapeHtml(item.testRatio || '未设置') + '</div></div>' +
             '<div class="card-row"><div class="label">保温厚度</div><div class="value">' + escapeHtml(item.insulationThickness || '未设置') + '</div></div>' +
@@ -3617,6 +3620,7 @@ function doPipelineSearch(q, subItem) {
     function open(idx) {
         var item = window.__boItems && window.__boItems[idx];
         if (!item) { toast('查询结果已变化，请重新查一次'); return; }
+        closeValves();                 // 两个面板不同时出现
         curItem = item;
         build().classList.add('active');
         var data = collect(item);
@@ -3630,9 +3634,212 @@ function doPipelineSearch(q, subItem) {
                  line: current ? current.line : '', rows: current ? current.rows : [] };
     }
 
+    // ===============================================================
+    //        🚪 所有阀门状态（与支架状态共用 bo-* 样式）
+    //   数据来自 data2.json（每天由动态库转出的静态库），键为阀门位号。
+    //   按「同图号」汇总：pipelineData 里同 isoNo 的所有管线号，
+    //   再取 data2.json 中 lineNo 属于这些管线号的阀门；
+    //   本地「待同步」录入（valvePendingMap）通过 getValveData 叠加显示。
+    // ===============================================================
+    var vPanel = null, vCurrent = null, vCurItem = null, vAutoRefreshed = false;
+
+    function valveCat(r) {
+        if ((r.serialNo || '').trim()) return '已录序列号';
+        if ((r.weldNo1 || '').trim() || (r.weldNo2 || '').trim()) return '已录焊口';
+        return '未录入';
+    }
+    function valveBadge(c) {
+        return c === '已录序列号' ? 'status-installed' :
+               c === '已录焊口' ? 'status-checking' : 'status-none';
+    }
+    function collectValves(item) {
+        var line = item.lineNo || '';
+        var lines = {}, lineCount = 0;
+        if (line) { lines[line] = 1; lineCount++; }
+        try {
+            if (typeof pipelineData !== 'undefined' && pipelineData && pipelineData.length && item.isoNo) {
+                pipelineData.forEach(function (p) {
+                    if (p.isoNo === item.isoNo && p.lineNo && !lines[p.lineNo]) {
+                        lines[p.lineNo] = 1; lineCount++;
+                    }
+                });
+            }
+        } catch (e) {}
+        var map = (typeof valveDataMap !== 'undefined' && valveDataMap) || {};
+        var tags = Object.keys(map).filter(function (k) {
+            var v = map[k] || {};
+            return (v.lineNo && lines[v.lineNo]) ||
+                   (v.isoNo && item.isoNo && v.isoNo === item.isoNo);
+        });
+        tags.sort(function (a, b) { return a.localeCompare(b, 'en', { numeric: true }); });
+        var rows = tags.map(function (k) {
+            var r = (typeof getValveData === 'function' ? getValveData(k) : null) || map[k] || {};
+            return {
+                tag: k,
+                name: r.valveName || '',
+                spec: [r.diameter ? 'DN' + r.diameter : '', r.pressure || '', r.valveId || '']
+                        .filter(Boolean).join(' · '),
+                w1: (r.weldNo1 || '').trim(), w2: (r.weldNo2 || '').trim(),
+                serial: (r.serialNo || '').trim(), user: r.user || '',
+                pending: !!r._pending, cat: valveCat(r)
+            };
+        });
+        var counts = {};
+        rows.forEach(function (r) { counts[r.cat] = (counts[r.cat] || 0) + 1; });
+        return { line: line, iso: item.isoNo || '', sub: item.subItem || '',
+                 rows: rows, counts: counts, mapSize: Object.keys(map).length,
+                 lineCount: lineCount };
+    }
+    function renderValves(data) {
+        vCurrent = data;
+        document.getElementById('voTitle').textContent = '🚪 ' + data.line + ' · 所有阀门状态';
+        document.getElementById('voSub').textContent =
+            (data.iso ? data.iso + ' ｜ ' : '') + (data.sub ? '子项 ' + data.sub + ' ｜ ' : '') +
+            '共 ' + data.rows.length + ' 个阀门';
+        var order = ['已录序列号', '已录焊口', '未录入'], chips = '';
+        order.forEach(function (c) {
+            if (!data.counts[c]) return;
+            var cls = c === '已录序列号' ? 'ok' : (c === '未录入' ? 'bad' : 'warn');
+            chips += '<span class="bo-chip ' + cls + '">' + esc(c) + ' ' + data.counts[c] + '</span>';
+        });
+        document.getElementById('voSummary').innerHTML =
+            '<div class="bo-total">共 <b>' + data.rows.length + '</b> 个阀门，已录序列号 <b>' +
+            (data.counts['已录序列号'] || 0) + '</b> 个，未录入 <b>' +
+            (data.counts['未录入'] || 0) + '</b> 个</div>' +
+            '<div class="bo-chips">' + (chips || '<span class="bo-chip">暂无阀门</span>') + '</div>';
+        var warn = document.getElementById('voWarn');
+        if (!data.mapSize) {
+            warn.style.display = 'block';
+            warn.innerHTML = '⚠️ 阀门库还没加载好。点下方「🔄 刷新数据」拉取 data2.json。';
+        } else { warn.style.display = 'none'; warn.innerHTML = ''; }
+        var list = document.getElementById('voList');
+        if (!data.rows.length) {
+            list.innerHTML = '<div class="bo-empty">这条管线没有登记阀门。<br>（data2.json 里没有对应管线号的记录）</div>';
+        } else {
+            list.innerHTML = data.rows.map(function (r, i) {
+                var bits = [];
+                if (r.w1 || r.w2) bits.push('焊口 ' + [r.w1, r.w2].filter(Boolean).join(' / '));
+                if (r.serial) bits.push('序列号 ' + r.serial);
+                if (r.user) bits.push('录入：' + r.user);
+                if (r.pending) bits.push('⏳ 待同步');
+                return '<div class="bo-item" data-vtag="' + esc(r.tag) + '">' +
+                    '<div class="bo-row1"><span class="bo-id">' + (i + 1) + '. ' + esc(r.tag) + '</span>' +
+                      '<span class="bo-badge ' + valveBadge(r.cat) + '">' + esc(r.cat) + '</span></div>' +
+                    (r.name || r.spec ? '<div class="bo-info">' + esc([r.name, r.spec].filter(Boolean).join(' · ')) + '</div>' : '') +
+                    (bits.length ? '<div class="bo-info">' + esc(bits.join(' · ')) + '</div>' : '') +
+                    '<div class="bo-info" style="text-align:right;color:var(--green-primary)">点此查该阀门 →</div>' +
+                  '</div>';
+            }).join('');
+        }
+        list.scrollTop = 0;
+        document.getElementById('voMeta').textContent =
+            data.mapSize ? ('阀门库 ' + data.mapSize + ' 条') : '阀门库未加载';
+    }
+    function buildValvePanel() {
+        if (vPanel) return vPanel;
+        if (!document.getElementById('boStyle')) build();   // 复用支架面板的 bo-* 样式
+        vPanel = document.createElement('div');
+        vPanel.id = 'voOverlay';
+        vPanel.className = 'bo-overlay';
+        vPanel.innerHTML =
+            '<div class="bo-panel">' +
+              '<div class="bo-head"><div style="min-width:0">' +
+                '<div class="bo-title" id="voTitle">🚪 所有阀门状态</div>' +
+                '<div class="bo-sub" id="voSub"></div></div>' +
+                '<button class="bo-x" id="voClose" aria-label="关闭">✕</button></div>' +
+              '<div class="bo-summary" id="voSummary"></div>' +
+              '<div class="bo-warn" id="voWarn" style="display:none"></div>' +
+              '<div class="bo-list" id="voList"></div>' +
+              '<div class="bo-foot">' +
+                '<button class="bo-btn" id="voCopy">📋 复制全部</button>' +
+                '<button class="bo-btn ghost" id="voRefresh">🔄 刷新数据</button>' +
+                '<span class="bo-meta" id="voMeta"></span>' +
+              '</div>' +
+            '</div>';
+        document.body.appendChild(vPanel);
+        document.getElementById('voClose').addEventListener('click', closeValves);
+        vPanel.addEventListener('click', function (e) { if (e.target === vPanel) closeValves(); });
+        vPanel.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeValves(); });
+        document.getElementById('voList').addEventListener('click', function (e) {
+            var el = e.target;
+            while (el && el !== vPanel && !(el.getAttribute && el.getAttribute('data-vtag'))) el = el.parentNode;
+            if (el && el.getAttribute) jumpValve(el.getAttribute('data-vtag'));
+        });
+        document.getElementById('voCopy').addEventListener('click', copyAllValves);
+        document.getElementById('voRefresh').addEventListener('click', refreshValves);
+        return vPanel;
+    }
+    function jumpValve(tag) {
+        if (!tag) return;
+        closeValves();
+        try { switchPage('valve'); } catch (e) {}
+        try {
+            var inp = document.getElementById('valveInput') || window.valveInput;
+            if (inp) inp.value = tag;
+            if (typeof doValveSearch === 'function') doValveSearch(tag);
+        } catch (e) { toast('跳转失败：' + e.message); }
+    }
+    function copyAllValves() {
+        if (!vCurrent) return;
+        var lines = [vCurrent.line + ' 全部阀门状态（' + vCurrent.rows.length + ' 个）'];
+        if (vCurrent.iso) lines.push('单线图号：' + vCurrent.iso);
+        lines.push('');
+        vCurrent.rows.forEach(function (r, i) {
+            lines.push((i + 1) + '. ' + r.tag + ' — ' + r.cat +
+                (r.name ? '｜' + r.name : '') + (r.spec ? '｜' + r.spec : '') +
+                (r.w1 || r.w2 ? '｜焊口 ' + [r.w1, r.w2].filter(Boolean).join('/') : '') +
+                (r.serial ? '｜序列号 ' + r.serial : '') +
+                (r.user ? '｜录入 ' + r.user : '') + (r.pending ? '｜待同步' : ''));
+        });
+        var text = lines.join('\n');
+        try {
+            if (typeof plus !== 'undefined' && plus.clipboard) {
+                plus.clipboard.setData(text);
+                toast('✅ 已复制 ' + vCurrent.rows.length + ' 个阀门状态');
+            } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function () { toast('✅ 已复制全部状态'); },
+                                                          function () { toast('❌ 复制失败'); });
+            } else { toast('❌ 当前环境不支持复制'); }
+        } catch (e) { toast('❌ 复制失败：' + e.message); }
+    }
+    function refreshValves() {
+        var meta = document.getElementById('voMeta');
+        if (meta) meta.textContent = '正在刷新…';
+        fetch(DATA2_URL + '?t=' + Date.now(), { cache: 'no-store' })
+            .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+            .then(function (d) {
+                valveDataMap = d || {};
+                try { lsSet('valveData', valveDataMap); } catch (e) {}
+                if (vCurItem) renderValves(collectValves(vCurItem));
+                toast('✅ 阀门数据已刷新');
+            })
+            .catch(function (e) {
+                if (meta) meta.textContent = '刷新失败，显示的是本地缓存';
+                toast('❌ 刷新失败：' + (e.message || '网络错误'));
+            });
+    }
+    function openValves(idx) {
+        var item = window.__boItems && window.__boItems[idx];
+        if (!item) { toast('查询结果已变化，请重新查一次'); return; }
+        close();                       // 两个面板不同时出现
+        vCurItem = item;
+        buildValvePanel().classList.add('active');
+        var data = collectValves(item);
+        renderValves(data);
+        if (!data.mapSize && !vAutoRefreshed) { vAutoRefreshed = true; refreshValves(); }
+    }
+    function closeValves() { if (vPanel) vPanel.classList.remove('active'); }
+    function valveState() {
+        return { open: !!(vPanel && vPanel.classList.contains('active')),
+                 line: vCurrent ? vCurrent.line : '', rows: vCurrent ? vCurrent.rows : [] };
+    }
+
     // 暴露给结果卡片的 onclick，以及真机 CDP 自检
     window.showAllBracketStatus = open;
+    window.showAllValveStatus = openValves;
     window.BracketOverview = { open: open, close: close, collect: collect, state: state, refresh: refresh };
+    window.ValveOverview = { open: openValves, close: closeValves, collect: collectValves,
+                             state: valveState, refresh: refreshValves };
 })();
 
 // ============================================================

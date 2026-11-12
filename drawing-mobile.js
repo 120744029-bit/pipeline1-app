@@ -13,7 +13,10 @@
 (function () {
     'use strict';
 
-    var LS_INDEX = 'pd.mobileDrawings.index.v1';
+    // v1 索引里存过「同一文件重复几百次」的脏数据，升级到 v2 让旧缓存自动失效。
+    // 目录配置 v1 继续沿用，用户选过的限定目录不丢。
+    var LS_INDEX = 'pd.mobileDrawings.index.v2';
+    var LEGACY_INDEX = 'pd.mobileDrawings.index.v1';
     var LS_CONF = 'pd.mobileDrawings.conf.v1';
     var DRAW_EXT = /\.(pdf|dwg|dxf|dwf|plt|png|jpe?g|tiff?|bmp)$/i;
     var ZIP_EXT = /\.zip$/i;
@@ -36,6 +39,12 @@
     var panel = null;
     var isoNo = '';
     var isoVer = '';
+    // 不折叠：同一图号下每份文件（含 _Copy 副本）都列出来，不隐藏任何一份。
+    // 排序仍把当前版 / 非副本 / 短文件名的正式版放在前面，方便优先点开。
+    var showDuplicates = true;
+    var lastReadRounds = 0;       // 诊断用：本次扫描单个目录最多读了几批 readEntries
+    var lastCacheOk = null;       // 诊断用：索引是否成功写入 localStorage
+    var lastCacheBytes = 0;
 
     // ---------------------------------------------------------------
     // 工具
@@ -66,24 +75,81 @@
     function saveConf() {
         try { localStorage.setItem(LS_CONF, JSON.stringify(conf)); } catch (e) {}
     }
+    function fileKey(f) { return f.p || f.u || ((f.d || '') + '/' + f.n); }
+    function dedupFiles(list) {
+        var seen = {}, out = [];
+        for (var i = 0; i < list.length; i++) {
+            var k = fileKey(list[i]);
+            if (seen[k]) continue;
+            seen[k] = 1; out.push(list[i]);
+        }
+        return out;
+    }
+    // 索引压缩：每条只存「目录表下标 + 文件名」，不再把完整路径重复存 3 遍。
+    // 真机实测 HBuilder 基座 localStorage 可用额度只有约 256~512KB（页面自身还占着
+    // 工作量/支架等缓存），2353 份图纸按原格式要 691KB，必然 QuotaExceededError。
+    // 压缩后约 160KB，能正常落盘，重启不用重扫。
+    function encodeIndex() {
+        var dirs = [], map = {};
+        function idx(d) {
+            d = d || '';
+            if (!(d in map)) { map[d] = dirs.length; dirs.push(d); }
+            return map[d];
+        }
+        var f = files.map(function (x) { return [idx(x.d), x.n]; });
+        var z = zips.slice(0, 60).map(function (x) { return [idx(x.d), x.n]; });
+        return { v: 2, t: builtAt, dirs: dirs, f: f, z: z };
+    }
+    function decodeRows(dirs, rows) {
+        return (rows || []).map(function (r) {
+            var d = (dirs && dirs[r[0]]) || '';
+            var n = r[1] || '';
+            var p = d ? (d.charAt(d.length - 1) === '/' ? d + n : d + '/' + n) : n;
+            return { n: n, p: p, u: p, d: d };
+        });
+    }
     function loadIndex() {
+        // 旧版索引含大量重复项，直接丢弃；下次扫描会重建干净索引
+        try { localStorage.removeItem(LEGACY_INDEX); } catch (e) {}
         try {
             var o = JSON.parse(localStorage.getItem(LS_INDEX) || 'null');
-            if (o && Array.isArray(o.f)) {
-                files = o.f; zips = o.z || []; builtAt = o.t || 0;
+            if (!o || !Array.isArray(o.f)) return;
+            if (o.dirs && Array.isArray(o.f[0])) {          // v2 压缩格式
+                files = dedupFiles(decodeRows(o.dirs, o.f));
+                zips = decodeRows(o.dirs, o.z);
+            } else {                                        // 兼容早期未压缩的 v2
+                files = dedupFiles(o.f);
+                zips = o.z || [];
             }
+            builtAt = o.t || 0;
         } catch (e) { /* 缓存损坏就重新扫描 */ }
     }
     function saveIndex() {
         try {
-            var s = JSON.stringify({ t: builtAt, f: files, z: zips.slice(0, 60) });
-            if (s.length > 3 * 1024 * 1024) {
-                files = files.slice(0, 12000);
-                s = JSON.stringify({ t: builtAt, f: files, z: zips.slice(0, 60) });
+            var s = JSON.stringify(encodeIndex());
+            var LIMIT = 380 * 1024;   // 给页面其它缓存留出余量
+            // 以前这里硬砍到 12000，导致界面显示「12000 份」这种假数字。
+            // 现在按缓存体积逐次裁剪，显示的数量始终是真实（去重后的）文件数。
+            if (s.length > LIMIT) {
+                while (files.length > 1 && s.length > LIMIT) {
+                    files = files.slice(0, Math.floor(files.length * 0.9));
+                    s = JSON.stringify(encodeIndex());
+                }
+                toast('图纸过多，索引只保留前 ' + files.length + ' 份');
             }
-            localStorage.setItem(LS_INDEX, s);
+            try {
+                localStorage.setItem(LS_INDEX, s);
+            } catch (e) {
+                // 旧值占着额度时，先删再写通常就能成功
+                localStorage.removeItem(LS_INDEX);
+                localStorage.setItem(LS_INDEX, s);
+            }
+            lastCacheOk = true;
+            lastCacheBytes = s.length;
         } catch (e) {
-            toast('索引缓存写入失败，本次可用，重启后需重扫');
+            lastCacheOk = false;
+            lastCacheBytes = 0;
+            toast('索引缓存写入失败，每次启动会重扫（不影响本次使用）');
         }
     }
     function status() {
@@ -91,7 +157,9 @@
             ready: ready, scanning: scanning, count: files.length, zips: zips.length,
             builtAt: builtAt, subDir: conf ? conf.subDir : '',
             roots: (conf && conf.subDir && conf.subDir.charAt(0) === '/') ? [conf.subDir] : rootPaths(),
-            stale: Date.now() - builtAt > STALE_MS
+            stale: Date.now() - builtAt > STALE_MS,
+            readRounds: lastReadRounds, expanded: true,
+            cacheOk: lastCacheOk, cacheBytes: lastCacheBytes
         };
     }
     function setStatus(text) {
@@ -139,22 +207,34 @@
     }
     function readAll(reader) {
         return new Promise(function (resolve) {
-            var acc = [], rounds = 0;
+            var acc = [], seen = {}, rounds = 0;
+            function done() {
+                if (rounds > lastReadRounds) lastReadRounds = rounds;
+                resolve(acc);
+            }
             function step() {
-                if (++rounds > 200) return resolve(acc);   // 防御某些实现的无限返回
+                if (++rounds > 30) return done();   // 防御异常实现无限返回
                 reader.readEntries(function (list) {
-                    if (!list || !list.length) return resolve(acc);
-                    for (var i = 0; i < list.length; i++) acc.push(list[i]);
-                    // DCloud 的 readEntries 通常一次返回全部；只有接近分批上限才继续读。
-                    // 每个目录少一次跨进程调用，真机上能省下约一半时间。
-                    if (list.length < 100) return resolve(acc);
+                    if (!list || !list.length) return done();
+                    var added = 0;
+                    for (var i = 0; i < list.length; i++) {
+                        var e = list[i];
+                        var key = e.fullPath || e.name;
+                        if (seen[key]) continue;      // 同一条目只收一次
+                        seen[key] = 1; acc.push(e); added++;
+                    }
+                    // 真机实测：DCloud 5+ 对同一个 reader 反复调用 readEntries 会重新
+                    // 返回【全部】条目（不推进游标）。旧代码只看 list.length >= 100 就继续读，
+                    // 于是 2000 多份图纸被累加十几遍，索引虚高、搜索结果全是重复项。
+                    // 这一批没有任何新条目就说明读完了，必须立刻停。
+                    if (!added || list.length < 100) return done();
                     step();
-                }, function () { resolve(acc); });
+                }, function () { done(); });
             }
             step();
         });
     }
-    function walk(dir, depth, out, zlist) {
+    function walk(dir, depth, out, zlist, seen) {
         if (depth > MAX_DEPTH || out.length >= MAX_FILES) return Promise.resolve();
         var reader;
         try { reader = dir.createReader(); } catch (e) { return Promise.resolve(); }
@@ -162,7 +242,7 @@
             return Promise.all(list.map(function (e) {
                 if (e.isDirectory) {
                     if (depth === 0 && SKIP_DIR.test(e.name)) return null;
-                    return walk(e, depth + 1, out, zlist);
+                    return walk(e, depth + 1, out, zlist, seen);
                 }
                 if (!e.isFile) return null;
                 var rec = {
@@ -171,6 +251,10 @@
                     u: (typeof e.toURL === 'function') ? e.toURL() : '',
                     d: dir.fullPath || ''
                 };
+                // 同一路径只收一次：防止多个扫描根目录重叠、嵌套目录被重复遍历
+                var key = fileKey(rec);
+                if (seen[key]) return null;
+                seen[key] = 1;
                 if (DRAW_EXT.test(e.name)) { if (out.length < MAX_FILES) out.push(rec); }
                 else if (ZIP_EXT.test(e.name)) zlist.push(rec);
                 return null;
@@ -188,8 +272,9 @@
         if (scanning) return Promise.resolve(status());
         if (!force && files.length && Date.now() - builtAt < STALE_MS) return Promise.resolve(status());
         scanning = true;
+        lastReadRounds = 0;
         setStatus('正在扫描图纸目录…');
-        var out = [], zlist = [];
+        var out = [], zlist = [], seen = {};
         var chain = Promise.resolve();
         return ensurePermission().then(function () {
             // 绝对路径（默认就是 Download/图纸/）时只扫这一处，不枚举 Download 根目录，最快
@@ -198,22 +283,22 @@
             roots.forEach(function (root) {
                 chain = chain.then(function () {
                     return resolveDir(root).then(function (dirEntry) {
-                        if (!conf.subDir || conf.subDir.charAt(0) === '/') return walk(dirEntry, 0, out, zlist);
+                        if (!conf.subDir || conf.subDir.charAt(0) === '/') return walk(dirEntry, 0, out, zlist, seen);
                         // 子目录名形式：先列 Download 一级，找到同名目录再递归
                         return readAll(dirEntry.createReader()).then(function (list) {
                             var target = null;
                             for (var i = 0; i < list.length; i++) {
                                 if (list[i].isDirectory && list[i].name === conf.subDir) { target = list[i]; break; }
                             }
-                            return target ? walk(target, 0, out, zlist) : null;
+                            return target ? walk(target, 0, out, zlist, seen) : null;
                         });
                     }).catch(function () { return null; });
                 });
             });
             return chain;
         }).then(function () {
-            files = out;
-            zips = zlist;
+            files = dedupFiles(out);   // 双保险：即使底层返回重复路径也不会进索引
+            zips = dedupFiles(zlist);
             builtAt = Date.now();
             scanning = false;
             saveIndex();
@@ -252,10 +337,14 @@
         if (/^[0-9]{3}$/.test(v)) v = v.slice(0, 2);
         return v;
     }
+    // _Copy / 副本 / (1) 之类的拷贝件排在同版本后面，不作为默认展示项
+    function dupRank(n) {
+        return /(_?copy|副本|复制|\(\d+\))/i.test(n) ? 1 : 0;
+    }
     function search(query, version) {
         var target = norm(version);
         var tokens = String(query || '').trim().split(/[\s,，]+/).map(norm).filter(Boolean);
-        var hits = [];
+        var hits = [], seen = {};
         if (tokens.length) {
             for (var i = 0; i < files.length; i++) {
                 var f = files[i];
@@ -265,6 +354,9 @@
                     if (k.indexOf(tokens[j]) === -1) { ok = false; break; }
                 }
                 if (!ok) continue;
+                var key = fileKey(f);
+                if (seen[key]) continue;     // 同一份文件只算一次，杜绝重复条目
+                seen[key] = 1;
                 var tail = tailOf(f.n, query);
                 hits.push({
                     n: f.n, p: f.p, u: f.u, d: f.d,
@@ -276,11 +368,15 @@
         hits.sort(function (a, b) {
             if (a.current !== b.current) return a.current ? -1 : 1;
             if (a.ver !== b.ver) return b.ver.localeCompare(a.ver, 'en', { numeric: true });
+            var ra = dupRank(a.n), rb = dupRank(b.n);
+            if (ra !== rb) return ra - rb;
             // 同版本里文件名更短的通常是正式版，_A / _bak / (1) 之类的副本靠后
             if (a.n.length !== b.n.length) return a.n.length - b.n.length;
             return a.n.localeCompare(b.n);
         });
-        return { total: hits.length, items: hits.slice(0, 300), target: target };
+        // 不再按版本折叠；hits 已按路径去重，全部交给界面显示。
+        return { total: hits.length, items: hits.slice(0, 300), target: target,
+                 folded: 0, expanded: true };
     }
 
     // ---------------------------------------------------------------
@@ -467,7 +563,7 @@
         var s = status();
         var meta = document.getElementById('dwMeta');
         meta.textContent = s.count
-            ? ('已索引 ' + s.count + ' 份图纸' + (s.subDir ? '（限 ' + s.subDir + '）' : '') + ' · 点击任一版本打开')
+            ? ('已索引 ' + s.count + ' 份图纸（按路径去重）' + (s.subDir ? '（限 ' + s.subDir + '）' : '') + ' · 点击任一版本打开')
             : '';
 
         var res = search(isoNo, isoVer);
@@ -541,7 +637,9 @@
             button: button,
             refresh: function () { return ready ? scan(true) : Promise.resolve(status()); },
             status: status,
-            search: function (q, v) { return search(q, v); }
+            search: function (q, v) { return search(q, v); },
+            // 兼容旧调用：现在恒为展开，不做任何隐藏
+            setExpanded: function () { render(isoNo, isoVer); return status(); }
         };
     }
 
