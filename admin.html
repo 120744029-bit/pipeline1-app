@@ -583,7 +583,8 @@ body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: c
             </div>
             <div style="margin-top:8px;font-size:12px;color:#7F7F7F;line-height:1.6;">
                 日志自动记录每次支架备注、阀门录入的新增 / 修改 / 删除（含批量导入）。本地最多保留 5000 条。
-                点「生成 data7.json」写入源仓库静态库（原文件自动备份），再点「一键推送 Git」上传，避免日志丢失。
+                <b style="color:#2a9d5b;">桌面版：每次录入后会自动保存到本地 data7.json（无需手动点生成）；网页版请点「生成 data7.json」下载。</b>
+                需要上传 Git 时点「一键推送 Git」（网络临时失败会自动重试 3 次）。
                 按日期查、范围汇总都使用当天保存的区域 / 人员快照，改名不影响历史。
             </div>
         </div>
@@ -3088,6 +3089,46 @@ function opLogNow() {
         date: d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
     };
 }
+// 是否桌面版（外壳在 <head> 注入了 <meta name="pipeline-desktop" content="1">）
+function opLogIsDesktop() {
+    try { return document.querySelector('meta[name="pipeline-desktop"]') !== null; } catch (e) { return false; }
+}
+// 自动落盘：桌面版把日志防抖写入源仓库 data7.json，避免只在浏览器里、清缓存就丢。
+// 网页版没有本地 API，跳过（仍存 localStorage，用户可点按钮下载）。
+var opLogWriteTimer = null;
+var opLogWriteBusy = false;
+var opLogWritePending = false;
+function opLogAutoSave() {
+    if (!opLogIsDesktop()) return;
+    if (opLogWriteTimer) clearTimeout(opLogWriteTimer);
+    opLogWriteTimer = setTimeout(function () {
+        opLogWriteTimer = null;
+        opLogFlushToDisk();
+    }, 1500);
+}
+function opLogFlushToDisk() {
+    if (!opLogIsDesktop()) return Promise.resolve(false);
+    if (opLogWriteBusy) { opLogWritePending = true; return Promise.resolve(false); }
+    opLogWriteBusy = true;
+    // 直接用 write-json，不弹确认框（自动落盘无需打扰用户）
+    var data = buildData7();
+    return fetch(LOCAL_API + 'write-json', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: 'data7.json', data: data })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+        if (!j.ok) throw new Error(j.error || '写入失败');
+        console.log('[操作日志] 已自动落盘 data7.json（' + data.count + ' 条）');
+        return true;
+    }).catch(function (e) {
+        console.warn('[操作日志] 自动落盘失败：' + e.message);
+        return false;
+    }).then(function (ok) {
+        opLogWriteBusy = false;
+        if (opLogWritePending) { opLogWritePending = false; opLogFlushToDisk(); }
+        return ok;
+    });
+}
+
 // 追加一条日志；entry: {kind, action, target, detail, user}
 function opLogPush(entry) {
     var t = opLogNow();
@@ -3099,6 +3140,7 @@ function opLogPush(entry) {
         user: entry.user || (typeof CONSOLE_USER !== 'undefined' ? CONSOLE_USER : '')
     });
     opLogSave();
+    opLogAutoSave();
 }
 
 /* ---- 解析写请求，返回日志条目或 null ---- */
