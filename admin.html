@@ -483,6 +483,7 @@ body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: c
         <button class="btn-secondary" onclick="openAddColumnDialog()">➕ 列</button>
         <button class="btn-success" onclick="saveAllWorkRecords()">💾 保存本地</button>
         <button class="btn-purple" onclick="commitWorkToStatic()">📦 加入静态库</button>
+        <button class="btn-cyan" onclick="bindRepoFile('data6.json')" title="网页版首次绑定仓库里的 data6.json，之后「加入静态库」直接写回该文件，不再下载">📁 绑定本地文件</button>
         <button class="btn-cyan" onclick="pushRepoToGit()">☁️ 一键推送 Git</button>
         <button class="btn-warning" onclick="loadWorkRecordsByRange()">📈 汇总</button>
         <button class="btn-success" onclick="exportWorkExcel()">📥 导出</button>
@@ -1752,27 +1753,141 @@ function saveWorkPendingUpload() {}
 // ---------------------------------------------------------------
 //  桌面版主进程本地能力：写源仓库静态库 / 一键推送 Git
 // ---------------------------------------------------------------
+// ---------------------------------------------------------------
+//  浏览器直接落盘（File System Access API）
+//  首次绑定一次仓库里的 data6.json，之后点「加入静态库」直接写回同一个文件，
+//  不再「下载 JSON → 手动覆盖」。桌面版本地服务下优先走 /local/write-json。
+//  Chrome / Edge + https（或 localhost）可用；其它浏览器仍退回下载。
+// ---------------------------------------------------------------
+var repoFileHandles = {};
+var REPO_HANDLE_DB = 'pipeline1-repo-handles';
+function directWriteSupported() {
+    return typeof window !== 'undefined' && window.isSecureContext &&
+           typeof window.showOpenFilePicker === 'function';
+}
+function openHandleDB() {
+    return new Promise(function (resolve, reject) {
+        if (typeof indexedDB === 'undefined') { reject(new Error('no indexedDB')); return; }
+        var req = indexedDB.open(REPO_HANDLE_DB, 1);
+        req.onupgradeneeded = function () {
+            var db = req.result;
+            if (!db.objectStoreNames.contains('handles')) db.createObjectStore('handles');
+        };
+        req.onsuccess = function () { resolve(req.result); };
+        req.onerror = function () { reject(req.error || new Error('indexedDB 打开失败')); };
+    });
+}
+function getSavedHandle(file) {
+    return openHandleDB().then(function (db) {
+        return new Promise(function (resolve) {
+            var tx = db.transaction('handles', 'readonly');
+            var r = tx.objectStore('handles').get(file);
+            r.onsuccess = function () { resolve(r.result || null); db.close(); };
+            r.onerror = function () { resolve(null); db.close(); };
+        });
+    }).catch(function () { return null; });
+}
+function saveHandle(file, handle) {
+    repoFileHandles[file] = handle;
+    return openHandleDB().then(function (db) {
+        return new Promise(function (resolve) {
+            var tx = db.transaction('handles', 'readwrite');
+            tx.objectStore('handles').put(handle, file);
+            tx.oncomplete = function () { resolve(handle); db.close(); };
+            tx.onerror = function () { resolve(handle); db.close(); };
+        });
+    }).catch(function () { return handle; });
+}
+function pickRepoFile(file) {
+    if (!directWriteSupported()) return Promise.reject(new Error('当前浏览器不支持直写本地文件'));
+    return window.showOpenFilePicker({
+        multiple: false,
+        types: [{ description: file, accept: { 'application/json': ['.json'] } }]
+    }).then(function (arr) {
+        var h = arr && arr[0];
+        if (!h) throw new Error('未选择文件');
+        if (h.name !== file) throw new Error('请选择 ' + file + '（刚才选的是 ' + h.name + '）');
+        return saveHandle(file, h);
+    });
+}
+function bindRepoFile(file) {
+    if (!directWriteSupported()) {
+        showStatus('⚠️ 直写本地文件需 Chrome / Edge；桌面版控制台会自动写源仓库', 'error');
+        return Promise.resolve(null);
+    }
+    return pickRepoFile(file).then(function (h) {
+        showStatus('✅ 已绑定 ' + file + '，以后点「加入静态库」直接写入这个文件（无需下载）', 'success');
+        return h;
+    }).catch(function (e) {
+        if (!e || e.name === 'AbortError') return null;
+        showStatus('❌ 绑定失败：' + e.message, 'error');
+        return null;
+    });
+}
+function ensureRepoHandle(file) {
+    if (repoFileHandles[file]) return Promise.resolve(repoFileHandles[file]);
+    return getSavedHandle(file).then(function (h) {
+        if (h) { repoFileHandles[file] = h; return h; }
+        return pickRepoFile(file);       // 首次：弹一次文件选择
+    });
+}
+function writeRepoFileDirect(file, text) {
+    return ensureRepoHandle(file).then(function (handle) {
+        var opt = { mode: 'readwrite' };
+        function doWrite(h) {
+            return h.createWritable().then(function (w) {
+                return w.write(text).then(function () { return w.close(); });
+            }).then(function () { return { ok: true, direct: true, file: file, bytes: text.length }; });
+        }
+        if (typeof handle.queryPermission !== 'function') return doWrite(handle);
+        return handle.queryPermission(opt).then(function (p) {
+            if (p === 'granted') return doWrite(handle);
+            return handle.requestPermission(opt).then(function (p2) {
+                if (p2 === 'granted') return doWrite(handle);
+                return pickRepoFile(file).then(doWrite);
+            });
+        });
+    });
+}
+// 页面打开时把上次授权的句柄恢复到内存（IndexedDB 跨刷新保留）
+if (directWriteSupported()) {
+    WRITE_WHITELIST.forEach(function (f) {
+        getSavedHandle(f).then(function (h) { if (h) repoFileHandles[f] = h; });
+    });
+}
+
 function writeStaticJson(file, obj) {
     if (WRITE_WHITELIST.indexOf(file) === -1) return Promise.reject(new Error('不允许写入 ' + file));
+    var text = JSON.stringify(obj);      // 与桌面端一致：紧凑单行
+    JSON.parse(text);                    // 序列化后自检，杜绝坏 JSON 落盘
     return fetch(LOCAL_API + 'write-json', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file: file, data: obj })
     }).then(function (r) {
         if (r.status === 404) throw new Error('NOT_DESKTOP');
-        return r.json().then(function (j) { if (!j.ok) throw new Error(j.error || '写入失败'); return j; });
+        // 某些静态站会把未知路径回退成 index.html（200 + HTML），同样按「非桌面版」处理
+        return r.json().catch(function () { throw new Error('NOT_DESKTOP'); })
+                .then(function (j) { if (!j.ok) throw new Error(j.error || '写入失败'); return j; });
     }).catch(function (err) {
-        if (err && err.message === 'NOT_DESKTOP') {
-            downloadJSON(obj, file);
-            return { ok: true, downloaded: true };
+        if (!err || err.message !== 'NOT_DESKTOP') throw err;
+        // 纯浏览器：直接写回已绑定的本地文件（首次会弹一次选择框）
+        if (directWriteSupported()) {
+            return writeRepoFileDirect(file, text).catch(function (e) {
+                showStatus('⚠️ 直写本地文件失败（' + e.message + '），已改为下载', 'error');
+                downloadJSON(obj, file);
+                return { ok: true, downloaded: true };
+            });
         }
-        throw err;
+        downloadJSON(obj, file);
+        return { ok: true, downloaded: true };
     });
 }
 function writeRepoJson(file, obj, extra) {
     if (!confirm('生成并【覆盖源仓库】的 ' + file + '？\n\n原文件会自动备份到 dist/backup/。\n' + (extra || ''))) return;
     showStatus('📦 正在写入源仓库 ' + file + ' …', 'loading');
     return writeStaticJson(file, obj).then(function (r) {
-        showStatus(r.downloaded ? ('✅ 已下载 ' + file + '（网页版，请手动覆盖仓库文件）')
+        showStatus(r.downloaded ? ('✅ 已下载 ' + file + '（请手动覆盖仓库文件）')
+                               : r.direct ? ('✅ 已直接写入本机 ' + file + '（原内容已替换）')
                                : ('✅ 已覆盖源仓库 ' + file + '，原文件已备份'), 'success');
     }).catch(function (e) { showStatus('❌ 写入失败：' + e.message, 'error'); });
 }
@@ -1956,28 +2071,94 @@ function commitWorkToStatic() {
     if (!draft || (!Object.keys(draft.records || {}).length && !draft.teams)) {
         showStatus('⚠️ 没有本地改动', 'error'); return;
     }
-    if (!confirm('把 ' + date + ' 的数据写入静态库 data6.json？\n\n· 会覆盖该日期的旧记录\n· 当天的区域 / 人员 / 列名会冻结成快照，以后改名不影响这天\n· 源仓库里的旧 data6.json 会自动备份')) return;
-    return ensureData6().then(function () {
-        data6.days[date] = {
-            teams: clone(draft.teams || data6.teams),
-            columns: clone(draft.columns || data6.columns),
-            records: clone(draft.records || {}),
+    // 写入前先拿最新 data6：桌面版读源仓库真实文件（含尚未 push 的改动），
+    // 网页版拉线上静态库并破 CDN 缓存；避免用旧缓存把别人刚写的记录覆盖掉。
+    function freshData6() {
+        return fetch(LOCAL_API + 'read-json?file=data6.json&t=' + Date.now(), { cache: 'no-store' })
+            .then(function (r) { if (!r.ok) throw new Error('NOT_DESKTOP'); return r.json(); })
+            .then(function (j) { if (!j.ok || !j.data || !j.data.days) throw new Error('NO_REPO_FILE'); return j.data; })
+            .catch(function () {
+                return fetch(DATA6_URL + '?t=' + Date.now(), { cache: 'no-store' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) { if (!d || !d.days) throw new Error('data6.json 格式不对'); return d; });
+            })
+            .catch(function () {
+                showStatus('⚠️ 读不到最新静态库，本次基于本地缓存合并，覆盖前请核对', 'error');
+                return ensureData6();
+            });
+    }
+
+    return freshData6().then(function (fresh) {
+        data6 = fresh;
+        data6.columns = data6.columns || [];
+        data6.teams = data6.teams || [];
+        data6.days = data6.days || {};
+        var old = data6.days[date] || {};
+        var oldRecs = old.records || {};
+        var newRecs = draft.records || {};
+
+        // 合并写入（不是替换），与桌面端一致：
+        //   · 其它天、以及当天已有的其它 班组×项目 记录一律保留
+        //   · 本次为空而原来有值 → 保留原值，不清空
+        var merged = {}, added = 0, updated = 0;
+        Object.keys(oldRecs).forEach(function (k) { merged[k] = oldRecs[k]; });
+        Object.keys(newRecs).forEach(function (k) {
+            var rec = newRecs[k] || {};
+            var qty = Number(rec.quantity) || 0;
+            var note = rec.note || '';
+            var prev = merged[k];
+            if (!prev) {
+                if (qty || note) { merged[k] = { quantity: qty, note: note }; added++; }
+            } else if (qty || note) {
+                if (Number(prev.quantity) !== qty || (prev.note || '') !== note) {
+                    merged[k] = { quantity: qty, note: note }; updated++;
+                }
+            }
+        });
+        function unionById(a, b, key) {
+            var out = (a || []).slice(), seen = {}, i, idx, j, k;
+            out.forEach(function (x) { if (x && x[key] !== undefined) seen[String(x[key])] = 1; });
+            for (i = 0; i < (b || []).length; i++) {
+                var x = b[i];
+                if (!x) continue;
+                k = String(x[key]);
+                if (seen[k]) {
+                    idx = -1;
+                    for (j = 0; j < out.length; j++) {
+                        if (out[j] && String(out[j][key]) === k) { idx = j; break; }
+                    }
+                    if (idx >= 0) out[idx] = clone(x);
+                } else { out.push(clone(x)); seen[k] = 1; }
+            }
+            return out;
+        }
+        var next = {
+            teams: unionById(old.teams, draft.teams || data6.teams || [], 'id'),
+            columns: unionById(old.columns, draft.columns || data6.columns || [], 'col_key'),
+            records: merged,
             savedAt: nowText()
         };
+        if (!confirm('把 ' + date + ' 的数据合并写入 data6.json？\n\n' +
+                     '· 新增 ' + added + ' 条、更新 ' + updated + ' 条；其它已有的天与记录全部保留\n' +
+                     '· 当天的区域 / 人员 / 列名会冻结成快照，以后改名不影响这天\n' +
+                     '· 写入格式为紧凑单行（与桌面端一致），源仓库旧文件会自动备份')) return null;
+        data6.days[date] = next;
         var maxDate = Object.keys(data6.days).sort().pop();
         if (date >= maxDate) {
-            data6.teams = clone(data6.days[date].teams);
-            data6.columns = clone(data6.days[date].columns);
+            data6.teams = clone(next.teams);
+            data6.columns = clone(next.columns);
         }
         data6.updatedAt = nowText();
+        var stat = '（新增 ' + added + ' / 更新 ' + updated + '，共 ' + Object.keys(merged).length + ' 条）';
         return writeStaticJson('data6.json', data6).then(function (r) {
             delete workDraft[date]; saveWorkDraft();
             try { localStorage.setItem('workData6Cache', JSON.stringify(data6)); } catch (e) {}
             workPendingChanges = {};
             updateWorkStats();
             loadWorkRecordsByDate();
-            showStatus(r.downloaded ? ('✅ ' + date + ' 已下载 data6.json（网页版，请手动覆盖仓库文件）')
-                                    : ('✅ ' + date + ' 已写入源仓库 data6.json。记得点「☁️ 一键推送 Git」'), 'success');
+            showStatus(r.downloaded ? ('✅ ' + date + ' 已合并' + stat + '，data6.json 已下载（请手动覆盖仓库文件）')
+                                    : r.direct ? ('✅ ' + date + ' 已合并' + stat + '，已直接写入本机 ' + r.file + '（无需下载）。记得跑 push.py / 桌面版「推送 Git」把改动推上线')
+                                    : ('✅ ' + date + ' 已合并写入源仓库 data6.json' + stat + '。记得点「☁️ 一键推送 Git」'), 'success');
         });
     }).catch(function (e) { showStatus('❌ 写入失败：' + e.message, 'error'); });
 }
@@ -2273,7 +2454,47 @@ function exportWorkExcel() {
     setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
     showStatus('✅ 已导出到 Excel', 'success');
 }
+// 有效数量：只有 >0 才算数；小于 0 / 0 / 空白 / 非数字一律当作「没填数量」。
+// 日报里这类人直接用备注作工作内容，合计也不让负数把正数抵掉。（与桌面端 reportQty 一致）
+function reportQty(rec) {
+    var q = Number(rec ? rec.quantity : 0);
+    return isFinite(q) && q > 0 ? q : 0;
+}
+// 总量页未完成清单，与「📋 一键复制总量」完全同一口径
+function buildTotalReportLines(d) {
+    var s = (d && d.summary) || {};
+    var out = ['总未完成:' + (s.unwelded || 0) + '寸'];
+    ((d && d.list) || []).forEach(function (a) {
+        out.push(a.area + '  未完成' + (Number(a.unwelded) || 0) + '寸');
+    });
+    return out;
+}
+// 复制纯文本：优先 clipboard API（异步取总量后仍可用），失败再退回 execCommand / 弹窗
+function copyReportText(text, okMsg, title) {
+    function fallback() {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+        document.body.appendChild(ta);
+        var ok = false;
+        try { ta.focus(); ta.select(); ta.setSelectionRange(0, text.length); ok = document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        if (ok) { showStatus(okMsg, 'success'); return; }
+        var w = window.open('', '_blank');
+        if (w) {
+            w.document.write('<meta charset="utf-8"><title>' + escapeHtml(title || '请手动复制') +
+                             '</title><pre style="white-space:pre-wrap;font-size:14px;line-height:1.7">' +
+                             escapeHtml(text) + '</pre>');
+            w.document.close();
+        }
+        showStatus('📋 已打开文本，请手动复制', 'error');
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { showStatus(okMsg, 'success'); }, fallback);
+    } else fallback();
+}
 function copyWorkAsReport() {
+    if (workMode !== 'day') { alert('范围汇总视图不能生成日报，请先按日期查回某一天'); return; }
     if (!workCurrentDate) { alert('请先选日期'); return; }
     if (!workViewTeams.length) { alert('没有班组数据'); return; }
     if (!workViewColumns.length) { alert('没有列配置'); return; }
@@ -2299,22 +2520,28 @@ function copyWorkAsReport() {
         var parts = [];
         workViewColumns.forEach(function (col) {
             if (isExcludedFromReport(col.col_name)) return;
-            var rec = workRecordsMap[team.id + '_' + col.col_key];
-            if (rec && Number(rec.quantity) > 0) {
-                var qty = Number(rec.quantity);
+            var qty = reportQty(workRecordsMap[team.id + '_' + col.col_key]);
+            if (qty > 0) {
                 parts.push(col.col_name + ((qty % 1 === 0) ? qty : qty.toFixed(2)) + getUnitByColName(col.col_name));
             }
         });
         var note = '';
         workViewColumns.forEach(function (col) {
             var rec = workRecordsMap[team.id + '_' + col.col_key];
-            if (rec && rec.note && !note) note = rec.note;
+            if (rec && rec.note && !note) note = String(rec.note).trim();
         });
-        if (parts.length === 0 && !noteMatches(note)) return;
+        // 数量全部小于 0 / 空白 → 直接用备注当工作内容（不加「备注：」，也不限关键词）
+        // 有有效数量时仍按数量走，备注只在命中关键词时另起一行附加
+        if (parts.length === 0 && !note) return;
         seq++;
-        lines.push(seq + '. ' + (team.area || '') + '  ' + welderName);
-        if (parts.length) lines.push('   ' + parts.join('，'));
-        if (note && noteMatches(note)) lines.push('   备注：' + note);
+        // 日报只列姓名，不带区域（与桌面端一致）
+        lines.push(seq + '. ' + welderName);
+        if (parts.length === 0) {
+            lines.push('   ' + note);
+        } else {
+            lines.push('   ' + parts.join('，'));
+            if (note && noteMatches(note)) lines.push('   备注：' + note);
+        }
     });
     if (seq === 0) { showStatus('⚠️ 没有符合条件的焊工数据', 'error'); return; }
     lines.push('');
@@ -2323,25 +2550,24 @@ function copyWorkAsReport() {
         if (isExcludedFromReport(col.col_name)) return;
         var sum = 0;
         workViewTeams.forEach(function (t) {
-            var rec = workRecordsMap[t.id + '_' + col.col_key];
-            sum += Number(rec ? rec.quantity : 0) || 0;
+            sum += reportQty(workRecordsMap[t.id + '_' + col.col_key]);
         });
         if (sum > 0) lines.push('   ' + col.col_name + ((sum % 1 === 0) ? sum : sum.toFixed(2)) + getUnitByColName(col.col_name));
     });
-    var text = lines.join('\n');
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed'; ta.style.left = '-9999px';
-    document.body.appendChild(ta); ta.select();
-    var ok = false;
-    try { ok = document.execCommand('copy'); } catch (e) {}
-    document.body.removeChild(ta);
-    if (ok) showStatus('✅ 已复制 ' + seq + ' 条焊工日报', 'success');
-    else {
-        var w = window.open('', '_blank');
-        if (w) { w.document.write('<pre>' + escapeHtml(text) + '</pre>'); w.document.close(); }
-        showStatus('📋 已打开文本，请手动复制', 'error');
+    // 末尾带上总量页的未完成清单；优先用已加载的 totalData，否则拉 data4.json
+    function finish(extra, msg) {
+        copyReportText(lines.concat(extra || []).join('\n'),
+                       '✅ 已复制 ' + seq + ' 条焊工日报' + (msg || ''),
+                       '📋 日报文本（请手动复制）');
     }
+    if (totalData && totalData.summary) { finish(buildTotalReportLines(totalData), '（含未完成量）'); return; }
+    fetch(DATA4_URL + '?t=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (d4) {
+            if (d4 && d4.summary) { totalData = d4; finish(buildTotalReportLines(d4), '（含未完成量）'); }
+            else finish([], '（总量数据为空，不含未完成量）');
+        })
+        .catch(function () { finish([], '（总量加载失败，不含未完成量）'); });
 }
 
 // ============================================================
@@ -2919,13 +3145,8 @@ function renderTotalTable() {
 // ============ 一键复制总量（文本格式，适合发微信/日报） ============
 function copyTotalReport() {
     if (!totalData) { showStatus('⚠️ 请先刷新总量', 'error'); return; }
-    var d = totalData;
-    var s = d.summary || {};
-    var lines = [];
-    lines.push('总未完成:' + (s.unwelded || 0) + '寸');
-    (d.list || []).forEach(function(a) {
-        lines.push(a.area + '  未完成' + (Number(a.unwelded) || 0) + '寸');
-    });
+    // 与日报末尾的未完成清单共用同一套文本，口径永远一致
+    var lines = buildTotalReportLines(totalData);
     var text = lines.join('\n');
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(function() {
@@ -3010,7 +3231,9 @@ function downloadCSV(csv, filename) {
     link.click();
 }
 function downloadJSON(obj, filename) {
-    var jsonStr = JSON.stringify(obj, null, 2);
+    // 与桌面端 local-api.writeJson 完全一致：紧凑单行。
+    // 缩进美化会让同样内容体积翻倍（data6.json 213KB → 446KB）。
+    var jsonStr = JSON.stringify(obj);
     var blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     var link = document.createElement('a');
