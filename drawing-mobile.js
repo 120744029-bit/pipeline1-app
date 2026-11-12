@@ -269,6 +269,7 @@
         return PUBLIC_ROOTS.slice();
     }
     function scan(force) {
+        if (!ready) return Promise.resolve(status());   // 未就绪时不碰 conf / plus.io
         if (scanning) return Promise.resolve(status());
         if (!force && files.length && Date.now() - builtAt < STALE_MS) return Promise.resolve(status());
         scanning = true;
@@ -610,17 +611,31 @@
     }
 
     function open(query, version) {
-        if (!ready) { toast('图纸模块尚未就绪，请稍后再试'); return; }
-        buildPanel().classList.add('active');
+        if (!ready) tryReady();   // plus 迟到时，点按钮这一刻再补一次初始化
+        var p = ensureUi();
+        p.classList.add('active');
+        if (!ready) {
+            setStatus('图纸模块未就绪：请在 APP 内打开；刚升级过请完全退出后重开一次 APP');
+            toast('图纸模块尚未就绪，请重启 APP 后再试');
+            return;
+        }
         render(query || '', version || '');
         if (!files.length || Date.now() - builtAt > STALE_MS) scan(false);
     }
     function close() { if (panel) panel.classList.remove('active'); }
 
     // 生成结果卡片里的「📐 图纸」按钮。模板里用
-    // (window.MobileDrawings ? MobileDrawings.button(...) : '') 调用，
-    // 因此网页版 / 桌面版不会渲染出任何按钮。
+    // (window.MobileDrawings ? MobileDrawings.button(...) : '') 调用。
+    // 只在「明确的桌面浏览器」隐藏：5+ APP / 手机 WebView / HBuilder 基座一律显示，
+    // 避免 plus 注入晚于结果渲染时按钮静默消失（4.1.4 反馈的问题）。
+    function isPlainBrowser() {
+        if (typeof plus !== 'undefined') return false;
+        var ua = navigator.userAgent || '';
+        if (/Html5Plus|uni-app|DCloud|HBuilder|Android|iPhone|iPad|Mobile|wv/i.test(ua)) return false;
+        return true;
+    }
     function button(iso, ver) {
+        if (isPlainBrowser()) return '';
         function q(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
         return '<button class="dw-mobile-btn mobile-only" onclick="MobileDrawings.open(\'' +
             q(iso) + '\',\'' + q(ver) + '\')" ' +
@@ -646,32 +661,53 @@
     // ---------------------------------------------------------------
     // 启动：等 plusready；网页版收不到事件，轮询若干次后安静放弃
     // ---------------------------------------------------------------
+    // 面板与样式不依赖 plus：按钮渲染出来就能点开，哪怕 plus 还没注入
+    function ensureUi() {
+        if (!conf) conf = loadConf();
+        if (!document.getElementById('dwMobileStyle')) {
+            var st = document.createElement('style');
+            st.id = 'dwMobileStyle';
+            st.textContent = CSS;
+            document.head.appendChild(st);
+        }
+        return buildPanel();
+    }
+    // plusready 可能在本脚本加载前就触发过了；点按钮 / APP 恢复时主动补一次
+    function tryReady() {
+        if (ready) return true;
+        if (typeof plus === 'undefined' || !plus.io || !plus.runtime) return false;
+        init();
+        return ready;
+    }
     function init() {
         if (ready) return;
         if (typeof plus === 'undefined' || !plus.io || !plus.runtime) return;
         ready = true;
         conf = loadConf();
         loadIndex();
-        expose();
-        var st = document.createElement('style');
-        st.id = 'dwMobileStyle';
-        st.textContent = CSS;
-        document.head.appendChild(st);
-        buildPanel();
+        ensureUi();
         setStatus(files.length ? ('已载入 ' + files.length + ' 份图纸索引') : '等待扫描图纸目录');
         // 首次或索引过期，后台静默扫描，不阻塞界面
         if (!files.length || Date.now() - builtAt > STALE_MS) setTimeout(function () { scan(false); }, 600);
     }
 
+    // 关键：全局入口【立即】挂载，不等 plusready。
+    // 结果卡片只认 window.MobileDrawings 是否存在；以前挂在 init() 里，
+    // 一旦 plusready 已错过或轮询超时，整排「📐 图纸」按钮就会静默消失。
+    expose();
+
     var tries = 0;
     function boot() {
         if (typeof plus === 'undefined' || !plus.io || !plus.runtime) {
-            if (++tries < 40) setTimeout(boot, 150);
+            if (++tries < 400) setTimeout(boot, 150);   // 冷启动 / wgt 重启最多等 60 秒
             return;
         }
         init();
     }
     document.addEventListener('plusready', init, false);
+    // 从后台恢复、wgt 热更新重启后再补一次，避免 init 永远没跑
+    document.addEventListener('resume', function () { tryReady(); }, false);
+    window.addEventListener('pageshow', function () { tryReady(); }, false);
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', boot, false);
     } else {

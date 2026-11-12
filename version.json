@@ -1,6 +1,6 @@
 {
-    "version": "4.1.4",
-    "updateTime": "2026-11-12 10:54:04",
+    "version": "4.1.5",
+    "updateTime": "2026-11-12 20:21:40",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "自动更新跟随主备站切换：用主站时从主站取版本和包，切到备站后从备站取；修复哨兵读不到切换状态的问题"
+    "updateLog": "修复升级后「📐 图纸」按钮不显示：图纸入口不再等待 plusready / plus 注入，APP 内恒定显示；未就绪时点按钮给出明确提示，桌面浏览器仍自动隐藏"
 }
