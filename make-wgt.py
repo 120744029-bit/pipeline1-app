@@ -31,6 +31,7 @@ except Exception:
 HERE = os.path.dirname(os.path.abspath(__file__))
 INDEX = os.path.join(HERE, 'index.html')
 ADDON = os.path.join(HERE, 'drawing-mobile.js')
+GUARD = os.path.join(HERE, 'update-guard.js')
 WGT = os.path.join(HERE, 'update.wgt')
 DIST = os.path.join(HERE, 'dist')
 VERSION_JSON = os.path.join(HERE, 'version.json')
@@ -55,7 +56,7 @@ def main():
     ap.add_argument('--version', help='新版本号，如 4.0.8；默认在当前 wgt 基础上 +1')
     args = ap.parse_args()
 
-    for f in (INDEX, ADDON, WGT):
+    for f in (INDEX, ADDON, GUARD, WGT):
         if not os.path.isfile(f):
             print('缺少文件：' + f)
             return 1
@@ -64,9 +65,14 @@ def main():
         index_html = fp.read()
     with open(ADDON, 'r', encoding='utf-8') as fp:
         addon_js = fp.read()
+    with open(GUARD, 'r', encoding='utf-8') as fp:
+        guard_js = fp.read()
 
     if '<script src="drawing-mobile.js"></script>' not in index_html:
         print('index.html 里没有引用 drawing-mobile.js，已中止（避免打出缺文件的包）')
+        return 1
+    if '<script src="update-guard.js"></script>' not in index_html:
+        print('index.html 里没有引用 update-guard.js，已中止（避免打出缺文件的包）')
         return 1
 
     # 现有 wgt 内的 manifest 才是新包 appid（H59116850）与 4.0.7 的真实配置
@@ -97,6 +103,7 @@ def main():
         z.writestr('index.html', lf(index_html).encode('utf-8'))
         z.writestr('manifest.json', manifest_bytes)
         z.writestr('drawing-mobile.js', lf(addon_js).encode('utf-8'))
+        z.writestr('update-guard.js', lf(guard_js).encode('utf-8'))
         for d in dirs:
             z.writestr(d, b'')
 
@@ -112,7 +119,7 @@ def main():
     print('  wgt 热更新包已生成：' + WGT)
     print('  大小：%.1f KB   appid：%s   版本：%s -> %s (code %d)' %
           (size / 1024.0, old_manifest.get('id', '?'), old_ver, new_ver, code_of(new_ver)))
-    print('  包含：index.html / manifest.json / drawing-mobile.js' +
+    print('  包含：index.html / manifest.json / drawing-mobile.js / update-guard.js' +
           (''.join(' / ' + d for d in dirs)))
     print('  旧包已备份：' + bak + '（回滚就把它复制回 update.wgt）')
     print('=' * 62)

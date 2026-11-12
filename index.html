@@ -1120,6 +1120,8 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- 独立热更新哨兵：先于业务脚本加载，业务代码崩溃也能把新版本拉下来 -->
+<script src="update-guard.js"></script>
 
 <script>
 // ============================================================
@@ -1807,7 +1809,12 @@ function loadWorkLatestDate() {
         var d = dates[dates.length - 1];
         workCurrentDate = d;
         document.getElementById('workCurrentDateDisplay').textContent = d;
-        renderWorkDayFrom(cached, d, box);
+        // ★ 崩溃隔离：缓存渲染失败不能中断后面的 loadWorkStatic()
+        try {
+            renderWorkDayFrom(cached, d, box);
+        } catch (e) {
+            console.error('⚠️ 工作量缓存渲染失败（已隔离）：' + (e && e.message));
+        }
     } else {
         box.innerHTML = workLoadingHtml('正在读取工作量静态库 data6.json...');
     }
@@ -4313,7 +4320,14 @@ function bootstrap() {
     waitForPlusNet(function () {
         installFetchPolyfill();
         // polyfill 装好后，再启动主流程
-        setTimeout(startApp, 50);
+        // ★ 崩溃隔离：主流程抛错也记录并继续，热更新哨兵独立运行不受影响
+        setTimeout(function () {
+            try {
+                startApp();
+            } catch (e) {
+                console.error('⚠️ startApp 异常（已隔离，热更新哨兵仍在工作）：' + (e && e.message));
+            }
+        }, 50);
     });
 }
 
@@ -4331,8 +4345,17 @@ function startApp() {
     console.log('  ✅ 设置完成，当前用户：' + (currentUser || '（未设置）'));
 
     // 立即切换页面（先用缓存展示）
+    // ★ 崩溃隔离：首屏渲染失败不能阻断后面的数据队列和热更新。
     console.log('📄 立即切换到工作量页（先用缓存秒显）...');
-    switchPage('work');
+    try {
+        switchPage('work');
+    } catch (e) {
+        console.error('⚠️ 工作量首屏渲染异常（已隔离，不影响其它页面/数据/更新）：' + (e && e.message));
+        var _wb = document.getElementById('workDailyContent');
+        if (_wb && !_wb.innerHTML.trim()) {
+            _wb.innerHTML = '<div class="no-result"><span>⚠️</span>工作量页加载异常，请切换其它页面重试</div>';
+        }
+    }
 
     // 串行队列
     var queue = [
