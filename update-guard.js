@@ -33,13 +33,22 @@
         try { console.log.apply(console, ['[更新哨兵]'].concat([].slice.call(arguments))); } catch (e) {}
     }
 
+    // 读取当前站点。注意：index.html 的 lsSet() 用 JSON.stringify 写入，
+    // 所以 localStorage 里存的是 "\"backup\""（带引号），而不是裸的 backup。
+    // 这里必须兼容两种格式，否则切到备站后哨兵仍永远走主站。
     function getBase() {
         try {
-            var b = localStorage.getItem('active_backend');
-            if (b === 'backup') return BACKUP;
+            var raw = localStorage.getItem('active_backend');
+            if (!raw) return PRIMARY;
+            var b = raw;
+            try { b = JSON.parse(raw); } catch (e) {}   // "\"backup\"" -> backup
+            if (b === 'backup' || raw === 'backup') return BACKUP;
         } catch (e) {}
         return PRIMARY;
     }
+
+    // 当前实际生效的站点名（用于日志）
+    function getBackendName() { return getBase() === BACKUP ? 'backup(备用站)' : 'primary(主站)'; }
 
     // 数字逐段比较：remote > current 返回 true
     function isNewer(current, remote) {
@@ -164,11 +173,14 @@
                     log('线上版本=' + remoteVer + '（本地稍后读取）');
                     if (!remoteVer || !wgtUrl) return;
 
-                    // 处理 wgtUrl：主站绝对地址在备用站下需替换域名
+                    // 处理 wgtUrl：无论 version.json 里写的是主站还是备站域名，
+                    // 都归一到【当前生效的站点】，保证"切到哪一站，版本和包都从哪一站取"。
                     if (wgtUrl.charAt(0) === '/') {
                         wgtUrl = base + wgtUrl;
-                    } else if (wgtUrl.indexOf(PRIMARY) === 0 && base !== PRIMARY) {
+                    } else if (wgtUrl.indexOf(PRIMARY) === 0) {
                         wgtUrl = base + wgtUrl.slice(PRIMARY.length);
+                    } else if (wgtUrl.indexOf(BACKUP) === 0) {
+                        wgtUrl = base + wgtUrl.slice(BACKUP.length);
                     }
 
                     currentVersion(function (localVer) {

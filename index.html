@@ -4216,12 +4216,17 @@ function checkRemoteVersion() {
                 if (wgtUrl.charAt(0) === '/') {
                     wgtUrl = BASE + wgtUrl;
                 }
-                // 情况 2：写死了 EdgeOne 主站地址，但当前用的是备用 → 替换域名
-                else if (typeof BACKENDS !== 'undefined' && BACKENDS.primary && BACKENDS[activeBackend]) {
-                    var primaryHost = BACKENDS.primary.replace(/\/$/, '');
+                // 情况 2：写死了主站或备站地址 → 统一归一到【当前生效站点】，
+                //         保证"切到哪一站，版本和包都从哪一站取"
+                else if (typeof BACKENDS !== 'undefined' && BACKENDS[activeBackend]) {
                     var currentHost = BACKENDS[activeBackend].replace(/\/$/, '');
-                    if (wgtUrl.indexOf(primaryHost) === 0 && currentHost !== primaryHost) {
-                        wgtUrl = currentHost + wgtUrl.slice(primaryHost.length);
+                    var known = [BACKENDS.primary, BACKENDS.backup].filter(Boolean);
+                    for (var ki = 0; ki < known.length; ki++) {
+                        var kh = known[ki].replace(/\/$/, '');
+                        if (kh !== currentHost && wgtUrl.indexOf(kh) === 0) {
+                            wgtUrl = currentHost + wgtUrl.slice(kh.length);
+                            break;
+                        }
                     }
                 }
             }
