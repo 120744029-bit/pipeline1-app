@@ -1735,11 +1735,13 @@ function clearPipelineInput() {
     pipelineInput.value = '';
 }
 
-/* 手机端工作量页：改读静态库 data6.json（不再调 /api/work）。
-   - 每天的记录自带当天的班组区域/人名与列名快照，以后改名不影响历史
-   - 按日期查：直接显示当天快照
-   - 范围汇总：按「每天实际的区域+人员组合」分组累加，不再套用当前班组表
-   - localStorage 只缓存最近 14 天，避免基座 WebView 配额限制 */
+/* ============================================================
+   手机端工作量页（v2 修复版）
+   - 读静态库 data6.json，不调 /api/work
+   - 历史按日期读当天的班组/人名快照（day.teams），不再套用当前固定班组表
+   - 范围汇总：合计总量 + 每个焊工工作量汇总（独立界面）
+   - 保留 renderWorkContent（v1 补丁误删，导致启动队列中断）
+   ============================================================ */
 var workData6 = null;
 
 function loadWorkStatic() {
@@ -1766,6 +1768,8 @@ function loadWorkStatic() {
         });
 }
 
+// ============ 某一天的展示 ============
+// 关键：优先用 day.teams（当天保存时冻结的快照），避免历史显示当前固定名字
 function renderWorkDayFrom(d6, date, box) {
     var day = d6.days[date] || {};
     var teams = (day.teams && day.teams.length) ? day.teams : (d6.teams || []);
@@ -1775,7 +1779,8 @@ function renderWorkDayFrom(d6, date, box) {
         recordsMap[k] = { quantity: Number(day.records[k].quantity) || 0, note: day.records[k].note || '' };
     });
     workTeams = teams; workColumns = columns; workDailyRecords = recordsMap;
-    renderWorkContent(box, teams, columns, recordsMap, date + '（当天实际区域人员）');
+    var label = date + ((day._snapshotFrom === 'export') ? '（历史快照：按导出时班组补录）' : '（当天实际区域人员）');
+    renderWorkContent(box, teams, columns, recordsMap, label);
 }
 
 function workLoadingHtml(text) {
@@ -1842,26 +1847,158 @@ function loadWorkDaily(date) {
     });
 }
 
-// 范围汇总：用每天保存的快照按「区域+管工+焊工+普工」分组累加
-function collectRangeDay(day, groups, state) {
-    if (!day) return;
-    var teams = day.teams || [];
-    var records = day.records || {};
+// ============ 核心渲染（v1 补丁误删，这里补回并增强）============
+function workUnit(name) {
+    if (!name) return '个';
+    if (name.indexOf('重量') !== -1) return 'kg';
+    if (name.indexOf('阀门') !== -1 || name.indexOf('台') !== -1) return '台';
+    if (name.indexOf('管道') !== -1 || name.indexOf('寸') !== -1) return '寸';
+    if (name.indexOf('支架') !== -1) return '个';
+    return '个';
+}
+function fmtNum(v) {
+    v = Number(v) || 0;
+    return (v % 1 === 0) ? String(v) : v.toFixed(2);
+}
+
+function renderWorkContent(box, teams, columns, recordsMap, dateLabel) {
+    if (!teams || !teams.length) { box.innerHTML = '<div class="no-result"><span>👥</span>暂无班组数据</div>'; return; }
+    if (!columns || !columns.length) { box.innerHTML = '<div class="no-result"><span>📋</span>暂无列配置</div>'; return; }
+
+    var totals = {};
+    columns.forEach(function (c) { totals[c.col_key] = 0; });
     teams.forEach(function (t) {
-        var gkey = [t.area || '', t.fitter || '', t.welder || '', t.helper || ''].join('|');
-        if (!groups[gkey]) {
-            state.seq++;
-            groups[gkey] = { id: 'g' + state.seq, area: t.area || '', fitter: t.fitter || '',
-                             welder: t.welder || '', helper: t.helper || '', qty: {}, notes: [] };
-        }
-        var g = groups[gkey], prefix = String(t.id) + '_';
-        Object.keys(records).forEach(function (k) {
-            if (k.indexOf(prefix) !== 0) return;
-            var unit = k.slice(prefix.length);
-            g.qty[unit] = (g.qty[unit] || 0) + (Number(records[k].quantity) || 0);
-            if (records[k].note) g.notes.push(records[k].note);
+        columns.forEach(function (c) {
+            var rec = recordsMap[t.id + '_' + c.col_key];
+            if (rec) totals[c.col_key] += Number(rec.quantity) || 0;
         });
     });
+
+    var fitters = {}, welders = {}, helpers = {};
+    teams.forEach(function (t) {
+        if (t.fitter && t.fitter.trim()) fitters[t.fitter.trim()] = 1;
+        if (t.welder && t.welder.trim()) welders[t.welder.trim()] = 1;
+        if (t.helper && t.helper.trim()) helpers[t.helper.trim()] = 1;
+    });
+
+    var html = '';
+    // 合计卡
+    html += '<div class="total-card">';
+    html += '<div class="total-title">当日合计<span class="date-tag">' + escapeHtml(dateLabel || '') + '</span></div>';
+    html += '<div class="total-list">';
+    columns.forEach(function (c) {
+        var v = totals[c.col_key];
+        if (!v) return;
+        html += '<div class="total-row"><span class="row-label">' + escapeHtml(c.col_name) + '</span><span class="row-value">' + fmtNum(v) + '<span class="unit">' + workUnit(c.col_name) + '</span></span></div>';
+    });
+    html += '</div></div>';
+
+    // 人数
+    html += '<div class="people-card"><div class="people-row">';
+    html += '<div class="person-box"><div class="plabel">👤 管工</div><div class="pvalue">' + Object.keys(fitters).length + '</div></div>';
+    html += '<div class="person-box"><div class="plabel">🔧 焊工</div><div class="pvalue">' + Object.keys(welders).length + '</div></div>';
+    html += '<div class="person-box"><div class="plabel">👷 普工</div><div class="pvalue">' + Object.keys(helpers).length + '</div></div>';
+    html += '</div></div>';
+
+    // 班组卡片
+    teams.forEach(function (t, idx) {
+        var worksHtml = '', noteText = '';
+        columns.forEach(function (c) {
+            var rec = recordsMap[t.id + '_' + c.col_key];
+            if (rec && Number(rec.quantity) > 0) {
+                worksHtml += '<div class="work-row"><span class="wlabel">' + escapeHtml(c.col_name) + '</span><span class="wvalue">' + fmtNum(rec.quantity) + '<span class="unit">' + workUnit(c.col_name) + '</span></span></div>';
+            }
+            if (rec && rec.note && rec.note.trim() && !noteText) noteText = rec.note.trim();
+        });
+        var peopleHtml = '';
+        if (t.fitter && t.fitter.trim()) peopleHtml += '<span class="person-tag"><span class="role">管</span>' + escapeHtml(t.fitter) + '</span>';
+        if (t.welder && t.welder.trim()) peopleHtml += '<span class="person-tag"><span class="role">焊</span>' + escapeHtml(t.welder) + '</span>';
+        if (t.helper && t.helper.trim()) peopleHtml += '<span class="person-tag"><span class="role">普</span>' + escapeHtml(t.helper) + '</span>';
+
+        html += '<div class="team-card">';
+        html += '<div class="team-header"><div class="team-name">📍 ' + escapeHtml(t.area || '') + '<span class="index-tag">' + (idx + 1) + '</span></div></div>';
+        html += '<div class="people-list">' + (peopleHtml || '<span style="color:var(--text-secondary);font-size:12px;">无人员信息</span>') + '</div>';
+        html += '<div class="work-list">' + (worksHtml || '<div class="work-row"><span class="wlabel" style="color:var(--text-tertiary);">无工作量数据</span></div>') + '</div>';
+        if (noteText) html += '<div class="team-note"><span class="note-icon">📝</span><span class="note-text">' + escapeHtml(noteText) + '</span></div>';
+        html += '</div>';
+    });
+    box.innerHTML = html;
+}
+
+// ============ 范围汇总：合计总量 + 每个焊工汇总（独立界面）============
+function collectRangeSummary(d6, from, to) {
+    var totals = {}, welders = {}, days = 0;
+    var seenCol = {};
+    Object.keys(d6.days || {}).sort().forEach(function (date) {
+        if (date < from || date > to) return;
+        days++;
+        var day = d6.days[date];
+        var records = day.records || {};
+        var teams = day.teams || d6.teams || [];
+
+        // 建 team_id -> welder 映射（用当天快照，历史名不串）
+        var idWelder = {};
+        teams.forEach(function (t) { idWelder[String(t.id)] = (t.welder || '').trim(); });
+
+        Object.keys(records).forEach(function (k) {
+            var parts = k.split('_');
+            var teamId = parts[0];
+            var unit = parts.slice(1).join('_');
+            var qty = Number(records[k].quantity) || 0;
+
+            totals[unit] = (totals[unit] || 0) + qty;
+            (d6.columns || []).forEach(function (c) { if (c.col_key === unit) seenCol[unit] = c; });
+            (day.columns || []).forEach(function (c) { if (c.col_key === unit) seenCol[unit] = c; });
+
+            var w = idWelder[teamId];
+            if (w) {
+                if (!welders[w]) welders[w] = { name: w, qty: {}, total: 0 };
+                welders[w].qty[unit] = (welders[w].qty[unit] || 0) + qty;
+                welders[w].total += qty;
+            }
+        });
+    });
+    return { totals: totals, welders: welders, cols: seenCol, days: days };
+}
+
+function renderRangeSummary(res, box, from, to) {
+    var html = '';
+    html += '<div class="total-card">';
+    html += '<div class="total-title">📊 合计总量<span class="date-tag">' + escapeHtml(from + ' ~ ' + to) + ' · ' + res.days + ' 天</span></div>';
+    html += '<div class="total-list">';
+    var any = false;
+    Object.keys(res.totals).forEach(function (unit) {
+        var v = res.totals[unit];
+        if (!v) return;
+        any = true;
+        var col = res.cols[unit];
+        var name = col ? col.col_name : unit;
+        html += '<div class="total-row"><span class="row-label">' + escapeHtml(name) + '</span><span class="row-value">' + fmtNum(v) + '<span class="unit">' + workUnit(name) + '</span></span></div>';
+    });
+    if (!any) html += '<div class="work-row"><span class="wlabel" style="color:var(--text-tertiary);">该范围无工作量数据</span></div>';
+    html += '</div></div>';
+
+    var wnames = Object.keys(res.welders).sort(function (a, b) { return res.welders[b].total - res.welders[a].total; });
+    html += '<div style="padding:14px 16px 4px;font-size:13px;color:var(--text-secondary);font-weight:600;">🔧 各焊工工作量汇总（' + wnames.length + ' 人）</div>';
+    if (!wnames.length) {
+        html += '<div class="no-result"><span>👷</span>该范围无焊工数据</div>';
+    } else {
+        wnames.forEach(function (name, idx) {
+            var w = res.welders[name];
+            html += '<div class="team-card">';
+            html += '<div class="team-header"><div class="team-name">🔧 ' + escapeHtml(name) + '<span class="index-tag">' + (idx + 1) + '</span></div></div>';
+            html += '<div class="work-list">';
+            Object.keys(w.qty).forEach(function (unit) {
+                if (!w.qty[unit]) return;
+                var col = res.cols[unit];
+                var cname = col ? col.col_name : unit;
+                html += '<div class="work-row"><span class="wlabel">' + escapeHtml(cname) + '</span><span class="wvalue">' + fmtNum(w.qty[unit]) + '<span class="unit">' + workUnit(cname) + '</span></span></div>';
+            });
+            html += '<div class="work-row" style="border-top:1px dashed var(--border-light);margin-top:4px;padding-top:6px;"><span class="wlabel" style="font-weight:600;">小计</span><span class="wvalue">' + fmtNum(w.total) + '</span></div>';
+            html += '</div></div>';
+        });
+    }
+    box.innerHTML = html;
 }
 
 function openRangeSummary() {
@@ -1872,49 +2009,21 @@ function openRangeSummary() {
 
     var box = document.getElementById('rangeDialogContent');
     document.getElementById('rangeDialogTitle').textContent = '📈 范围汇总 ' + from + ' ~ ' + to;
-    box.innerHTML = workLoadingHtml('按当天实际区域人员汇总中...');
+    box.innerHTML = workLoadingHtml('汇总中...');
     document.getElementById('rangeDialog').classList.add('active');
 
-    var cacheKey = 'workStaticRange_' + from + '_' + to;
+    var cacheKey = 'workSummary_' + from + '_' + to;
     var cached = lsGet(cacheKey, null);
-    if (cached && cached.teams && cached.columns) {
-        renderRangeFromCache(cached, box, from, to);
+    if (cached && cached.totals && cached.welders) {
+        renderRangeSummary(cached, box, from, to);
     }
-
     loadWorkStatic().then(function (d6) {
-        var groups = {}, state = { seq: 0 }, days = 0;
-        var seenCol = {}, cols = [];
-        Object.keys(d6.days || {}).sort().forEach(function (date) {
-            if (date < from || date > to) return;
-            days++;
-            var day = d6.days[date];
-            collectRangeDay(day, groups, state);
-            (day.columns || []).forEach(function (c) {
-                if (c && c.col_key && !seenCol[c.col_key]) { seenCol[c.col_key] = 1; cols.push(c); }
-            });
-        });
-        (d6.columns || []).forEach(function (c) {
-            if (c && c.col_key && !seenCol[c.col_key]) { seenCol[c.col_key] = 1; cols.push(c); }
-        });
-        var teams = Object.keys(groups).map(function (k) { return groups[k]; });
-        var recordsMap = {};
-        teams.forEach(function (g) {
-            Object.keys(g.qty).forEach(function (unit) {
-                recordsMap[g.id + '_' + unit] = { quantity: g.qty[unit], note: g.notes.slice(-3).join(' / ') };
-            });
-        });
-        var result = { teams: teams, columns: cols, recordsMap: recordsMap,
-                       hint: days + ' 天 / ' + teams.length + ' 组（按当天实际区域人员汇总）' };
-        renderRangeFromCache(result, box, from, to);
-        try { lsSet(cacheKey, result); updateRangeCacheKeys(cacheKey); } catch (e) {}
+        var res = collectRangeSummary(d6, from, to);
+        renderRangeSummary(res, box, from, to);
+        try { lsSet(cacheKey, res); updateRangeCacheKeys(cacheKey); } catch (e) {}
     }).catch(function (err) {
         if (!cached) box.innerHTML = '<div class="no-result"><span>⚠️</span>加载失败：' + escapeHtml(err.message || '') + '</div>';
     });
-}
-
-function renderRangeFromCache(res, box, from, to) {
-    document.getElementById('rangeDialogTitle').textContent = '📈 范围汇总 ' + from + ' ~ ' + to + '（' + res.hint + '）';
-    renderWorkContent(box, res.teams, res.columns, res.recordsMap, from + ' ~ ' + to);
 }
 
 function closeRangeDialog() {
@@ -1927,10 +2036,11 @@ function updateRangeCacheKeys(newKey) {
     keys.push(newKey);
     while (keys.length > 10) {
         var oldKey = keys.shift();
-        try { localStorage.removeItem(oldKey); } catch(e) {}
+        try { localStorage.removeItem(oldKey); } catch (e) {}
     }
     lsSet('workRangeKeys', keys);
 }
+
 
 
 // ============================================================
