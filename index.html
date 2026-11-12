@@ -1353,13 +1353,14 @@ var DATA2_URL    = BASE + '/data2.json';
 var DATA3_URL    = BASE + '/data3.json';
 var DATA4_URL    = BASE + '/data4.json';
 var DATA5_URL    = BASE + '/data5.json';
+var DATA6_URL    = BASE + '/data6.json';
 var SCHEDULE_URL = BASE + '/schedule.json';
 var ELBOW_URL    = BASE + '/elbow.json';
 var SUBITEMS_URL = BASE + '/subitems.json';
 var PIPELINE_URL = BASE + '/data.json';
 
 var KV_API         = API_BASE_URL + '/kv';      // ← 新增：KV 统一入口
-var WORK_API       = API_BASE_URL + '/work';
+var WORK_API       = ''; // 工作量已改为 data6.json 静态库
 var TAIL_ITEMS_API = API_BASE_URL + '/tails?action=get-all';
 var TAIL_GET_API   = API_BASE_URL + '/tails?action=get';
 var TAIL_SAVE_API  = API_BASE_URL + '/tails?action=save';
@@ -1734,14 +1735,60 @@ function clearPipelineInput() {
     pipelineInput.value = '';
 }
 
-// ============================================================
-//                    工作量页
-// ============================================================
+/* 手机端工作量页：改读静态库 data6.json（不再调 /api/work）。
+   - 每天的记录自带当天的班组区域/人名与列名快照，以后改名不影响历史
+   - 按日期查：直接显示当天快照
+   - 范围汇总：按「每天实际的区域+人员组合」分组累加，不再套用当前班组表
+   - localStorage 只缓存最近 14 天，避免基座 WebView 配额限制 */
+var workData6 = null;
+
+function loadWorkStatic() {
+    if (workData6) return Promise.resolve(workData6);
+    return fetch(DATA6_URL + '?t=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) {
+            if (!d || !d.days) throw new Error('data6.json 格式不对');
+            workData6 = d;
+            try {
+                var dates = Object.keys(d.days).sort().slice(-14), days = {};
+                dates.forEach(function (k) { days[k] = d.days[k]; });
+                lsSet('workData6Cache', {
+                    columns: d.columns || [], teams: d.teams || [],
+                    days: days, updatedAt: d.updatedAt || ''
+                });
+            } catch (e) { /* 缓存写不下不影响本次使用 */ }
+            return d;
+        })
+        .catch(function (err) {
+            var c = lsGet('workData6Cache', null);
+            if (c && c.days) { workData6 = c; return c; }
+            throw err;
+        });
+}
+
+function renderWorkDayFrom(d6, date, box) {
+    var day = d6.days[date] || {};
+    var teams = (day.teams && day.teams.length) ? day.teams : (d6.teams || []);
+    var columns = (day.columns && day.columns.length) ? day.columns : (d6.columns || []);
+    var recordsMap = {};
+    Object.keys(day.records || {}).forEach(function (k) {
+        recordsMap[k] = { quantity: Number(day.records[k].quantity) || 0, note: day.records[k].note || '' };
+    });
+    workTeams = teams; workColumns = columns; workDailyRecords = recordsMap;
+    renderWorkContent(box, teams, columns, recordsMap, date + '（当天实际区域人员）');
+}
+
+function workLoadingHtml(text) {
+    return '<div class="no-result"><span>⏳</span>' + escapeHtml(text) + '</div>';
+}
+
 function initWorkPage() {
     var to = new Date();
     var from = new Date();
     from.setDate(from.getDate() - 14);
-    var fmt = function(d) { return d.toISOString().slice(0, 10); };
+    var fmt = function (d) {
+        return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    };
     document.getElementById('workRangeFrom').value = fmt(from);
     document.getElementById('workRangeTo').value = fmt(to);
     loadWorkLatestDate();
@@ -1749,55 +1796,25 @@ function initWorkPage() {
 
 function loadWorkLatestDate() {
     var box = document.getElementById('workDailyContent');
-    var cachedTeams = lsGet('workTeamsCache', null);
-    var cachedColumns = lsGet('workColumnsCache', null);
-    var cachedDate = lsGet('workLatestDate', null);
-    var cachedRecords = cachedDate ? lsGet('workDailyCache_' + cachedDate, null) : null;
-
-    if (cachedDate) {
-        document.getElementById('workCurrentDateDisplay').textContent = cachedDate;
-        workCurrentDate = cachedDate;
-    }
-
-    if (cachedTeams && cachedColumns && cachedRecords && cachedDate) {
-        workTeams = cachedTeams;
-        workColumns = cachedColumns;
-        workDailyRecords = cachedRecords;
-        renderWorkContent(box, workTeams, workColumns, workDailyRecords, cachedDate);
+    var cached = lsGet('workData6Cache', null);
+    if (cached && cached.days && Object.keys(cached.days).length) {
+        var dates = Object.keys(cached.days).sort();
+        var d = dates[dates.length - 1];
+        workCurrentDate = d;
+        document.getElementById('workCurrentDateDisplay').textContent = d;
+        renderWorkDayFrom(cached, d, box);
     } else {
-        box.innerHTML = '<div class="no-result"><span>⏳</span>加载中...</div>';
+        box.innerHTML = workLoadingHtml('正在读取工作量静态库 data6.json...');
     }
-
-    Promise.all([
-        fetch(WORK_API + '?action=latest-records-get&t=' + Date.now()).then(function(r) { return r.json(); }),
-        fetch(WORK_API + '?action=teams-get&t=' + Date.now()).then(function(r) { return r.json(); }),
-        fetch(WORK_API + '?action=columns-get&t=' + Date.now()).then(function(r) { return r.json(); })
-    ]).then(function(results) {
-        var latest = results[0] || {};
-        var teams = (results[1] && results[1].data) || [];
-        var columns = (results[2] && results[2].data) || [];
-        var date = latest.date || new Date().toISOString().slice(0, 10);
-        var rows = latest.records || [];
-
-        workTeams = teams;
-        workColumns = columns;
-        workDailyRecords = {};
-        rows.forEach(function(r) {
-            var key = r.team_id + '_' + r.unit;
-            workDailyRecords[key] = { quantity: Number(r.quantity) || 0, note: r.note || '' };
-        });
-
-        document.getElementById('workCurrentDateDisplay').textContent = date;
+    loadWorkStatic().then(function (d6) {
+        var all = Object.keys(d6.days || {}).sort();
+        var date = all.length ? all[all.length - 1] : new Date().toISOString().slice(0, 10);
         workCurrentDate = date;
-        lsSet('workTeamsCache', teams);
-        lsSet('workColumnsCache', columns);
+        document.getElementById('workCurrentDateDisplay').textContent = date;
         lsSet('workLatestDate', date);
-        lsSet('workDailyCache_' + date, workDailyRecords);
-        renderWorkContent(box, workTeams, workColumns, workDailyRecords, date);
-    }).catch(function(err) {
-        if (!cachedTeams) {
-            box.innerHTML = '<div class="no-result"><span>⚠️</span>加载失败：' + escapeHtml(err.message || '') + '</div>';
-        }
+        renderWorkDayFrom(d6, date, box);
+    }).catch(function (err) {
+        if (!cached) box.innerHTML = '<div class="no-result"><span>⚠️</span>加载失败：' + escapeHtml(err.message || '') + '</div>';
     });
 }
 
@@ -1813,186 +1830,93 @@ function changeWorkDate() {
 
 function loadWorkDaily(date) {
     var box = document.getElementById('workDailyContent');
-    var cachedTeams = lsGet('workTeamsCache', null);
-    var cachedColumns = lsGet('workColumnsCache', null);
-    var cachedRecords = lsGet('workDailyCache_' + date, null);
-
-    if (cachedTeams && cachedColumns && cachedRecords) {
-        workTeams = cachedTeams;
-        workColumns = cachedColumns;
-        workDailyRecords = cachedRecords;
-        renderWorkContent(box, workTeams, workColumns, workDailyRecords, date);
-    } else {
-        box.innerHTML = '<div class="no-result"><span>⏳</span>加载 ' + escapeHtml(date) + ' 数据中...</div>';
-    }
-
-    Promise.all([
-        fetch(WORK_API + '?action=teams-get&t=' + Date.now()).then(function(r) { return r.json(); }),
-        fetch(WORK_API + '?action=columns-get&t=' + Date.now()).then(function(r) { return r.json(); }),
-        fetch(WORK_API + '?action=records-get&date=' + encodeURIComponent(date) + '&t=' + Date.now()).then(function(r) { return r.json(); })
-    ]).then(function(results) {
-        var teams = (results[0] && results[0].data) || [];
-        var columns = (results[1] && results[1].data) || [];
-        var rows = (results[2] && results[2].data) || [];
-
-        workTeams = teams;
-        workColumns = columns;
-        workDailyRecords = {};
-        rows.forEach(function(r) {
-            var key = r.team_id + '_' + r.unit;
-            workDailyRecords[key] = { quantity: Number(r.quantity) || 0, note: r.note || '' };
-        });
-
-        lsSet('workTeamsCache', teams);
-        lsSet('workColumnsCache', columns);
-        lsSet('workDailyCache_' + date, workDailyRecords);
-        renderWorkContent(box, workTeams, workColumns, workDailyRecords, date);
-    }).catch(function(err) {
-        if (!cachedTeams) {
+    var cached = lsGet('workData6Cache', null);
+    if (cached && cached.days && cached.days[date]) renderWorkDayFrom(cached, date, box);
+    else box.innerHTML = workLoadingHtml('加载 ' + date + ' 数据中...');
+    loadWorkStatic().then(function (d6) {
+        renderWorkDayFrom(d6, date, box);
+    }).catch(function (err) {
+        if (!cached || !cached.days || !cached.days[date]) {
             box.innerHTML = '<div class="no-result"><span>⚠️</span>加载失败：' + escapeHtml(err.message || '') + '</div>';
         }
     });
 }
 
-function renderWorkContent(box, teams, columns, recordsMap, dateLabel) {
-    if (!teams.length) { box.innerHTML = '<div class="no-result"><span>👥</span>暂无班组数据</div>'; return; }
-    if (!columns.length) { box.innerHTML = '<div class="no-result"><span>📋</span>暂无列配置</div>'; return; }
-
-    var totals = {};
-    columns.forEach(function(c) { totals[c.col_key] = 0; });
-    teams.forEach(function(t) {
-        columns.forEach(function(c) {
-            var rec = recordsMap[t.id + '_' + c.col_key];
-            if (rec) totals[c.col_key] += Number(rec.quantity) || 0;
-        });
-    });
-
-    var fitters = {}, welders = {}, helpers = {};
-    teams.forEach(function(t) {
-        if (t.fitter && t.fitter.trim()) fitters[t.fitter.trim()] = 1;
-        if (t.welder && t.welder.trim()) welders[t.welder.trim()] = 1;
-        if (t.helper && t.helper.trim()) helpers[t.helper.trim()] = 1;
-    });
-    var fitterCnt = Object.keys(fitters).length;
-    var welderCnt = Object.keys(welders).length;
-    var helperCnt = Object.keys(helpers).length;
-
-    function getUnit(name) {
-        if (!name) return '个';
-        if (name.indexOf('重量') !== -1) return 'kg';
-        if (name.indexOf('阀门') !== -1) return '台';
-        if (name.indexOf('台') !== -1) return '台';
-        if (name.indexOf('管道') !== -1) return '寸';
-        if (name.indexOf('寸') !== -1) return '寸';
-        if (name.indexOf('支架') !== -1) return '个';
-        return '个';
-    }
-
-    var html = '';
-
-    // 合计
-    html += '<div class="total-card">';
-    html += '<div class="total-title">当日合计<span class="date-tag">' + escapeHtml(dateLabel) + '</span></div>';
-    html += '<div class="total-list">';
-    columns.forEach(function(c) {
-        var v = totals[c.col_key];
-        if (v === 0) return;
-        var display = (v % 1 === 0) ? v : v.toFixed(2);
-        html += '<div class="total-row"><span class="row-label">' + escapeHtml(c.col_name) + '</span><span class="row-value">' + display + '<span class="unit">' + getUnit(c.col_name) + '</span></span></div>';
-    });
-    html += '</div></div>';
-
-    // 人数
-    html += '<div class="people-card">';
-    html += '<div class="people-row">';
-    html += '<div class="person-box"><div class="plabel">👤 管工</div><div class="pvalue">' + fitterCnt + '</div></div>';
-    html += '<div class="person-box"><div class="plabel">🔧 焊工</div><div class="pvalue">' + welderCnt + '</div></div>';
-    html += '<div class="person-box"><div class="plabel">👷 普工</div><div class="pvalue">' + helperCnt + '</div></div>';
-    html += '</div></div>';
-
-    // 班组卡片
-    teams.forEach(function(t, idx) {
-        var worksHtml = '';
-        columns.forEach(function(c) {
-            var rec = recordsMap[t.id + '_' + c.col_key];
-            if (rec && Number(rec.quantity) > 0) {
-                var display = (rec.quantity % 1 === 0) ? rec.quantity : Number(rec.quantity).toFixed(2);
-                worksHtml += '<div class="work-row"><span class="wlabel">' + escapeHtml(c.col_name) + '</span><span class="wvalue">' + display + '<span class="unit">' + getUnit(c.col_name) + '</span></span></div>';
-            }
-        });
-
-        var noteText = '';
-        columns.forEach(function(c) {
-            var rec = recordsMap[t.id + '_' + c.col_key];
-            if (rec && rec.note && rec.note.trim() && !noteText) noteText = rec.note.trim();
-        });
-
-        var peopleHtml = '';
-        if (t.fitter && t.fitter.trim()) peopleHtml += '<span class="person-tag"><span class="role">管</span>' + escapeHtml(t.fitter) + '</span>';
-        if (t.welder && t.welder.trim()) peopleHtml += '<span class="person-tag"><span class="role">焊</span>' + escapeHtml(t.welder) + '</span>';
-        if (t.helper && t.helper.trim()) peopleHtml += '<span class="person-tag"><span class="role">普</span>' + escapeHtml(t.helper) + '</span>';
-
-        html += '<div class="team-card">';
-        html += '<div class="team-header"><div class="team-name">📍 ' + escapeHtml(t.area) + '<span class="index-tag">' + (idx + 1) + '</span></div></div>';
-        html += '<div class="people-list">' + (peopleHtml || '<span style="color:var(--text-secondary);font-size:12px;">无人员信息</span>') + '</div>';
-        html += '<div class="work-list">' + (worksHtml || '<div class="work-row"><span class="wlabel" style="color:var(--text-tertiary);">无工作量数据</span></div>') + '</div>';
-        if (noteText) {
-            html += '<div class="team-note"><span class="note-icon">📝</span><span class="note-text">' + escapeHtml(noteText) + '</span></div>';
+// 范围汇总：用每天保存的快照按「区域+管工+焊工+普工」分组累加
+function collectRangeDay(day, groups, state) {
+    if (!day) return;
+    var teams = day.teams || [];
+    var records = day.records || {};
+    teams.forEach(function (t) {
+        var gkey = [t.area || '', t.fitter || '', t.welder || '', t.helper || ''].join('|');
+        if (!groups[gkey]) {
+            state.seq++;
+            groups[gkey] = { id: 'g' + state.seq, area: t.area || '', fitter: t.fitter || '',
+                             welder: t.welder || '', helper: t.helper || '', qty: {}, notes: [] };
         }
-        html += '</div>';
+        var g = groups[gkey], prefix = String(t.id) + '_';
+        Object.keys(records).forEach(function (k) {
+            if (k.indexOf(prefix) !== 0) return;
+            var unit = k.slice(prefix.length);
+            g.qty[unit] = (g.qty[unit] || 0) + (Number(records[k].quantity) || 0);
+            if (records[k].note) g.notes.push(records[k].note);
+        });
     });
-
-    box.innerHTML = html;
 }
 
-// ============================================================
-//                    范围汇总弹窗（含 10 个缓存）
-// ============================================================
 function openRangeSummary() {
     var from = document.getElementById('workRangeFrom').value;
     var to = document.getElementById('workRangeTo').value;
     if (!from || !to) { alert('请选择起止日期'); return; }
     if (from > to) { alert('起始日期不能大于结束日期'); return; }
 
-    var cacheKey = 'workRangeCache_' + from + '_' + to;
+    var box = document.getElementById('rangeDialogContent');
     document.getElementById('rangeDialogTitle').textContent = '📈 范围汇总 ' + from + ' ~ ' + to;
-    document.getElementById('rangeDialogContent').innerHTML = '<div class="no-result"><span>⏳</span>加载中...</div>';
+    box.innerHTML = workLoadingHtml('按当天实际区域人员汇总中...');
     document.getElementById('rangeDialog').classList.add('active');
 
+    var cacheKey = 'workStaticRange_' + from + '_' + to;
     var cached = lsGet(cacheKey, null);
-    if (cached && cached.teams && cached.columns && cached.records) {
-        var recordsMap = {};
-        cached.records.forEach(function(r) {
-            var key = r.team_id + '_' + r.unit;
-            recordsMap[key] = { quantity: Number(r.quantity) || 0, note: '' };
-        });
-        renderWorkContent(document.getElementById('rangeDialogContent'), cached.teams, cached.columns, recordsMap, from + ' ~ ' + to);
+    if (cached && cached.teams && cached.columns) {
+        renderRangeFromCache(cached, box, from, to);
     }
 
-    fetch(WORK_API + '?action=records-range-summary&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to) + '&t=' + Date.now())
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-            if (!res || !res.success || !res.data) {
-                if (!cached) document.getElementById('rangeDialogContent').innerHTML = '<div class="no-result"><span>⚠️</span>加载失败</div>';
-                return;
-            }
-            var teams = res.data.teams || [];
-            var columns = res.data.columns || [];
-            var records = res.data.records || [];
-            lsSet(cacheKey, { teams: teams, columns: columns, records: records });
-            updateRangeCacheKeys(cacheKey);
-
-            var recordsMap = {};
-            records.forEach(function(r) {
-                var key = r.team_id + '_' + r.unit;
-                recordsMap[key] = { quantity: Number(r.quantity) || 0, note: '' };
+    loadWorkStatic().then(function (d6) {
+        var groups = {}, state = { seq: 0 }, days = 0;
+        var seenCol = {}, cols = [];
+        Object.keys(d6.days || {}).sort().forEach(function (date) {
+            if (date < from || date > to) return;
+            days++;
+            var day = d6.days[date];
+            collectRangeDay(day, groups, state);
+            (day.columns || []).forEach(function (c) {
+                if (c && c.col_key && !seenCol[c.col_key]) { seenCol[c.col_key] = 1; cols.push(c); }
             });
-            renderWorkContent(document.getElementById('rangeDialogContent'), teams, columns, recordsMap, from + ' ~ ' + to);
-        })
-        .catch(function(err) {
-            if (!cached) document.getElementById('rangeDialogContent').innerHTML = '<div class="no-result"><span>⚠️</span>加载失败：' + escapeHtml(err.message || '') + '</div>';
         });
+        (d6.columns || []).forEach(function (c) {
+            if (c && c.col_key && !seenCol[c.col_key]) { seenCol[c.col_key] = 1; cols.push(c); }
+        });
+        var teams = Object.keys(groups).map(function (k) { return groups[k]; });
+        var recordsMap = {};
+        teams.forEach(function (g) {
+            Object.keys(g.qty).forEach(function (unit) {
+                recordsMap[g.id + '_' + unit] = { quantity: g.qty[unit], note: g.notes.slice(-3).join(' / ') };
+            });
+        });
+        var result = { teams: teams, columns: cols, recordsMap: recordsMap,
+                       hint: days + ' 天 / ' + teams.length + ' 组（按当天实际区域人员汇总）' };
+        renderRangeFromCache(result, box, from, to);
+        try { lsSet(cacheKey, result); updateRangeCacheKeys(cacheKey); } catch (e) {}
+    }).catch(function (err) {
+        if (!cached) box.innerHTML = '<div class="no-result"><span>⚠️</span>加载失败：' + escapeHtml(err.message || '') + '</div>';
+    });
 }
+
+function renderRangeFromCache(res, box, from, to) {
+    document.getElementById('rangeDialogTitle').textContent = '📈 范围汇总 ' + from + ' ~ ' + to + '（' + res.hint + '）';
+    renderWorkContent(box, res.teams, res.columns, res.recordsMap, from + ' ~ ' + to);
+}
+
 function closeRangeDialog() {
     document.getElementById('rangeDialog').classList.remove('active');
 }
@@ -2007,6 +1931,7 @@ function updateRangeCacheKeys(newKey) {
     }
     lsSet('workRangeKeys', keys);
 }
+
 
 // ============================================================
 //                    总量页

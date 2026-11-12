@@ -456,6 +456,7 @@ body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: c
 	    <button id="tabStatus" onclick="switchTab('status')">📊 状态</button>
 	    <button id="tabValveLive" onclick="switchTab('valveLive')">🚪 阀门录入</button>
 	    <button id="tabValve" onclick="switchTab('valve')">🔧 阀门数据</button>
+    <button id="tabOpLog" onclick="switchTab('opLog')">📜 操作日志</button>
 	</div>
 	
     <div class="toolbar" id="notesLiveToolbar">
@@ -480,7 +481,9 @@ body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: c
         <button class="btn-primary" onclick="openAddTeamDialog()">➕ 班组</button>
         <button class="btn-warning" onclick="openImportTeamsDialog()">📤 导入班组</button>
         <button class="btn-secondary" onclick="openAddColumnDialog()">➕ 列</button>
-        <button class="btn-success" onclick="saveAllWorkRecords()">💾 保存</button>
+        <button class="btn-success" onclick="saveAllWorkRecords()">💾 保存本地</button>
+        <button class="btn-purple" onclick="commitWorkToStatic()">📦 加入静态库</button>
+        <button class="btn-cyan" onclick="pushRepoToGit()">☁️ 一键推送 Git</button>
         <button class="btn-warning" onclick="loadWorkRecordsByRange()">📈 汇总</button>
         <button class="btn-success" onclick="exportWorkExcel()">📥 导出</button>
         <button class="btn-purple" onclick="copyWorkAsReport()">📋 日报</button>
@@ -490,7 +493,8 @@ body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: c
     <div class="toolbar" id="statusToolbar" style="display: none;">
         <button class="btn-primary" onclick="loadStatusData(false)">🔄 刷新</button>
 		<button class="btn-success" onclick="exportStatusExcel()">📥 导出 Excel</button>
-        <button class="btn-purple" onclick="exportData1Json()">📦 导出 data1.json</button>
+        <button class="btn-purple" onclick="exportData1Json()">📦 生成 data1.json 到仓库</button>
+		<button class="btn-cyan" onclick="pushRepoToGit()">☁️ 一键推送 Git</button>
     </div>
 	
 	<div class="toolbar" id="totalToolbar" style="display: none;">
@@ -508,7 +512,8 @@ body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: c
 
     <div class="toolbar" id="valveToolbar" style="display: none;">
         <button class="btn-primary" onclick="loadValveData(false)">🔄 刷新</button>
-        <button class="btn-purple" onclick="exportData2Json()">📦 导出 data2.json</button>
+        <button class="btn-purple" onclick="exportData2Json()">📦 生成 data2.json 到仓库</button>
+		<button class="btn-cyan" onclick="pushRepoToGit()">☁️ 一键推送 Git</button>
 		<button class="btn-success" onclick="exportValveExcel()">📥 导出 Excel</button>
         <button class="btn-danger" onclick="deleteAllValves()">🗑️ 清空</button>
         <button class="btn-danger" onclick="flushWholeDatabase()">☠️ 清空整库</button>
@@ -536,6 +541,51 @@ body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: c
         <div style="padding: 12px 16px;">
             <div style="font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px;">📊 合计</div>
             <div id="workTotals"></div>
+        </div>
+    </div>
+
+
+    <!-- 操作日志面板 -->
+    <div class="work-panel" id="opLogPanel" style="display:none;">
+        <div style="padding:12px 16px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+                <div style="font-size:13px;font-weight:600;">📜 支架备注 / 阀门录入 操作日志 <span id="opLogCount" style="color:#5b8def;">0 条</span></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                <input type="text" id="opLogSearch" placeholder="🔍 搜索位号/内容/录入人" oninput="opLogPage=1;renderOpLogTable()" style="flex:1;min-width:160px;padding:8px 10px;border:1px solid var(--border-light,#ddd);border-radius:6px;font-size:13px;">
+                <select id="opLogKindFilter" onchange="opLogPage=1;renderOpLogTable()" style="padding:8px;border:1px solid var(--border-light,#ddd);border-radius:6px;font-size:13px;">
+                    <option value="">全部类型</option>
+                    <option value="支架备注">支架备注</option>
+                    <option value="阀门录入">阀门录入</option>
+                </select>
+            </div>
+            <div class="table-container" style="border:none;padding:0;">
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead><tr style="background:var(--bg-hover,#f5f5f5);">
+                        <th style="padding:8px 6px;text-align:left;">时间</th>
+                        <th style="padding:8px 6px;text-align:left;">类型</th>
+                        <th style="padding:8px 6px;text-align:left;">动作</th>
+                        <th style="padding:8px 6px;text-align:left;">对象 / 内容</th>
+                        <th style="padding:8px 6px;text-align:left;">录入人</th>
+                    </tr></thead>
+                    <tbody id="opLogTableBody"></tbody>
+                </table>
+            </div>
+            <div class="pagination" style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;">
+                <button onclick="opLogChangePage(-1)">上一页</button>
+                <span id="opLogPageInfo">第 1 页</span>
+                <button onclick="opLogChangePage(1)">下一页</button>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+                <button class="btn-success" onclick="commitOpLogToStatic()">💾 生成 data7.json 到源仓库</button>
+                <button class="btn-primary" onclick="pushRepoToGit()">☁️ 一键推送 Git</button>
+                <button class="btn-danger" onclick="clearOpLog()">🗑️ 清空本地日志</button>
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#7F7F7F;line-height:1.6;">
+                日志自动记录每次支架备注、阀门录入的新增 / 修改 / 删除（含批量导入）。本地最多保留 5000 条。
+                点「生成 data7.json」写入源仓库静态库（原文件自动备份），再点「一键推送 Git」上传，避免日志丢失。
+                按日期查、范围汇总都使用当天保存的区域 / 人员快照，改名不影响历史。
+            </div>
         </div>
     </div>
 
@@ -762,6 +812,10 @@ body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: c
         <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/></svg>
         <span class="tab-label">阀门数据</span>
     </button>
+    <button class="tab-item" data-tab="opLog" onclick="switchTab('opLog')">
+        <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+        <span class="tab-label">操作日志</span>
+    </button>
 </div>
 
 <script>
@@ -836,18 +890,7 @@ var TAIL_SAVE_API   = API_BASE + '/tails?action=save';
 var TAIL_UPDATE_API = API_BASE + '/tails?action=update';
 var TAIL_DELETE_API = API_BASE + '/tails?action=delete';
 
-var WORK_API = API_BASE + '/work';
-var WORK_TEAMS_GET      = WORK_API + '?action=teams-get';
-var WORK_TEAMS_ADD      = WORK_API + '?action=teams-add';
-var WORK_TEAMS_UPDATE   = WORK_API + '?action=teams-update';
-var WORK_TEAMS_DELETE   = WORK_API + '?action=teams-delete';
-var WORK_RECORDS_GET    = WORK_API + '?action=records-get';
-var WORK_RECORDS_BATCH  = WORK_API + '?action=records-batch';
-var WORK_RECORDS_DELETE = WORK_API + '?action=records-delete';
-var WORK_COLUMNS_GET    = WORK_API + '?action=columns-get';
-var WORK_COLUMNS_UPDATE = WORK_API + '?action=columns-update';
-var WORK_COLUMNS_ADD    = WORK_API + '?action=columns-add';
-var WORK_COLUMNS_DELETE = WORK_API + '?action=columns-delete';
+// 工作量已改为本地静态库 data6.json，不再调用 /api/work
 
 var adminPassword = '';
 var currentTab = 'work';
@@ -964,13 +1007,7 @@ function refreshAllStatus() {
         })
         .catch(function() { document.getElementById('gsTails').innerHTML = '—'; });
 
-    fetch(WORK_RECORDS_GET + '&t=' + Date.now())
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            var count = (data && data.data) ? data.data.length : 0;
-            document.getElementById('gsWork').innerHTML = count + '<small>条</small>';
-        })
-        .catch(function() { document.getElementById('gsWork').innerHTML = '—'; });
+    updateWorkStats();
 }
 
 // ============================================================
@@ -990,6 +1027,8 @@ function switchTab(tab) {
     if (bottomBtn) bottomBtn.classList.add('active');
 
     document.getElementById('searchInput').value = '';
+    var opLogPanel = document.getElementById('opLogPanel');
+    if (opLogPanel) opLogPanel.style.display = 'none';
     document.getElementById('tableContainer').style.display = 'block';
     document.getElementById('searchBox').style.display = (tab === 'work' || tab === 'total') ? 'none' : 'flex';
     document.getElementById('workPanel').style.display = 'none';
@@ -1032,6 +1071,13 @@ function switchTab(tab) {
 	    document.getElementById('tabTotal').classList.add('active');
 	    document.getElementById('totalToolbar').style.display = 'flex';
 	    refreshTotal();
+	} else if (tab === 'opLog') {
+	    document.getElementById('tabOpLog').classList.add('active');
+	    document.getElementById('searchBox').style.display = 'none';
+	    document.getElementById('tableContainer').style.display = 'none';
+	    if (opLogPanel) opLogPanel.style.display = 'block';
+	    opLogLoad();
+	    renderOpLogTable();
 	}
 }
 
@@ -1614,236 +1660,472 @@ function exportValveExcel() {
 }
 
 // ============================================================
-//                    3️⃣ 工作量统计
+//      3️⃣ 工作量统计 —— 本地静态库 data6.json（不再用动态库）
+//
+//  · 数据全在 data6.json：{ columns, teams, days:{ "YYYY-MM-DD":{
+//        teams:[当天班组快照], columns:[当天列快照], records:{ "班组id_列key":{quantity,note} } } } }
+//  · 每天录入先存 localStorage 草稿（workDraft），确认后点「📦 加入静态库」
+//    才写入源仓库 data6.json；「☁️ 一键推送 Git」再 commit + push。
+//  · 按日期查 / 范围汇总一律用【当天保存的班组区域与人名】，以后改班组
+//    不会影响历史；范围汇总按「实际当天的人员组合」分组累加。
+//  · 写入/推送走桌面版主进程的 /local/* 接口；网页版自动降级为下载文件。
 // ============================================================
-function loadWorkLocalCache() {
-    try {
-        var c = localStorage.getItem('workLocalCache');
-        if (c) workLocalCache = JSON.parse(c) || {};
-    } catch(e) { workLocalCache = {}; }
-    try {
-        var p = localStorage.getItem('workPendingUpload');
-        if (p) workPendingUpload = JSON.parse(p) || {};
-    } catch(e) { workPendingUpload = {}; }
+
+var DATA6_URL = BASE + '/data6.json';
+var LOCAL_API = '/local/';
+var WRITE_WHITELIST = ['data1.json', 'data2.json', 'data6.json', 'data7.json'];
+
+var data6 = null;
+var data6Loading = null;
+var workDraft = {};          // 未加入静态库的本地改动：{ date: {teams, columns, records} }
+var workViewTeams = [];      // 当前表格显示的班组（当天快照 / 范围聚合组）
+var workViewColumns = [];    // 当前表格显示的列（当天快照 / 列并集）
+var workViewHint = '';
+
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
 }
-function saveWorkLocalCache() {
-    try { localStorage.setItem('workLocalCache', JSON.stringify(workLocalCache)); } catch(e) {}
+function nowText() {
+    var d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' +
+           pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
 }
-function saveWorkPendingUpload() {
-    try { localStorage.setItem('workPendingUpload', JSON.stringify(workPendingUpload)); } catch(e) {}
+function emptyData6() { return { version: 1, updatedAt: '', columns: [], teams: [], days: {} }; }
+
+function ensureData6() {
+    if (data6) return Promise.resolve(data6);
+    if (data6Loading) return data6Loading;
+    data6Loading = loadData6().then(function (d) { data6Loading = null; return d; },
+                                    function (d) { data6Loading = null; return d; });
+    return data6Loading;
+}
+function loadData6() {
+    return fetch(DATA6_URL + '?t=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function (d) {
+            if (!d || typeof d !== 'object' || !d.days) throw new Error('data6.json 格式不对');
+            data6 = d;
+            data6.columns = data6.columns || [];
+            data6.teams = data6.teams || [];
+            data6.days = data6.days || {};
+            try { localStorage.setItem('workData6Cache', JSON.stringify(data6)); } catch (e) {}
+            updateWorkStats();
+            return data6;
+        })
+        .catch(function () {
+            try {
+                var c = JSON.parse(localStorage.getItem('workData6Cache') || 'null');
+                if (c && c.days) {
+                    data6 = c; updateWorkStats();
+                    showStatus('⚠️ 用的是本地缓存 data6.json', 'error');
+                    return data6;
+                }
+            } catch (e) {}
+            data6 = emptyData6();
+            showStatus('⚠️ data6.json 未加载，当前是空库', 'error');
+            return data6;
+        });
+}
+function updateWorkStats() {
+    var el = document.getElementById('gsWork');
+    if (!el) return;
+    if (!data6) { el.innerHTML = '—'; return; }
+    var n = 0;
+    Object.keys(data6.days || {}).forEach(function (d) { n += Object.keys((data6.days[d].records) || {}).length; });
+    el.innerHTML = n + '<small>条</small>';
+}
+function loadWorkDraft() {
+    try { workDraft = JSON.parse(localStorage.getItem('workDraft') || '{}') || {}; } catch (e) { workDraft = {}; }
+}
+function saveWorkDraft() {
+    try { localStorage.setItem('workDraft', JSON.stringify(workDraft)); } catch (e) { showStatus('❌ 本地草稿保存失败（存储空间不足）', 'error'); }
+}
+// 兼容旧调用名（旧版缓存/待上传队列已不再使用）
+function loadWorkLocalCache() { loadWorkDraft(); }
+function saveWorkLocalCache() {}
+function saveWorkPendingUpload() {}
+
+// ---------------------------------------------------------------
+//  桌面版主进程本地能力：写源仓库静态库 / 一键推送 Git
+// ---------------------------------------------------------------
+function writeStaticJson(file, obj) {
+    if (WRITE_WHITELIST.indexOf(file) === -1) return Promise.reject(new Error('不允许写入 ' + file));
+    return fetch(LOCAL_API + 'write-json', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: file, data: obj })
+    }).then(function (r) {
+        if (r.status === 404) throw new Error('NOT_DESKTOP');
+        return r.json().then(function (j) { if (!j.ok) throw new Error(j.error || '写入失败'); return j; });
+    }).catch(function (err) {
+        if (err && err.message === 'NOT_DESKTOP') {
+            downloadJSON(obj, file);
+            return { ok: true, downloaded: true };
+        }
+        throw err;
+    });
+}
+function writeRepoJson(file, obj, extra) {
+    if (!confirm('生成并【覆盖源仓库】的 ' + file + '？\n\n原文件会自动备份到 dist/backup/。\n' + (extra || ''))) return;
+    showStatus('📦 正在写入源仓库 ' + file + ' …', 'loading');
+    return writeStaticJson(file, obj).then(function (r) {
+        showStatus(r.downloaded ? ('✅ 已下载 ' + file + '（网页版，请手动覆盖仓库文件）')
+                               : ('✅ 已覆盖源仓库 ' + file + '，原文件已备份'), 'success');
+    }).catch(function (e) { showStatus('❌ 写入失败：' + e.message, 'error'); });
+}
+function pushRepoToGit() {
+    if (!confirm('☁️ 一键推送到 Git 库？\n\n会提交并推送仓库里【所有】未提交的改动（含页面、version.json、热更新包）。\n全队手机 APP 下次打开会自动热更新。')) return;
+    showStatus('☁️ 正在提交并推送 Git …', 'loading');
+    fetch(LOCAL_API + 'git-push', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+    }).then(function (r) {
+        if (r.status === 404) throw new Error('NOT_DESKTOP');
+        return r.json();
+    }).then(function (j) {
+        if (!j.ok) throw new Error(j.error || '推送失败');
+        showStatus('✅ ' + (j.message || '推送完成'), 'success');
+        if (j.log) { console.log('[git]', j.log); alert('Git 输出：\n\n' + j.log.slice(-1200)); }
+    }).catch(function (err) {
+        showStatus(err.message === 'NOT_DESKTOP' ? '❌ 这个按钮只在桌面版控制台可用'
+                                                 : ('❌ 推送失败：' + err.message), 'error');
+    });
 }
 
+// ---------------------------------------------------------------
+//  初始化 / 刷新
+// ---------------------------------------------------------------
 function initWorkPanel() {
     var d = document.getElementById('workDate');
-    if (!d.value) d.value = new Date().toISOString().slice(0, 10);
+    if (!d.value) d.value = todayISO();
     workCurrentDate = d.value;
     var teamEl = document.getElementById('workTeamName');
     if (teamEl && !teamEl.value) teamEl.value = getTeamName();
-    loadWorkLocalCache();
+    loadWorkDraft();
 }
-
 function refreshWorkAll() {
-    showStatus('🔄 正在刷新工作量...', 'loading');
-    refreshWorkColumns().then(function() {
-        return refreshWorkTeams();
-    }).then(function() {
-        loadWorkRecordsByDate();
-    }).catch(function(err) {
-        showStatus('❌ 刷新失败：' + (err && err.message || err), 'error');
-    });
+    showStatus('🔄 正在刷新本地静态库…', 'loading');
+    data6 = null; data6Loading = null;
+    return loadData6().then(function () { loadWorkRecordsByDate(); showStatus('✅ 本地静态库已刷新', 'success'); });
 }
-
 function refreshWorkColumns() {
-    return fetch(WORK_COLUMNS_GET + '&t=' + Date.now())
-        .then(function(r) { return r.json(); })
-        .then(function(res) { workColumns = (res && res.data) ? res.data : []; })
-        .catch(function() { workColumns = []; });
+    return ensureData6().then(function () { workColumns = data6.columns || []; return workColumns; });
 }
-
 function refreshWorkTeams() {
-    showStatus('🔄 正在加载班组...', 'loading');
-    fetch(WORK_TEAMS_GET + '&t=' + Date.now())
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-            workTeams = (res && res.data) ? res.data : [];
-            renderWorkTeams();
-            showStatus('✅ 班组 ' + workTeams.length + ' 个', 'success');
-        })
-        .catch(function(err) { showStatus('❌ 加载失败：' + err.message, 'error'); });
+    return ensureData6().then(function () { workTeams = data6.teams || []; return workTeams; });
+}
+function syncPendingWork() {
+    var dates = Object.keys(workDraft);
+    if (dates.length) showStatus('📝 有 ' + dates.length + ' 天（' + dates.join('、') + '）的本地改动还没加入静态库', 'loading');
 }
 
+// ---------------------------------------------------------------
+//  按日期查：用当天冻结的班组 / 列名，不受以后改名影响
+// ---------------------------------------------------------------
 function loadWorkRecordsByDate() {
-    var date = document.getElementById('workDate').value;
-    if (!date) return;
+    var dateEl = document.getElementById('workDate');
+    var date = (dateEl && dateEl.value) || workCurrentDate || todayISO();
     workCurrentDate = date;
     workMode = 'day';
-    workRecordsMap = {};
-    var local = workLocalCache[date] || {};
-    Object.keys(local).forEach(function(k) {
-        workRecordsMap[k] = { quantity: local[k].quantity || 0, note: local[k].note || '', _pending: local[k]._pending || false };
+    return ensureData6().then(function () {
+        var day = data6.days[date] || null;
+        workViewTeams = clone((day && day.teams && day.teams.length ? day.teams : data6.teams) || []);
+        workViewColumns = clone((day && day.columns && day.columns.length ? day.columns : data6.columns) || []);
+        workRecordsMap = {}; workPendingChanges = {};
+        if (day && day.records) {
+            Object.keys(day.records).forEach(function (k) {
+                workRecordsMap[k] = { quantity: Number(day.records[k].quantity) || 0, note: day.records[k].note || '' };
+            });
+        }
+        var draft = workDraft[date];
+        if (draft) {
+            if (draft.teams && draft.teams.length) workViewTeams = clone(draft.teams);
+            if (draft.columns && draft.columns.length) workViewColumns = clone(draft.columns);
+            if (draft.records) Object.keys(draft.records).forEach(function (k) {
+                workRecordsMap[k] = { quantity: Number(draft.records[k].quantity) || 0, note: draft.records[k].note || '' };
+            });
+        }
+        workTeams = workViewTeams; workColumns = workViewColumns;
+        workViewHint = date + ' · 显示当天实际区域/人员' + (day ? '（静态库快照）' : '（新的一天，沿用当前班组）');
+        renderWorkTeams(); renderWorkTotals();
+        var pending = draft ? Object.keys(draft.records || {}).length : 0;
+        showStatus(pending ? ('📝 ' + date + '：' + pending + ' 条本地改动未加入静态库')
+                           : ('✅ ' + date + ' 已加载' + (day ? '（共 ' + Object.keys(day.records || {}).length + ' 条）' : '（暂无记录）')),
+                   pending ? 'error' : 'success');
+        return true;
     });
-    renderWorkTeams();
-    renderWorkTotals();
-    showStatus('🔄 加载 ' + date + ' 数据...', 'loading');
-    fetch(WORK_RECORDS_GET + '&date=' + date + '&t=' + Date.now())
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-            var rows = (res && res.data) ? res.data : [];
-            rows.forEach(function(r) {
-                var key = r.team_id + '_' + r.unit;
-                if (workRecordsMap[key] && workRecordsMap[key]._pending) return;
-                workRecordsMap[key] = { quantity: Number(r.quantity) || 0, note: r.note || '', _pending: false };
-            });
-            var cache = {};
-            Object.keys(workRecordsMap).forEach(function(k) {
-                cache[k] = { quantity: workRecordsMap[k].quantity, note: workRecordsMap[k].note, _pending: workRecordsMap[k]._pending || false };
-            });
-            workLocalCache[date] = cache;
-            saveWorkLocalCache();
-            renderWorkTeams();
-            renderWorkTotals();
-            var pendingCount = Object.keys(workPendingUpload[date] || {}).length;
-            if (pendingCount > 0) showStatus('✅ 已加载 ' + rows.length + ' 条（本地待上传 ' + pendingCount + ' 条）', 'success');
-            else showStatus('✅ 已加载 ' + rows.length + ' 条记录', 'success');
-        })
-        .catch(function() { showStatus('⚠️ 离线模式（本地缓存）', 'error'); });
 }
 
+// 范围汇总：按「当天实际的区域+人员组合」分组，不再套用现在的班组表
+function collectRangeDay(date, day, draft, groups, state) {
+    var teams = (draft && draft.teams && draft.teams.length) ? draft.teams
+              : ((day && day.teams && day.teams.length) ? day.teams : (data6.teams || []));
+    var records = (draft && draft.records) ? draft.records : ((day && day.records) || {});
+    teams.forEach(function (t) {
+        var gkey = [t.area || '', t.fitter || '', t.welder || '', t.helper || ''].join('|');
+        if (!groups[gkey]) {
+            state.seq++;
+            groups[gkey] = { id: 'g' + state.seq, area: t.area || '', fitter: t.fitter || '',
+                             welder: t.welder || '', helper: t.helper || '', qty: {}, notes: [] };
+        }
+        var g = groups[gkey], prefix = String(t.id) + '_';
+        Object.keys(records).forEach(function (k) {
+            if (k.indexOf(prefix) !== 0) return;
+            var unit = k.slice(prefix.length);
+            g.qty[unit] = (g.qty[unit] || 0) + (Number(records[k].quantity) || 0);
+            if (records[k].note) g.notes.push(records[k].note);
+        });
+    });
+}
 function loadWorkRecordsByRange() {
     var from = document.getElementById('workFrom').value;
     var to = document.getElementById('workTo').value;
     if (!from || !to) { alert('请选择起始和结束日期'); return; }
+    if (from > to) { alert('起始日期不能晚于结束日期'); return; }
     workMode = 'range';
-    showStatus('🔄 加载 ' + from + ' ~ ' + to + ' 汇总...', 'loading');
-    fetch(WORK_RECORDS_GET + '&from=' + from + '&to=' + to + '&t=' + Date.now())
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-            var rows = (res && res.data) ? res.data : [];
-            var sumMap = {};
-            rows.forEach(function(r) {
-                var key = r.team_id + '_' + r.unit;
-                if (!sumMap[key]) sumMap[key] = { quantity: 0, notes: [] };
-                sumMap[key].quantity += Number(r.quantity) || 0;
-                if (r.note) sumMap[key].notes.push(r.note);
+    return ensureData6().then(function () {
+        var groups = {}, state = { seq: 0 }, days = 0;
+        Object.keys(data6.days).sort().forEach(function (date) {
+            if (date < from || date > to) return;
+            days++;
+            collectRangeDay(date, data6.days[date], null, groups, state);
+        });
+        Object.keys(workDraft).forEach(function (date) {
+            if (date < from || date > to) return;
+            collectRangeDay(date, data6.days[date] || null, workDraft[date], groups, state);
+        });
+        // 列取范围内的并集，历史改过列名也能显示
+        var seen = {}, cols = [];
+        function addCol(c) { if (c && c.col_key && !seen[c.col_key]) { seen[c.col_key] = 1; cols.push(clone(c)); } }
+        (data6.columns || []).forEach(addCol);
+        Object.keys(data6.days).forEach(function (date) {
+            if (date < from || date > to) return;
+            ((data6.days[date].columns) || []).forEach(addCol);
+        });
+        workViewColumns = cols.length ? cols : clone(data6.columns || []);
+        workViewTeams = Object.keys(groups).map(function (k) { return groups[k]; });
+        workRecordsMap = {}; workPendingChanges = {};
+        workViewTeams.forEach(function (g) {
+            Object.keys(g.qty).forEach(function (unit) {
+                workRecordsMap[g.id + '_' + unit] = { quantity: g.qty[unit], note: g.notes.slice(-3).join(' / ') };
             });
-            workRecordsMap = {};
-            Object.keys(sumMap).forEach(function(k) {
-                workRecordsMap[k] = { quantity: sumMap[k].quantity, note: sumMap[k].notes.slice(-3).join(' / ') };
-            });
+        });
+        workTeams = workViewTeams; workColumns = workViewColumns;
+        workViewHint = from + ' ~ ' + to + ' · ' + days + ' 天 / ' + workViewTeams.length + ' 组（按当天实际区域人员汇总）';
+        renderWorkTeams(); renderWorkTotals();
+        showStatus('✅ 范围汇总完成：' + days + ' 天 / ' + workViewTeams.length + ' 组实际班组', 'success');
+    });
+}
+
+// ---------------------------------------------------------------
+//  本地草稿：任何编辑先落 localStorage，绝不丢
+// ---------------------------------------------------------------
+function markWorkDirty() {
+    var date = workCurrentDate;
+    if (!date || workMode !== 'day') return;
+    var d = workDraft[date] || (workDraft[date] = {});
+    d.teams = clone(workViewTeams);
+    d.columns = clone(workViewColumns);
+    d.records = {};
+    var keys = {};
+    Object.keys(workRecordsMap).forEach(function (k) { keys[k] = 1; });
+    Object.keys(workPendingChanges).forEach(function (k) { keys[k] = 1; });
+    Object.keys(keys).forEach(function (k) {
+        var p = workPendingChanges[k], e = workRecordsMap[k] || {};
+        d.records[k] = {
+            quantity: (p && p.quantity !== undefined) ? p.quantity : (Number(e.quantity) || 0),
+            note: (p && p.note !== undefined) ? p.note : (e.note || '')
+        };
+    });
+    saveWorkDraft();
+}
+function stashWorkRecordsLocally() { markWorkDirty(); }   // 兼容旧调用
+
+function saveAllWorkRecords() {
+    if (workMode !== 'day') { alert('范围汇总模式下不能保存，请先按日期查回某一天'); return; }
+    markWorkDirty();
+    showStatus('💾 已保存到本地草稿（' + workCurrentDate + '）。确认无误后点「📦 加入静态库」写入 data6.json', 'success');
+}
+function commitWorkToStatic() {
+    if (workMode !== 'day') { alert('范围汇总模式下不能写入，请先按日期查回某一天'); return; }
+    var date = workCurrentDate;
+    markWorkDirty();
+    var draft = workDraft[date];
+    if (!draft || (!Object.keys(draft.records || {}).length && !draft.teams)) {
+        showStatus('⚠️ 没有本地改动', 'error'); return;
+    }
+    if (!confirm('把 ' + date + ' 的数据写入静态库 data6.json？\n\n· 会覆盖该日期的旧记录\n· 当天的区域 / 人员 / 列名会冻结成快照，以后改名不影响这天\n· 源仓库里的旧 data6.json 会自动备份')) return;
+    return ensureData6().then(function () {
+        data6.days[date] = {
+            teams: clone(draft.teams || data6.teams),
+            columns: clone(draft.columns || data6.columns),
+            records: clone(draft.records || {}),
+            savedAt: nowText()
+        };
+        var maxDate = Object.keys(data6.days).sort().pop();
+        if (date >= maxDate) {
+            data6.teams = clone(data6.days[date].teams);
+            data6.columns = clone(data6.days[date].columns);
+        }
+        data6.updatedAt = nowText();
+        return writeStaticJson('data6.json', data6).then(function (r) {
+            delete workDraft[date]; saveWorkDraft();
+            try { localStorage.setItem('workData6Cache', JSON.stringify(data6)); } catch (e) {}
             workPendingChanges = {};
-            renderWorkTeams();
-            renderWorkTotals();
-            showStatus('✅ 汇总完成：' + rows.length + ' 条原始记录', 'success');
-        })
-        .catch(function(err) { showStatus('❌ 加载失败：' + err.message, 'error'); });
+            updateWorkStats();
+            loadWorkRecordsByDate();
+            showStatus(r.downloaded ? ('✅ ' + date + ' 已下载 data6.json（网页版，请手动覆盖仓库文件）')
+                                    : ('✅ ' + date + ' 已写入源仓库 data6.json。记得点「☁️ 一键推送 Git」'), 'success');
+        });
+    }).catch(function (e) { showStatus('❌ 写入失败：' + e.message, 'error'); });
+}
+function deleteWorkRecordsByDate() {
+    if (!workCurrentDate) { alert('请先选日期'); return; }
+    if (!confirm('⚠️ 确认删除 ' + workCurrentDate + ' 的所有工作量记录？\n\n此操作不可恢复！')) return;
+    if (!confirm('⚠️⚠️ 再次确认：真的要删除吗？')) return;
+    var date = workCurrentDate;
+    delete workDraft[date]; saveWorkDraft();
+    var p = ensureData6().then(function () {
+        if (data6.days[date]) {
+            delete data6.days[date];
+            data6.updatedAt = nowText();
+            try { localStorage.setItem('workData6Cache', JSON.stringify(data6)); } catch (e) {}
+            return writeStaticJson('data6.json', data6);
+        }
+        return null;
+    });
+    return p.then(function () { updateWorkStats(); loadWorkRecordsByDate(); showStatus('🗑️ 已删除 ' + date + ' 的记录', 'success'); })
+            .catch(function (e) { showStatus('❌ 删除失败：' + e.message, 'error'); });
 }
 
-function renderWorkTeams() {
-    var box = document.getElementById('workTeamsList');
-    if (!workTeams.length) {
-        box.innerHTML = '<div class="no-data"><span>👥</span>还没有班组，点「➕ 班组」或「📤 导入班组」</div>';
-        return;
-    }
-    if (!workColumns.length) {
-        box.innerHTML = '<div class="no-data"><span>📋</span>没有列配置，点「➕ 列」</div>';
-        return;
-    }
-    var html = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;">';
-    html += '<thead><tr style="background:#f8fafc;">' +
-            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:70px;">区域</th>' +
-            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:60px;">管工</th>' +
-            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:60px;">焊工</th>' +
-            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:60px;">普工</th>';
-    workColumns.forEach(function(col) {
-        html += '<th class="work-col-vert" style="color:#7F7F7F;width:34px;">' +
-                '<span>' + escapeHtml(col.col_name) + '</span>' +
-                '<br><a href="javascript:void(0)" class="col-icon-btn" style="color:#07C160;" onclick="renameWorkColumn(' + col.id + ',\'' + escapeJs(col.col_name) + '\')" title="改名">✏️</a>' +
-                '<br><a href="javascript:void(0)" class="col-icon-btn" style="color:#FA5151;" onclick="deleteWorkColumn(' + col.id + ',\'' + escapeJs(col.col_name) + '\')" title="删列">✖</a>' +
-                '</th>';
+// ---------------------------------------------------------------
+//  班组 / 列管理（全部本地，不再调后端）
+// ---------------------------------------------------------------
+function updateTeamField(id, field, value) {
+    if (workMode !== 'day') return;
+    var team = workViewTeams.find(function (t) { return String(t.id) === String(id); });
+    if (!team) return;
+    team[field] = value;
+    markWorkDirty();
+    showStatus('📝 已修改 ' + workCurrentDate + ' 当天的「' + field + '」（本地草稿，不影响其它日期）', 'loading');
+}
+function nextTeamId() {
+    var max = 0;
+    (workViewTeams.concat(data6 ? data6.teams : [])).forEach(function (t) {
+        if (typeof t.id === 'number' && t.id > max) max = t.id;
     });
-    html += '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:120px;">备注</th>' +
-            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:center;width:60px;">操作</th>' +
-            '</tr></thead><tbody>';
-    workTeams.forEach(function(team) {
-        html += '<tr style="border-bottom:1px solid #f0f4f9;">';
-        html += '<td style="padding:4px 3px;width:70px;"><input class="work-table-input" type="text" value="' + escapeHtml(team.area) + '" onchange="updateTeamField(' + team.id + ',\'area\',this.value)"></td>';
-        html += '<td style="padding:4px 3px;width:60px;"><input class="work-table-input" type="text" value="' + escapeHtml(team.fitter) + '" onchange="updateTeamField(' + team.id + ',\'fitter\',this.value)"></td>';
-        html += '<td style="padding:4px 3px;width:60px;"><input class="work-table-input" type="text" value="' + escapeHtml(team.welder) + '" onchange="updateTeamField(' + team.id + ',\'welder\',this.value)"></td>';
-        html += '<td style="padding:4px 3px;width:60px;"><input class="work-table-input" type="text" value="' + escapeHtml(team.helper) + '" onchange="updateTeamField(' + team.id + ',\'helper\',this.value)"></td>';
-        workColumns.forEach(function(col) {
-            var key = team.id + '_' + col.col_key;
-            var rec = workRecordsMap[key] || { quantity: 0, note: '' };
-            var val = rec.quantity ? rec.quantity : '';
-            html += '<td style="text-align:center;width:34px;padding:3px 2px;">' +
-                    '<input class="work-num-input" type="number" step="0.01" placeholder="' + escapeHtml(col.col_name) + '" value="' + val + '" ' +
-                    'onchange="onWorkInputChange(' + team.id + ',\'' + escapeJs(col.col_key) + '\',this.value)">' +
-                    '</td>';
-        });
-        var teamNote = '';
-        workColumns.forEach(function(col) {
-            var rec = workRecordsMap[team.id + '_' + col.col_key];
-            if (rec && rec.note && !teamNote) teamNote = rec.note;
-        });
-        html += '<td style="padding:4px 3px;width:120px;"><input class="work-table-input" type="text" value="' + escapeHtml(teamNote) + '" onchange="onWorkNoteChange(' + team.id + ',this.value)"></td>';
-        html += '<td style="padding:6px;text-align:center;white-space:nowrap;width:70px;">' +
-                '<button onclick="deleteWorkTeam(' + team.id + ')" style="padding:5px 10px;background:#FA5151;color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;">🗑️</button>' +
-                '</td>';
-        html += '</tr>';
+    return max + 1;
+}
+function deleteWorkTeam(id) {
+    if (workMode !== 'day') { alert('范围汇总模式下不能改班组'); return; }
+    if (!confirm('确认删除该班组？\n（同时删除当前日期下它的工作量格子）')) return;
+    workViewTeams = workViewTeams.filter(function (t) { return String(t.id) !== String(id); });
+    Object.keys(workRecordsMap).forEach(function (k) { if (k.indexOf(String(id) + '_') === 0) delete workRecordsMap[k]; });
+    workTeams = workViewTeams;
+    markWorkDirty(); renderWorkTeams(); renderWorkTotals();
+    showStatus('🗑️ 已删除班组（本地草稿）', 'success');
+}
+function openAddTeamDialog() {
+    document.getElementById('addTeamArea').value = '';
+    document.getElementById('addTeamFitter').value = '';
+    document.getElementById('addTeamWelder').value = '';
+    document.getElementById('addTeamHelper').value = '';
+    document.getElementById('addTeamDialog').classList.add('active');
+}
+function closeAddTeamDialog() { document.getElementById('addTeamDialog').classList.remove('active'); }
+function doAddTeam() {
+    if (workMode !== 'day') { alert('范围汇总模式下不能添加班组'); return; }
+    var area = document.getElementById('addTeamArea').value.trim();
+    if (!area) { alert('区域不能为空'); return; }
+    workViewTeams.push({
+        id: nextTeamId(), area: area,
+        fitter: document.getElementById('addTeamFitter').value.trim(),
+        welder: document.getElementById('addTeamWelder').value.trim(),
+        helper: document.getElementById('addTeamHelper').value.trim(),
+        sort_order: 0
     });
-    html += '</tbody></table>';
-    box.innerHTML = html;
+    workTeams = workViewTeams;
+    closeAddTeamDialog(); markWorkDirty(); renderWorkTeams(); renderWorkTotals();
+    showStatus('✅ 已添加班组（本地草稿）', 'success');
+}
+function openImportTeamsDialog() { document.getElementById('importTeamsText').value = ''; document.getElementById('importTeamsDialog').classList.add('active'); }
+function closeImportTeamsDialog() { document.getElementById('importTeamsDialog').classList.remove('active'); }
+function doImportTeams() {
+    if (workMode !== 'day') { alert('范围汇总模式下不能导入班组'); return; }
+    var text = document.getElementById('importTeamsText').value.trim();
+    if (!text) { alert('请输入数据'); return; }
+    var items = [];
+    text.split('\n').filter(function (l) { return l.trim(); }).forEach(function (line) {
+        var parts = line.split(',').map(function (s) { return s.trim(); });
+        if (parts[0]) items.push({ area: parts[0], fitter: parts[1] || '', welder: parts[2] || '', helper: parts[3] || '' });
+    });
+    if (!items.length) { alert('没有有效数据'); return; }
+    if (!confirm('确认导入 ' + items.length + ' 个班组？')) return;
+    var id = nextTeamId();
+    items.forEach(function (it) { it.id = id++; it.sort_order = 0; workViewTeams.push(it); });
+    workTeams = workViewTeams;
+    closeImportTeamsDialog(); markWorkDirty(); renderWorkTeams(); renderWorkTotals();
+    showStatus('✅ 已导入 ' + items.length + ' 个班组（本地草稿）', 'success');
+}
+function nextColKey() { return 'c' + Date.now().toString(36); }
+function openAddColumnDialog() {
+    if (workMode !== 'day') { alert('范围汇总模式下不能加列'); return; }
+    var name = prompt('输入新列名称（如"管道安装米数"）：');
+    if (!name) return;
+    workViewColumns.push({ id: Date.now(), col_key: nextColKey(), col_name: name.trim(), sort_order: workViewColumns.length + 1 });
+    workColumns = workViewColumns;
+    markWorkDirty(); renderWorkTeams(); renderWorkTotals();
+    showStatus('✅ 已添加列（本地草稿）', 'success');
+}
+function renameWorkColumn(id, oldName) {
+    if (workMode !== 'day') { alert('范围汇总模式下不能改列名'); return; }
+    var newName = prompt('输入新的列名：', oldName);
+    if (!newName || newName === oldName) return;
+    var col = workViewColumns.find(function (c) { return String(c.id) === String(id); });
+    if (!col) return;
+    col.col_name = newName.trim();                 // 只改显示名，col_key 不变，历史数据不会丢
+    workColumns = workViewColumns;
+    markWorkDirty(); renderWorkTeams(); renderWorkTotals();
+    showStatus('✅ 列名已更新（本地草稿，当天快照）', 'success');
+}
+function deleteWorkColumn(id, name) {
+    if (workMode !== 'day') { alert('范围汇总模式下不能删列'); return; }
+    if (!confirm('确认删除列「' + name + '」？\n（会同时删除当前日期下该列的数据）')) return;
+    var col = workViewColumns.find(function (c) { return String(c.id) === String(id); });
+    workViewColumns = workViewColumns.filter(function (c) { return String(c.id) !== String(id); });
+    if (col) Object.keys(workRecordsMap).forEach(function (k) { if (k.slice(-col.col_key.length) === col.col_key) delete workRecordsMap[k]; });
+    workColumns = workViewColumns;
+    markWorkDirty(); renderWorkTeams(); renderWorkTotals();
+    showStatus('🗑️ 已删除列（本地草稿）', 'success');
 }
 
+// ---------------------------------------------------------------
+//  表格 / 合计 / 导出 / 日报（沿用原有交互，数据源换成当天视图）
+// ---------------------------------------------------------------
 function onWorkInputChange(teamId, unitKey, value) {
     var key = teamId + '_' + unitKey;
     if (!workPendingChanges[key]) workPendingChanges[key] = {};
     workPendingChanges[key].quantity = Number(value) || 0;
-    workPendingChanges[key].unit = unitKey;
-    workPendingChanges[key].team_id = teamId;
-    workPendingChanges[key].work_date = workCurrentDate;
+    workRecordsMap[key] = workRecordsMap[key] || { quantity: 0, note: '' };
+    workRecordsMap[key].quantity = Number(value) || 0;
     renderWorkTotals();
-    stashWorkRecordsLocally();
+    markWorkDirty();
 }
-
 function onWorkNoteChange(teamId, value) {
-    if (!workColumns.length) return;
-    var col = workColumns[0];
-    var key = teamId + '_' + col.col_key;
-    if (!workPendingChanges[key]) {
-        var existing = workRecordsMap[key];
-        workPendingChanges[key] = {
-            quantity: existing ? (existing.quantity || 0) : 0,
-            unit: col.col_key, team_id: teamId, work_date: workCurrentDate
-        };
-    }
+    if (!workViewColumns.length) return;
+    var col = workViewColumns[0], key = teamId + '_' + col.col_key;
+    if (!workPendingChanges[key]) workPendingChanges[key] = { quantity: (workRecordsMap[key] || {}).quantity || 0 };
     workPendingChanges[key].note = value;
-    stashWorkRecordsLocally();
+    workRecordsMap[key] = workRecordsMap[key] || { quantity: 0, note: '' };
+    workRecordsMap[key].note = value;
+    markWorkDirty();
 }
-
 function getTeamName() { return (localStorage.getItem('workTeamName') || '').trim(); }
 function saveTeamName() {
     var el = document.getElementById('workTeamName');
     if (el) localStorage.setItem('workTeamName', el.value.trim());
 }
-
-function deleteWorkRecordsByDate() {
-    if (!workCurrentDate) { alert('请先选日期'); return; }
-    if (!confirm('⚠️ 确认删除 ' + workCurrentDate + ' 的所有工作量记录？\n\n此操作不可恢复！')) return;
-    if (!confirm('⚠️⚠️ 再次确认：真的要删除吗？')) return;
-    if (workLocalCache[workCurrentDate]) { delete workLocalCache[workCurrentDate]; saveWorkLocalCache(); }
-    if (workPendingUpload[workCurrentDate]) { delete workPendingUpload[workCurrentDate]; saveWorkPendingUpload(); }
-    showStatus('🗑️ 正在删除 ' + workCurrentDate + ' 的所有记录...', 'loading');
-    fetch(WORK_RECORDS_DELETE + '&date=' + workCurrentDate, { method: 'DELETE' })
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-            if (res && res.success) {
-                showStatus('✅ ' + (res.message || '已删除 ' + (res.deleted || 0) + ' 条'), 'success');
-                loadWorkRecordsByDate();
-            } else showStatus('❌ ' + ((res && res.error) || '删除失败'), 'error');
-        })
-        .catch(function(err) { showStatus('❌ 删除失败：' + err.message, 'error'); });
-}
-
 function getUnitByColName(name) {
     if (!name) return '个';
     if (name.indexOf('重量') !== -1) return 'kg';
@@ -1855,482 +2137,84 @@ function getUnitByColName(name) {
     if (name.indexOf('个数') !== -1) return '个';
     return '个';
 }
-
 function isExcludedFromReport(colName) {
     if (!colName) return false;
     return colName.indexOf('包含') !== -1 && colName.indexOf('2寸以下') !== -1;
 }
-
-function copyWorkAsReport() {
-    if (!workCurrentDate) { alert('请先选日期'); return; }
-    stashWorkRecordsLocally();
-    if (!workTeams.length) { alert('没有班组数据'); return; }
-    if (!workColumns.length) { alert('没有列配置'); return; }
-
-    var NOTE_KEYWORDS = ['管台焊接', '返修焊口', '借到', '结构', '支架'];
-    function noteMatches(note) {
-        if (!note) return false;
-        for (var i = 0; i < NOTE_KEYWORDS.length; i++) {
-            if (note.indexOf(NOTE_KEYWORDS[i]) !== -1) return true;
-        }
-        return false;
+function renderWorkTeams() {
+    var box = document.getElementById('workTeamsList');
+    var readonly = (workMode !== 'day');
+    var hint = '<div style="padding:6px 10px;background:#f0f7ff;color:#1a56c4;font-size:12px;border-radius:4px;margin-bottom:8px;">' +
+               escapeHtml(workViewHint || '') + (readonly ? ' · 汇总视图只读' : '') + '</div>';
+    if (!workViewTeams.length) {
+        box.innerHTML = hint + '<div class="no-data"><span>👥</span>还没有班组，点「➕ 班组」或「📤 导入班组」</div>';
+        return;
     }
-
-    var lines = [];
-    var teamName = getTeamName();
-    if (teamName) lines.push('队伍:' + teamName);
-    var welderCount = 0;
-    workTeams.forEach(function(t) { if ((t.welder || '').trim()) welderCount++; });
-    lines.push('焊工人数:' + welderCount + '人');
-    var d = new Date(workCurrentDate);
-    lines.push(d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日');
-    lines.push('');
-
-    var seq = 0;
-    workTeams.forEach(function(team) {
-        var welderName = (team.welder || '').trim();
-        if (!welderName) return;
-        var parts = [];
-        workColumns.forEach(function(col) {
-            if (isExcludedFromReport(col.col_name)) return;
+    if (!workViewColumns.length) {
+        box.innerHTML = hint + '<div class="no-data"><span>📋</span>没有列配置，点「➕ 列」</div>';
+        return;
+    }
+    var dis = readonly ? ' disabled' : '';
+    var html = hint + '<table style="width:100%;border-collapse:collapse;table-layout:fixed;">';
+    html += '<thead><tr style="background:#f8fafc;">' +
+            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:70px;">区域</th>' +
+            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:60px;">管工</th>' +
+            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:60px;">焊工</th>' +
+            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:60px;">普工</th>';
+    workViewColumns.forEach(function (col) {
+        html += '<th class="work-col-vert" style="color:#7F7F7F;width:34px;">' +
+                '<span>' + escapeHtml(col.col_name) + '</span>' +
+                (readonly ? '' :
+                  '<br><a href="javascript:void(0)" class="col-icon-btn" style="color:#07C160;" onclick="renameWorkColumn(' + col.id + ',\'' + escapeJs(col.col_name) + '\')" title="改名">✏️</a>' +
+                  '<br><a href="javascript:void(0)" class="col-icon-btn" style="color:#FA5151;" onclick="deleteWorkColumn(' + col.id + ',\'' + escapeJs(col.col_name) + '\')" title="删列">✖</a>') +
+                '</th>';
+    });
+    html += '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:left;width:120px;">备注</th>' +
+            '<th style="padding:6px 4px;font-size:11px;color:#7F7F7F;text-align:center;width:60px;">操作</th>' +
+            '</tr></thead><tbody>';
+    workViewTeams.forEach(function (team) {
+        html += '<tr style="border-bottom:1px solid #f0f4f9;">';
+        ['area', 'fitter', 'welder', 'helper'].forEach(function (f) {
+            html += '<td style="padding:4px 3px;"><input class="work-table-input" type="text" value="' +
+                    escapeHtml(team[f] || '') + '"' + dis +
+                    (readonly ? '' : ' onchange="updateTeamField(' + JSON.stringify(team.id) + ',\'' + f + '\',this.value)"') + '></td>';
+        });
+        workViewColumns.forEach(function (col) {
             var key = team.id + '_' + col.col_key;
-            var rec = workRecordsMap[key];
-            if (rec && Number(rec.quantity) > 0) {
-                var qty = Number(rec.quantity);
-                var display = (qty % 1 === 0) ? qty : qty.toFixed(2);
-                parts.push(col.col_name + display + getUnitByColName(col.col_name));
-            }
+            var rec = workRecordsMap[key] || { quantity: 0, note: '' };
+            var val = rec.quantity ? rec.quantity : '';
+            html += '<td style="text-align:center;width:34px;padding:3px 2px;">' +
+                    '<input class="work-num-input" type="number" step="0.01" placeholder="' + escapeHtml(col.col_name) + '" value="' + val + '"' + dis +
+                    (readonly ? '' : ' onchange="onWorkInputChange(' + JSON.stringify(team.id) + ',\'' + escapeJs(col.col_key) + '\',this.value)"') + '>' +
+                    '</td>';
         });
-
-        var note = '';
-        workColumns.forEach(function(col) {
+        var teamNote = '';
+        workViewColumns.forEach(function (col) {
             var rec = workRecordsMap[team.id + '_' + col.col_key];
-            if (rec && rec.note && !note) {
-                if (parts.length > 0) {
-                    if (noteMatches(rec.note)) note = rec.note;
-                } else {
-                    note = rec.note;
-                }
-            }
+            if (rec && rec.note && !teamNote) teamNote = rec.note;
         });
-        if (parts.length === 0 && !note) return;
-        seq++;
-        var nameLine = seq + '、 ' + welderName;
-        if (parts.length > 0) {
-            nameLine += '  ' + parts.join(' ');
-            if (note) nameLine += '  【' + note + '】';
-        } else if (note) {
-            nameLine += '  ' + note;
-        }
-        lines.push(nameLine);
+        html += '<td style="padding:4px 3px;width:120px;"><input class="work-table-input" type="text" value="' + escapeHtml(teamNote) + '"' + dis +
+                (readonly ? '' : ' onchange="onWorkNoteChange(' + JSON.stringify(team.id) + ',this.value)"') + '></td>';
+        html += '<td style="padding:6px;text-align:center;white-space:nowrap;width:70px;">' +
+                (readonly ? '—' : '<button onclick="deleteWorkTeam(' + JSON.stringify(team.id) + ')" style="padding:5px 10px;background:#FA5151;color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;">🗑️</button>') +
+                '</td>';
+        html += '</tr>';
     });
-
-    if (seq === 0) { showStatus('⚠️ 没有符合条件的焊工数据', 'error'); return; }
-
-    lines.push('');
-    var totalParts = [];
-    workColumns.forEach(function(col) {
-        if (isExcludedFromReport(col.col_name)) return;
-        var sum = 0;
-        workTeams.forEach(function(team) {
-            if (!(team.welder || '').trim()) return;
-            var rec = workRecordsMap[team.id + '_' + col.col_key];
-            if (rec) sum += Number(rec.quantity) || 0;
-        });
-        if (sum > 0) {
-            var display = (sum % 1 === 0) ? sum : sum.toFixed(2);
-            totalParts.push(col.col_name + display + getUnitByColName(col.col_name));
-        }
-    });
-    if (totalParts.length > 0) lines.push('【合计】 ' + totalParts.join(' '));
-
-    // ============ 追加：未完成量（精简版，优先用缓存） ============
-    var t = totalData;
-    if (!t) {
-        try {
-            var cached = localStorage.getItem(TOTAL_CACHE_KEY);
-            if (cached) t = JSON.parse(cached);
-        } catch(e) {}
-    }
-
-    function appendTotal() {
-        if (t) {
-            var s = t.summary || {};
-            lines.push('');
-            lines.push('总未完成:' + (s.unwelded || 0) + '寸');
-            (t.list || []).forEach(function(a) {
-                lines.push(a.area + '  未完成' + (Number(a.unwelded) || 0) + '寸');
-            });
-        }
-        copyTextWithFallback(lines.join('\n'), seq);
-    }
-
-    if (t) {
-        appendTotal();
-    } else {
-        // 内存和缓存都没有 → 兜底请求一次
-        fetch(DATA4_URL + '?t=' + Date.now())
-            .then(function(r) { return r.json(); })
-            .catch(function() { return null; })
-            .then(function(data4) {
-                if (data4) {
-                    totalData = data4;
-                    try { localStorage.setItem(TOTAL_CACHE_KEY, JSON.stringify(data4)); } catch(e) {}
-                    t = data4;
-                }
-                appendTotal();
-            });
-    }   
+    html += '</tbody></table>';
+    box.innerHTML = html;
 }
-function copyTextWithFallback(text, seq) {
-    var msg = '✅ 已复制 ' + seq + ' 条焊工日报';
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(function() { showStatus(msg, 'success'); })
-            .catch(function() {
-                if (execCommandCopySilent(text)) showStatus(msg, 'success');
-                else showManualCopyDialog(text);
-            });
-    } else {
-        if (execCommandCopySilent(text)) showStatus(msg, 'success');
-        else showManualCopyDialog(text);
-    }
-}
-function execCommandCopySilent(text) {
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
-    document.body.appendChild(ta);
-    var ok = false;
-    try { ta.focus(); ta.select(); ta.setSelectionRange(0, text.length); ok = document.execCommand('copy'); } catch(e) { ok = false; }
-    document.body.removeChild(ta);
-    return ok;
-}
-function showManualCopyDialog(text) {
-    var dlg = document.createElement('div');
-    dlg.className = 'dialog-overlay active';
-    dlg.innerHTML = '<div class="dialog">' +
-        '<h2>📋 手动复制</h2>' +
-        '<p>长按下方文本 → 全选 → 复制</p>' +
-        '<textarea id="manualCopyArea" style="height:280px;" readonly></textarea>' +
-        '<div class="dialog-buttons"><button class="btn-primary" onclick="this.closest(\'.dialog-overlay\').remove()">关闭</button></div>' +
-        '</div>';
-    document.body.appendChild(dlg);
-    var ta = dlg.querySelector('#manualCopyArea');
-    ta.value = text;
-    setTimeout(function() { ta.focus(); ta.select(); }, 100);
-}
-
-function stashWorkRecordsLocally() {
-    if (workMode !== 'day') return;
-    if (!workCurrentDate) return;
-    if (!workColumns.length) return;
-    if (!workTeams.length) return;
-
-    var date = workCurrentDate;
-    var firstColKey = workColumns[0].col_key;
-    var records = [];
-
-    workTeams.forEach(function(team) {
-        workColumns.forEach(function(col) {
-            var key = team.id + '_' + col.col_key;
-            var pending = workPendingChanges[key];
-            var existing = workRecordsMap[key];
-            var qty = pending ? pending.quantity : (existing ? existing.quantity : 0);
-            if (qty > 0) {
-                records.push({
-                    team_id: team.id, work_date: date,
-                    unit: col.col_key, quantity: qty, note: ''
-                });
-            }
-        });
-
-        var firstKey = team.id + '_' + firstColKey;
-        var firstPending = workPendingChanges[firstKey];
-        var firstExisting = workRecordsMap[firstKey];
-        var teamNote = firstPending && firstPending.note !== undefined
-                     ? firstPending.note
-                     : (firstExisting ? firstExisting.note : '');
-
-        if (teamNote && teamNote.trim() !== '') {
-            var hasFirst = records.some(function(r) {
-                return r.team_id === team.id && r.unit === firstColKey;
-            });
-            if (!hasFirst) {
-                records.push({
-                    team_id: team.id, work_date: date,
-                    unit: firstColKey, quantity: 0, note: teamNote
-                });
-            } else {
-                records.forEach(function(r) {
-                    if (r.team_id === team.id && r.unit === firstColKey) {
-                        r.note = teamNote;
-                    }
-                });
-            }
-        }
-    });
-
-    if (!records.length) return;
-
-    if (!workLocalCache[date]) workLocalCache[date] = {};
-    records.forEach(function(r) {
-        var key = r.team_id + '_' + r.unit;
-        workLocalCache[date][key] = {
-            quantity: r.quantity,
-            note: r.note || '',
-            _pending: true
-        };
-    });
-    saveWorkLocalCache();
-
-    if (!workPendingUpload[date]) workPendingUpload[date] = {};
-    records.forEach(function(r) {
-        var key = r.team_id + '_' + r.unit;
-        workPendingUpload[date][key] = {
-            team_id: r.team_id, unit: r.unit,
-            quantity: r.quantity, note: r.note || ''
-        };
-    });
-    saveWorkPendingUpload();
-}
-
-function saveAllWorkRecords() {
-    if (workMode !== 'day') { alert('范围汇总模式下不允许保存，请先切回日期'); return; }
-    if (!workCurrentDate) { alert('请先选日期'); return; }
-    if (!workColumns.length) { alert('没有列配置'); return; }
-
-    var date = workCurrentDate;
-    var firstColKey = workColumns[0].col_key;
-
-    stashWorkRecordsLocally();
-
-    var map = workPendingUpload[date] || {};
-    var records = Object.keys(map).map(function(k) {
-        var item = map[k];
-        return {
-            team_id: item.team_id, work_date: date,
-            unit: item.unit, quantity: item.quantity, note: item.note || ''
-        };
-    });
-
-    if (!records.length) { showStatus('⚠️ 没有要保存的数据', 'error'); return; }
-
-    workPendingChanges = {};
-    workRecordsMap = {};
-    var local = workLocalCache[date] || {};
-    Object.keys(local).forEach(function(k) {
-        workRecordsMap[k] = {
-            quantity: local[k].quantity || 0,
-            note: local[k].note || '',
-            _pending: true
-        };
-    });
-    renderWorkTeams();
-    renderWorkTotals();
-
-    showStatus('💾 已保存到本地，正在上传...', 'loading');
-    uploadWorkBatch(date, records);
-}
-
-function uploadWorkBatch(date, records) {
-    if (!navigator.onLine) { showStatus('📶 离线，已存本地，联网后自动上传', 'error'); return; }
-    fetch(WORK_RECORDS_BATCH, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ records: records })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(res) {
-        if (res && res.success) {
-            if (workPendingUpload[date]) {
-                records.forEach(function(r) {
-                    var key = r.team_id + '_' + r.unit;
-                    delete workPendingUpload[date][key];
-                });
-                if (Object.keys(workPendingUpload[date]).length === 0) delete workPendingUpload[date];
-                saveWorkPendingUpload();
-            }
-            if (workLocalCache[date]) {
-                records.forEach(function(r) {
-                    var key = r.team_id + '_' + r.unit;
-                    if (workLocalCache[date][key]) workLocalCache[date][key]._pending = false;
-                });
-                saveWorkLocalCache();
-            }
-            showStatus('✅ 已上传 ' + res.saved + ' 条', 'success');
-            loadWorkRecordsByDate();
-        } else showStatus('⚠️ 上传失败，已存本地，联网后自动重试', 'error');
-    })
-    .catch(function() { showStatus('⚠️ 网络错误，已存本地，联网后自动重试', 'error'); });
-}
-
-function syncPendingWork() {
-    if (!navigator.onLine) return;
-    Object.keys(workPendingUpload).forEach(function(date) {
-        var map = workPendingUpload[date];
-        var records = Object.keys(map).map(function(k) {
-            var item = map[k];
-            return { team_id: item.team_id, work_date: date, unit: item.unit, quantity: item.quantity, note: item.note || '' };
-        });
-        if (records.length > 0) uploadWorkBatch(date, records);
-    });
-}
-
-function updateTeamField(id, field, value) {
-    var team = workTeams.find(function(t) { return t.id === id; });
-    if (!team) return;
-    team[field] = value;
-    fetch(WORK_TEAMS_UPDATE, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id, area: team.area, fitter: team.fitter, welder: team.welder, helper: team.helper })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(res) {
-        if (res && res.success) showStatus('✅ 已更新', 'success');
-        else showStatus('❌ ' + ((res && res.error) || '更新失败'), 'error');
-    })
-    .catch(function(err) { showStatus('❌ 更新失败：' + err.message, 'error'); });
-}
-
-function deleteWorkTeam(id) {
-    if (!confirm('确认删除该班组？\n（会同时删除它所有工作量记录）')) return;
-    fetch(WORK_TEAMS_DELETE + '&id=' + id, { method: 'DELETE' })
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-            if (res && res.success) { showStatus('✅ 已删除', 'success'); refreshWorkTeams(); }
-            else showStatus('❌ ' + ((res && res.error) || '删除失败'), 'error');
-        })
-        .catch(function(err) { showStatus('❌ 删除失败：' + err.message, 'error'); });
-}
-
-function openAddTeamDialog() {
-    document.getElementById('addTeamArea').value = '';
-    document.getElementById('addTeamFitter').value = '';
-    document.getElementById('addTeamWelder').value = '';
-    document.getElementById('addTeamHelper').value = '';
-    document.getElementById('addTeamDialog').classList.add('active');
-}
-function closeAddTeamDialog() { document.getElementById('addTeamDialog').classList.remove('active'); }
-function doAddTeam() {
-    var area = document.getElementById('addTeamArea').value.trim();
-    var fitter = document.getElementById('addTeamFitter').value.trim();
-    var welder = document.getElementById('addTeamWelder').value.trim();
-    var helper = document.getElementById('addTeamHelper').value.trim();
-    if (!area) { alert('区域不能为空'); return; }
-    showStatus('📤 正在添加...', 'loading');
-    fetch(WORK_TEAMS_ADD, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ area: area, fitter: fitter, welder: welder, helper: helper })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(res) {
-        if (res && res.success) { closeAddTeamDialog(); showStatus('✅ 已添加', 'success'); refreshWorkTeams(); }
-        else showStatus('❌ ' + ((res && res.error) || '添加失败'), 'error');
-    })
-    .catch(function(err) { showStatus('❌ 添加失败：' + err.message, 'error'); });
-}
-
-function openImportTeamsDialog() {
-    document.getElementById('importTeamsText').value = '';
-    document.getElementById('importTeamsDialog').classList.add('active');
-}
-function closeImportTeamsDialog() { document.getElementById('importTeamsDialog').classList.remove('active'); }
-async function doImportTeams() {
-    var text = document.getElementById('importTeamsText').value.trim();
-    if (!text) { alert('请输入数据'); return; }
-    var items = [];
-    text.split('\n').filter(function(l) { return l.trim(); }).forEach(function(line) {
-        var parts = line.split(',').map(function(s){ return s.trim(); });
-        if (parts.length >= 1 && parts[0]) {
-            items.push({ area: parts[0], fitter: parts[1] || '', welder: parts[2] || '', helper: parts[3] || '' });
-        }
-    });
-    if (!items.length) { alert('没有有效数据'); return; }
-    if (!confirm('确认导入 ' + items.length + ' 个班组？')) return;
-    closeImportTeamsDialog();
-    showStatus('📤 正在导入...', 'loading');
-    var success = 0, failed = 0, i = 0;
-    function next() {
-        if (i >= items.length) {
-            showStatus('✅ 完成：成功 ' + success + '，失败 ' + failed, 'success');
-            refreshWorkTeams(); return;
-        }
-        fetch(WORK_TEAMS_ADD, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(items[i])
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-            if (res && res.success) success++; else failed++;
-            i++;
-            showStatus('📤 已导入 ' + i + ' / ' + items.length, 'loading');
-            setTimeout(next, 200);
-        })
-        .catch(function() { failed++; i++; setTimeout(next, 200); });
-    }
-    next();
-}
-
-function renameWorkColumn(id, oldName) {
-    var newName = prompt('输入新的列名：', oldName);
-    if (!newName || newName === oldName) return;
-    fetch(WORK_COLUMNS_UPDATE, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id, col_name: newName.trim() })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(res) {
-        if (res && res.success) {
-            showStatus('✅ 列名已更新', 'success');
-            refreshWorkColumns().then(function() { loadWorkRecordsByDate(); });
-        } else showStatus('❌ ' + ((res && res.error) || '更新失败'), 'error');
-    })
-    .catch(function(err) { showStatus('❌ 更新失败：' + err.message, 'error'); });
-}
-
-function deleteWorkColumn(id, name) {
-    if (!confirm('确认删除列「' + name + '」？\n（会同时删除该列所有数据）')) return;
-    fetch(WORK_COLUMNS_DELETE + '&id=' + id, { method: 'DELETE' })
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-            if (res && res.success) {
-                showStatus('✅ 已删除', 'success');
-                refreshWorkColumns().then(function() { loadWorkRecordsByDate(); });
-            } else showStatus('❌ ' + ((res && res.error) || '删除失败'), 'error');
-        })
-        .catch(function(err) { showStatus('❌ 删除失败：' + err.message, 'error'); });
-}
-
-function openAddColumnDialog() {
-    var name = prompt('输入新列名称（如"管道安装米数"）：');
-    if (!name) return;
-    fetch(WORK_COLUMNS_ADD, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ col_name: name.trim() })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(res) {
-        if (res && res.success) {
-            showStatus('✅ 已添加', 'success');
-            refreshWorkColumns().then(function() { loadWorkRecordsByDate(); });
-        } else showStatus('❌ ' + ((res && res.error) || '添加失败'), 'error');
-    })
-    .catch(function(err) { showStatus('❌ 添加失败：' + err.message, 'error'); });
-}
-
 function renderWorkTotals() {
     var totals = {};
-    workColumns.forEach(function(col) { totals[col.col_key] = 0; });
-    workTeams.forEach(function(team) {
-        workColumns.forEach(function(col) {
+    workViewColumns.forEach(function (col) { totals[col.col_key] = 0; });
+    workViewTeams.forEach(function (team) {
+        workViewColumns.forEach(function (col) {
             var key = team.id + '_' + col.col_key;
-            var pending = workPendingChanges[key];
-            var existing = workRecordsMap[key];
-            var qty = pending ? pending.quantity : (existing ? existing.quantity : 0);
-            totals[col.col_key] += Number(qty) || 0;
+            var rec = workRecordsMap[key];
+            totals[col.col_key] += Number(rec ? rec.quantity : 0) || 0;
         });
     });
     var fitterCount = 0, welderCount = 0, helperCount = 0;
-    workTeams.forEach(function(t) {
+    workViewTeams.forEach(function (t) {
         if (t.fitter) fitterCount++;
         if (t.welder) welderCount++;
         if (t.helper) helperCount++;
@@ -2339,26 +2223,25 @@ function renderWorkTotals() {
     html += '<div class="work-total-box people"><div class="tlabel">管工</div><div class="tvalue">' + fitterCount + '</div></div>';
     html += '<div class="work-total-box people"><div class="tlabel">焊工</div><div class="tvalue">' + welderCount + '</div></div>';
     html += '<div class="work-total-box people"><div class="tlabel">普工</div><div class="tvalue">' + helperCount + '</div></div>';
-    workColumns.forEach(function(col) {
-        var v = totals[col.col_key];
+    workViewColumns.forEach(function (col) {
+        var v = totals[col.col_key] || 0;
         var display = (v % 1 === 0) ? v : v.toFixed(2);
-        var unit = getUnitByColName(col.col_name);
-        html += '<div class="work-total-box"><div class="tlabel">' + escapeHtml(col.col_name) + '</div><div class="tvalue">' + display + '<span style="font-size:12px;color:#7F7F7F;font-weight:400;margin-left:3px;">' + unit + '</span></div></div>';
+        html += '<div class="work-total-box"><div class="tlabel">' + escapeHtml(col.col_name) + '</div><div class="tvalue">' +
+                display + '<span style="font-size:12px;color:#7F7F7F;font-weight:400;margin-left:3px;">' + getUnitByColName(col.col_name) + '</span></div></div>';
     });
     document.getElementById('workTotals').innerHTML = html;
 }
-
 function exportWorkExcel() {
-    if (!workTeams.length) { showStatus('⚠️ 没有班组数据', 'error'); return; }
+    if (!workViewTeams.length) { showStatus('⚠️ 没有班组数据', 'error'); return; }
     var rows = [];
-    workTeams.forEach(function(team) {
+    workViewTeams.forEach(function (team) {
         var row = [team.area || '', team.fitter || '', team.welder || '', team.helper || ''];
-        workColumns.forEach(function(col) {
+        workViewColumns.forEach(function (col) {
             var rec = workRecordsMap[team.id + '_' + col.col_key];
             row.push(rec ? (rec.quantity || '') : '');
         });
         var note = '';
-        workColumns.forEach(function(col) {
+        workViewColumns.forEach(function (col) {
             var rec = workRecordsMap[team.id + '_' + col.col_key];
             if (rec && rec.note && !note) note = rec.note;
         });
@@ -2370,11 +2253,11 @@ function exportWorkExcel() {
     html += 'th{background:#07C160;color:white;border:1px solid #ccc;padding:6px 8px;font-size:13px;font-weight:bold;}</style>';
     html += '</head><body><table>';
     html += '<tr><th>区域</th><th>管工</th><th>焊工</th><th>普工</th>';
-    workColumns.forEach(function(col) { html += '<th>' + escapeHtml(col.col_name) + '</th>'; });
+    workViewColumns.forEach(function (col) { html += '<th>' + escapeHtml(col.col_name) + '</th>'; });
     html += '<th>备注</th></tr>';
-    rows.forEach(function(r) {
+    rows.forEach(function (r) {
         html += '<tr>';
-        r.forEach(function(c) {
+        r.forEach(function (c) {
             html += '<td>' + String(c == null ? '' : c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>';
         });
         html += '</tr>';
@@ -2386,8 +2269,78 @@ function exportWorkExcel() {
     link.href = url;
     link.download = '工作量_' + (workMode === 'day' ? workCurrentDate : 'range') + '_' + today() + '.xls';
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    setTimeout(function() { URL.revokeObjectURL(url); }, 3000);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
     showStatus('✅ 已导出到 Excel', 'success');
+}
+function copyWorkAsReport() {
+    if (!workCurrentDate) { alert('请先选日期'); return; }
+    if (!workViewTeams.length) { alert('没有班组数据'); return; }
+    if (!workViewColumns.length) { alert('没有列配置'); return; }
+    var NOTE_KEYWORDS = ['管台焊接', '返修焊口', '借到', '结构', '支架'];
+    function noteMatches(note) {
+        if (!note) return false;
+        for (var i = 0; i < NOTE_KEYWORDS.length; i++) if (note.indexOf(NOTE_KEYWORDS[i]) !== -1) return true;
+        return false;
+    }
+    var lines = [];
+    var teamName = getTeamName();
+    if (teamName) lines.push('队伍:' + teamName);
+    var welderCount = 0;
+    workViewTeams.forEach(function (t) { if ((t.welder || '').trim()) welderCount++; });
+    lines.push('焊工人数:' + welderCount + '人');
+    var d = new Date(workCurrentDate);
+    lines.push(d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日');
+    lines.push('');
+    var seq = 0;
+    workViewTeams.forEach(function (team) {
+        var welderName = (team.welder || '').trim();
+        if (!welderName) return;
+        var parts = [];
+        workViewColumns.forEach(function (col) {
+            if (isExcludedFromReport(col.col_name)) return;
+            var rec = workRecordsMap[team.id + '_' + col.col_key];
+            if (rec && Number(rec.quantity) > 0) {
+                var qty = Number(rec.quantity);
+                parts.push(col.col_name + ((qty % 1 === 0) ? qty : qty.toFixed(2)) + getUnitByColName(col.col_name));
+            }
+        });
+        var note = '';
+        workViewColumns.forEach(function (col) {
+            var rec = workRecordsMap[team.id + '_' + col.col_key];
+            if (rec && rec.note && !note) note = rec.note;
+        });
+        if (parts.length === 0 && !noteMatches(note)) return;
+        seq++;
+        lines.push(seq + '. ' + (team.area || '') + '  ' + welderName);
+        if (parts.length) lines.push('   ' + parts.join('，'));
+        if (note && noteMatches(note)) lines.push('   备注：' + note);
+    });
+    if (seq === 0) { showStatus('⚠️ 没有符合条件的焊工数据', 'error'); return; }
+    lines.push('');
+    lines.push('合计：');
+    workViewColumns.forEach(function (col) {
+        if (isExcludedFromReport(col.col_name)) return;
+        var sum = 0;
+        workViewTeams.forEach(function (t) {
+            var rec = workRecordsMap[t.id + '_' + col.col_key];
+            sum += Number(rec ? rec.quantity : 0) || 0;
+        });
+        if (sum > 0) lines.push('   ' + col.col_name + ((sum % 1 === 0) ? sum : sum.toFixed(2)) + getUnitByColName(col.col_name));
+    });
+    var text = lines.join('\n');
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.left = '-9999px';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    if (ok) showStatus('✅ 已复制 ' + seq + ' 条焊工日报', 'success');
+    else {
+        var w = window.open('', '_blank');
+        if (w) { w.document.write('<pre>' + escapeHtml(text) + '</pre>'); w.document.close(); }
+        showStatus('📋 已打开文本，请手动复制', 'error');
+    }
 }
 
 // ============================================================
@@ -2475,7 +2428,6 @@ function renderStatusTable() {
 }
 
 async function exportData1Json() {
-    if (!confirm('生成并导出 data1.json？')) return;
     showStatus('📥 正在生成...', 'loading');
     try {
         var notesRes = await fetch(GET_NOTES_API + '&t=' + Date.now());
@@ -2503,8 +2455,7 @@ async function exportData1Json() {
             };
             updated++;
         });
-        downloadJSON(newStatusMap, 'data1_' + today() + '.json');
-        showStatus('✅ 完成（更新 ' + updated + ' 条，跳过 ' + skipped + ' 条）', 'success');
+        return writeRepoJson('data1.json', newStatusMap, '更新 ' + updated + ' 条，跳过 ' + skipped + ' 条');
     } catch (err) { showStatus('❌ 失败：' + err.message, 'error'); }
 }
 
@@ -2782,7 +2733,6 @@ function renderValveTable() {
 }
 
 async function exportData2Json() {
-    if (!confirm('生成并导出 data2.json？')) return;
     showStatus('📥 正在生成...', 'loading');
     try {
         var staticRes = await fetch(DATA2_URL + '?t=' + Date.now());
@@ -2811,8 +2761,7 @@ async function exportData2Json() {
                 added++;
             }
         });
-        downloadJSON(newMap, 'data2_' + today() + '.json');
-        showStatus('✅ 完成（更新 ' + updated + ' 条，新增 ' + added + ' 条）', 'success');
+        return writeRepoJson('data2.json', newMap, '更新 ' + updated + ' 条，新增 ' + added + ' 条');
     } catch (err) { showStatus('❌ 失败：' + err.message, 'error'); }
 }
 
@@ -3093,6 +3042,238 @@ setTimeout(function() {
         updateBackendBtn();
     }
 }, 100);
+
+
+/* ===== 操作日志模块（自动注入） ===== */
+/* ============================================================
+ * 操作日志模块（支架备注 + 阀门录入）
+ * 通过拦截写 API 的 fetch，自动记录每一次 新增/修改/删除。
+ *  - 本地日志存 localStorage（容量友好，最多 5000 条）
+ *  - 「生成 data7.json」 puts 到源仓库（桌面版）/ 下载（网页版）
+ *  - 「一键推送 Git」在桌面版可用
+ * ============================================================ */
+var OPLOG_KEY = 'pd.opLog.v1';
+var OPLOG_MAX = 5000;
+var opLogEntries = [];
+var opLogFiltered = [];
+var opLogPage = 1, opLogPages = 1;
+var OPLOG_PAGE_SIZE = 30;
+
+function opLogLoad() {
+    try {
+        var raw = localStorage.getItem(OPLOG_KEY);
+        var arr = raw ? JSON.parse(raw) : [];
+        opLogEntries = Array.isArray(arr) ? arr : [];
+    } catch (e) { opLogEntries = []; }
+}
+function opLogSave() {
+    try {
+        if (opLogEntries.length > OPLOG_MAX) opLogEntries = opLogEntries.slice(-OPLOG_MAX);
+        localStorage.setItem(OPLOG_KEY, JSON.stringify(opLogEntries));
+    } catch (e) {
+        // 容量不足时砍掉一半老的再试
+        try {
+            opLogEntries = opLogEntries.slice(-Math.floor(opLogEntries.length / 2));
+            localStorage.setItem(OPLOG_KEY, JSON.stringify(opLogEntries));
+        } catch (e2) { showStatus && showStatus('⚠️ 操作日志本地存储已满', 'error'); }
+    }
+}
+function opLogNow() {
+    var d = new Date();
+    function p(n) { return ('0' + n).slice(-2); }
+    return {
+        ts: d.getTime(),
+        time: d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' +
+              p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()),
+        date: d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+    };
+}
+// 追加一条日志；entry: {kind, action, target, detail, user}
+function opLogPush(entry) {
+    var t = opLogNow();
+    opLogEntries.push({
+        id: t.ts + '_' + Math.random().toString(36).slice(2, 8),
+        time: t.time, date: t.date,
+        kind: entry.kind || '', action: entry.action || '',
+        target: entry.target || '', detail: entry.detail || '',
+        user: entry.user || (typeof CONSOLE_USER !== 'undefined' ? CONSOLE_USER : '')
+    });
+    opLogSave();
+}
+
+/* ---- 解析写请求，返回日志条目或 null ---- */
+function opLogParse(url, opts) {
+    var u = String(url || '');
+    var method = ((opts && opts.method) || 'GET').toUpperCase();
+    var body = null;
+    if (opts && opts.body) {
+        try { body = (typeof opts.body === 'string') ? JSON.parse(opts.body) : opts.body; } catch (e) {}
+    }
+    // --- 备注：保存（新增 or 修改）---
+    if (u.indexOf('action=save-note') !== -1 && method === 'POST' && body) {
+        return {
+            kind: '支架备注', action: '保存',
+            target: (body.bracketId || '') + '_' + (body.pipeNo || ''),
+            detail: body.note || '', user: body.user || ''
+        };
+    }
+    // --- 备注：删除 ---
+    if (u.indexOf('action=delete-note') !== -1) {
+        var bm = u.match(/[?&]bracketId=([^&]*)/), pm = u.match(/[?&]pipeNo=([^&]*)/);
+        var br = bm ? decodeURIComponent(bm[1]) : '', pn = pm ? decodeURIComponent(pm[1]) : '';
+        return { kind: '支架备注', action: '删除', target: br + '_' + pn, detail: '', user: '' };
+    }
+    // --- 阀门：保存（新增 or 修改）---
+    if (u.indexOf('action=save-valve') !== -1 && method === 'POST' && body) {
+        var bits = [];
+        if (body.weldNo1) bits.push('焊口1=' + body.weldNo1);
+        if (body.weldNo2) bits.push('焊口2=' + body.weldNo2);
+        if (body.serialNo) bits.push('序列号=' + body.serialNo);
+        return {
+            kind: '阀门录入', action: '保存',
+            target: body.valveTag || '', detail: bits.join('，'), user: body.user || ''
+        };
+    }
+    // --- 阀门：删除单个 ---
+    if (u.indexOf('action=delete-valve') !== -1 && u.indexOf('all=1') === -1) {
+        var km = u.match(/[?&]key=([^&]*)/);
+        var key = km ? decodeURIComponent(km[1]) : '';
+        return { kind: '阀门录入', action: '删除', target: key.replace(/^阀门_/, ''), detail: '', user: '' };
+    }
+    // 清空整库不记单条，跳过（危险操作另有确认）
+    return null;
+}
+
+// 安装 fetch 拦截器：只记录"响应成功"的写操作
+function opLogInstallFetchHook() {
+    if (window.__opLogHooked) return;
+    window.__opLogHooked = true;
+    opLogLoad();
+    var nativeFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+        var entry = null;
+        try { entry = opLogParse(typeof input === 'string' ? input : (input && input.url), init); } catch (e) {}
+        var p = nativeFetch(input, init);
+        if (entry) {
+            p.then(function (resp) {
+                // 克隆一份读 JSON，避免影响调用方
+                try {
+                    resp.clone().json().then(function (data) {
+                        if (data && data.success) {
+                            // 备注"修改"实现是先删后存：删后 800ms 内出现同 target 的保存，
+                            // 视为一次修改，避免记成"删除+新增"两条。
+                            if (entry.kind === '支架备注' && entry.action === '删除') {
+                                var pend = opLogEntries[opLogEntries.length - 1];
+                                // 暂不写，挂到待定表
+                                opLogPendingNoteDelete[entry.target] = { entry: entry, at: Date.now() };
+                                return;
+                            }
+                            if (entry.kind === '支架备注' && entry.action === '保存') {
+                                var pd = opLogPendingNoteDelete[entry.target];
+                                if (pd && Date.now() - pd.at < 3000) {
+                                    delete opLogPendingNoteDelete[entry.target];
+                                    pd.entry.action = '修改';
+                                    pd.entry.detail = '改为：' + entry.detail;
+                                    pd.entry.user = entry.user || pd.entry.user;
+                                    opLogPush(pd.entry);
+                                    return;
+                                }
+                            }
+                            opLogPush(entry);
+                        }
+                    }).catch(function () {});
+                } catch (e) {}
+            }).catch(function () {});
+        }
+        return p;
+    };
+    // 定时清理超过 3 秒仍未被"修改"合并的待定删除，落盘为删除
+    setInterval(function () {
+        var now = Date.now(), changed = false;
+        Object.keys(opLogPendingNoteDelete).forEach(function (k) {
+            var pd = opLogPendingNoteDelete[k];
+            if (now - pd.at >= 3000) {
+                opLogPush(pd.entry);
+                delete opLogPendingNoteDelete[k];
+                changed = true;
+            }
+        });
+    }, 1000);
+}
+var opLogPendingNoteDelete = {};
+
+/* ---- 渲染操作日志表 ---- */
+function renderOpLogTable() {
+    var box = document.getElementById('opLogTableBody');
+    if (!box) return;
+    var q = (document.getElementById('opLogSearch') && document.getElementById('opLogSearch').value || '').trim().toLowerCase();
+    var kindF = (document.getElementById('opLogKindFilter') && document.getElementById('opLogKindFilter').value) || '';
+    opLogFiltered = opLogEntries.filter(function (e) {
+        if (kindF && e.kind !== kindF) return false;
+        if (q && (e.target + ' ' + e.detail + ' ' + e.user).toLowerCase().indexOf(q) === -1) return false;
+        return true;
+    });
+    opLogFiltered = opLogFiltered.slice().reverse(); // 最新在前
+    opLogPages = Math.ceil(opLogFiltered.length / OPLOG_PAGE_SIZE) || 1;
+    if (opLogPage > opLogPages) opLogPage = opLogPages;
+    if (opLogPage < 1) opLogPage = 1;
+    var start = (opLogPage - 1) * OPLOG_PAGE_SIZE;
+    var rows = opLogFiltered.slice(start, start + OPLOG_PAGE_SIZE);
+    var actionClass = { '保存': 'ok', '修改': 'warn', '删除': 'bad' };
+    box.innerHTML = rows.map(function (e) {
+        var ac = actionClass[e.action] || '';
+        return '<tr>' +
+            '<td style="white-space:nowrap;font-size:12px;">' + escapeHtml(e.time) + '</td>' +
+            '<td>' + escapeHtml(e.kind) + '</td>' +
+            '<td><span class="badge ' + ac + '">' + escapeHtml(e.action) + '</span></td>' +
+            '<td><b>' + escapeHtml(e.target) + '</b>' + (e.detail ? '<div style="color:#7F7F7F;font-size:12px;">' + escapeHtml(e.detail) + '</div>' : '') + '</td>' +
+            '<td>' + escapeHtml(e.user || '—') + '</td>' +
+            '</tr>';
+    }).join('') || '<tr><td colspan="5" style="color:#9ca3af;text-align:center;padding:20px;">暂无操作日志。新增/修改/删除支架备注或阀门录入后会自动记录。</td></tr>';
+    var pageInfo = document.getElementById('opLogPageInfo');
+    if (pageInfo) pageInfo.textContent = '第 ' + opLogPage + ' / ' + opLogPages + ' 页 · 共 ' + opLogFiltered.length + ' 条';
+    var cnt = document.getElementById('opLogCount');
+    if (cnt) cnt.textContent = opLogEntries.length + ' 条';
+}
+function opLogChangePage(delta) {
+    opLogPage += delta;
+    if (opLogPage < 1) opLogPage = 1;
+    if (opLogPage > opLogPages) opLogPage = opLogPages;
+    renderOpLogTable();
+}
+
+/* ---- 生成 data7.json ---- */
+function buildData7() {
+    var byDate = {};
+    opLogEntries.forEach(function (e) {
+        if (!byDate[e.date]) byDate[e.date] = { count: 0, note: 0, valve: 0, entries: [] };
+        var d = byDate[e.date];
+        d.count++;
+        if (e.kind === '支架备注') d.note++; else if (e.kind === '阀门录入') d.valve++;
+        d.entries.push(e);
+    });
+    return {
+        version: 1,
+        updatedAt: new Date().toLocaleString('zh-CN'),
+        source: 'admin-console-op-log',
+        count: opLogEntries.length,
+        byDate: byDate,
+        logs: opLogEntries
+    };
+}
+function commitOpLogToStatic() {
+    var data = buildData7();
+    if (!data.count) { showStatus('⚠️ 暂无操作日志，无需生成', 'error'); return; }
+    writeRepoJson('data7.json', data, '（含 ' + data.count + ' 条操作记录）');
+}
+function clearOpLog() {
+    if (!confirm('确认清空本地操作日志？\n（不会删除已生成的 data7.json）')) return;
+    opLogEntries = []; opLogSave(); renderOpLogTable();
+    showStatus('✅ 本地操作日志已清空', 'success');
+}
+
+// 安装写操作拦截（覆盖备注/阀门所有增删改，含批量导入）
+try { opLogInstallFetchHook(); } catch (e) { console.warn('操作日志 hook 失败', e); }
 </script>
 </body>
 </html>

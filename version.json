@@ -1,6 +1,6 @@
 {
-    "version": "4.0.9",
-    "updateTime": "2026-11-12 07:37:01",
+    "version": "4.1.0",
+    "updateTime": "2026-11-12 08:52:42",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "图纸搜索不再折叠，列出全部文件（修复索引数量虚高、重复项）；新增「所有阀门状态」，按图号汇总全部阀门录入状态"
+    "updateLog": "工作量改为本地静态库 data6.json（按日期查/范围汇总显示当天实际区域人员）；控制台新增操作日志，记录支架备注与阀门录入的新增/修改/删除并生成 data7.json"
 }
