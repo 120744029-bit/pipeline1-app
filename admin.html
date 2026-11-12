@@ -3066,6 +3066,77 @@ function opLogLoad() {
         var arr = raw ? JSON.parse(raw) : [];
         opLogEntries = Array.isArray(arr) ? arr : [];
     } catch (e) { opLogEntries = []; }
+    renderOpLogTable();
+    // 从动态库全量重建：手机 APP 的录入不经过本控制台页面，靠 fetch 拦截抓不到，
+    // 所以每次打开日志都主动从 Upstash 拉备注/阀门原始数据（自带 time/user）合并进来。
+    opLogRebuildFromLive();
+}
+
+/* 从动态库重建日志：备注(GET_NOTES_API) + 阀门(GET_VALVES_API)。
+ * 结果与本地 hook 记录按稳定 key 去重（同一条 时间+类型+对象+内容 只留一条）。
+ * 备注动态库结构: { key: { bracketId, pipeNo, notes:[{note,time,user}] } }
+ * 阀门动态库结构: { success, data:[{ valveTag, weldNo1, weldNo2, serialNo, user, updateTime }] }
+ */
+function opLogEntryKey(e) {
+    return [e.kind || '', e.action || '', e.target || '', e.time || '', e.detail || ''].join('\u0001');
+}
+function opLogRebuildFromLive() {
+    if (!opLogIsDesktop() && typeof API_BASE !== 'undefined' && !API_BASE) return;
+    var pNotes = fetch(GET_NOTES_API + '&t=' + Date.now())
+        .then(function (r) { return r.json(); })
+        .then(function (obj) {
+            var rows = [];
+            Object.keys(obj || {}).forEach(function (key) {
+                var item = obj[key];
+                if (!item || !Array.isArray(item.notes)) return;
+                item.notes.forEach(function (n) {
+                    var t = (n.time || '').replace(/\//g, '-');
+                    rows.push({
+                        time: t, date: t.slice(0, 10),
+                        kind: '支架备注', action: '保存',
+                        target: (item.bracketId || key) + '_' + (item.pipeNo || ''),
+                        detail: n.note || '', user: n.user || ''
+                    });
+                });
+            });
+            return rows;
+        }).catch(function () { return []; });
+    var pValves = fetch(GET_VALVES_API + '&t=' + Date.now())
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            var list = (data && data.success && Array.isArray(data.data)) ? data.data : [];
+            return list.map(function (item) {
+                var bits = [];
+                if (item.weldNo1) bits.push('焊口1=' + item.weldNo1);
+                if (item.weldNo2) bits.push('焊口2=' + item.weldNo2);
+                if (item.serialNo) bits.push('序列号=' + item.serialNo);
+                var t = (item.updateTime || '').replace(/\//g, '-');
+                return {
+                    time: t, date: t.slice(0, 10),
+                    kind: '阀门录入', action: '保存',
+                    target: item.valveTag || '', detail: bits.join('，'), user: item.user || ''
+                };
+            });
+        }).catch(function () { return []; });
+    return Promise.all([pNotes, pValves]).then(function (all) {
+        var live = (all[0] || []).concat(all[1] || []);
+        var seen = {};
+        opLogEntries.forEach(function (e) { seen[opLogEntryKey(e)] = true; });
+        live.forEach(function (e) {
+            if (!e.time) return;               // 无时间的脏数据跳过
+            var k = opLogEntryKey(e);
+            if (seen[k]) return;               // 本地 hook 已记录同条
+            seen[k] = true;
+            e.id = e.time + '_' + Math.random().toString(36).slice(2, 8);
+            opLogEntries.push(e);
+        });
+        opLogEntries.sort(function (a, b) { return (b.time || '').localeCompare(a.time || ''); });
+        opLogSave();
+        renderOpLogTable();
+        // 桌面版把重建后的全量日志落盘，保证 data7.json 与界面一致
+        if (opLogIsDesktop()) opLogAutoSave();
+        return live.length;
+    }).catch(function () { return 0; });
 }
 function opLogSave() {
     try {
