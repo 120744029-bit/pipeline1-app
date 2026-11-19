@@ -3564,6 +3564,7 @@ function doPipelineSearch(q, subItem) {
                 if (r.time) info.push(esc(r.time));
                 return '<div class="bo-item" data-bid="' + esc(r.id) + '">' +
                          '<div class="bo-row1"><span class="bo-id">' + (i + 1) + '. ' + esc(r.id) + '</span>' +
+                           (window.BracketForm ? window.BracketForm.button(r.id) : '') +
                            '<span class="bo-badge ' + cls + '">' + esc(r.status || '未设置') + '</span></div>' +
                          (info.length ? '<div class="bo-info">' + info.join(' · ') + ' · 点此查该支架</div>' :
                                         '<div class="bo-info">点此查该支架</div>') +
@@ -3937,7 +3938,7 @@ function renderBracketResults(exactMatched, matchedBracket, q) {
             '<div class="card-row"><div class="label">管线号</div><div class="value" style="color:#1a5fb0;">' + escapeHtml(item.lineNo) + '</div></div>' +
             '<div class="card-row"><div class="label">子项号</div><div class="value">' + escapeHtml(item.subItem) + '</div></div>' +
             '<div class="card-row"><div class="label">单线图号</div><div class="value" style="font-size:13px;">' + escapeHtml(item.isoNo) + ' ' + (window.MobileDrawings ? MobileDrawings.button(item.isoNo, item.version || '') : '') + '</div></div>' +
-            '<div class="card-row"><div class="label">支架号</div><div class="value" style="color:#5b21b6;">' + escapeHtml(matchedBracket) + '</div></div>' +
+            '<div class="card-row"><div class="label">支架号</div><div class="value" style="color:#5b21b6;">' + escapeHtml(matchedBracket) + (window.BracketForm ? window.BracketForm.button(matchedBracket) : '') + '</div></div>' +
             '<div class="card-row"><div class="label">📊 状态</div><div class="value">' + statusHtml + '</div></div>' +
             '<div class="card-row" style="flex-wrap:wrap;gap:8px;background:var(--bg-input);border-radius:4px;padding:8px 12px;">' +
                 '<div class="label" style="width:70px;">📝 备注</div>' + remarkHtml +
@@ -4458,5 +4459,7 @@ if (typeof plus !== 'undefined' && window.plus) {
 console.log('🚀 APP 启动完成');
 </script>
 <script src="drawing-mobile.js"></script>
+<script src="bracketFormData.js"></script>
+<script src="bracketForm.js"></script>
 </body>
 </html>

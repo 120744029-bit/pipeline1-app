@@ -1,0 +1,846 @@
+{
+ "version": 1,
+ "source": "D:\\桌面\\支架形式.xlsx",
+ "pdf": "D:\\桌面\\GCC-DLM-DDD-00000-00-0000-TKM-DWG-00001-04(1).pdf",
+ "countBrackets": 6882,
+ "countModels": 63,
+ "countPages": 79,
+ "models": {
+  "ZAS8": {
+   "name": "Z-AS8",
+   "pages": [
+    74
+   ],
+   "files": [
+    {
+     "file": "Z-AS8_1.pdf",
+     "page": 74
+    }
+   ]
+  },
+  "ZBP1": {
+   "name": "Z-BP1",
+   "pages": [
+    80
+   ],
+   "files": [
+    {
+     "file": "Z-BP1_1.pdf",
+     "page": 80
+    }
+   ]
+  },
+  "ZBP2": {
+   "name": "Z-BP2",
+   "pages": [
+    81
+   ],
+   "files": [
+    {
+     "file": "Z-BP2_1.pdf",
+     "page": 81
+    }
+   ]
+  },
+  "ZDF33": {
+   "name": "Z-DF33",
+   "pages": [
+    84
+   ],
+   "files": [
+    {
+     "file": "Z-DF33_1.pdf",
+     "page": 84
+    }
+   ]
+  },
+  "ZDS1": {
+   "name": "Z-DS1",
+   "pages": [
+    92,
+    93
+   ],
+   "files": [
+    {
+     "file": "Z-DS1_1.pdf",
+     "page": 92
+    },
+    {
+     "file": "Z-DS1_2.pdf",
+     "page": 93
+    }
+   ]
+  },
+  "ZDS3": {
+   "name": "Z-DS3",
+   "pages": [
+    94
+   ],
+   "files": [
+    {
+     "file": "Z-DS3_1.pdf",
+     "page": 94
+    }
+   ]
+  },
+  "ZDS31": {
+   "name": "Z-DS31",
+   "pages": [
+    104
+   ],
+   "files": [
+    {
+     "file": "Z-DS31_1.pdf",
+     "page": 104
+    }
+   ]
+  },
+  "ZDS33": {
+   "name": "Z-DS33",
+   "pages": [
+    106
+   ],
+   "files": [
+    {
+     "file": "Z-DS33_1.pdf",
+     "page": 106
+    }
+   ]
+  },
+  "ZDS34": {
+   "name": "Z-DS34",
+   "pages": [
+    107
+   ],
+   "files": [
+    {
+     "file": "Z-DS34_1.pdf",
+     "page": 107
+    }
+   ]
+  },
+  "ZDS35": {
+   "name": "Z-DS35",
+   "pages": [
+    108
+   ],
+   "files": [
+    {
+     "file": "Z-DS35_1.pdf",
+     "page": 108
+    }
+   ]
+  },
+  "ZDS37": {
+   "name": "Z-DS37",
+   "pages": [
+    110
+   ],
+   "files": [
+    {
+     "file": "Z-DS37_1.pdf",
+     "page": 110
+    }
+   ]
+  },
+  "ZDS7": {
+   "name": "Z-DS7",
+   "pages": [
+    97,
+    98
+   ],
+   "files": [
+    {
+     "file": "Z-DS7_1.pdf",
+     "page": 97
+    },
+    {
+     "file": "Z-DS7_2.pdf",
+     "page": 98
+    }
+   ]
+  },
+  "ZDS9": {
+   "name": "Z-DS9",
+   "pages": [
+    99
+   ],
+   "files": [
+    {
+     "file": "Z-DS9_1.pdf",
+     "page": 99
+    }
+   ]
+  },
+  "ZFS1": {
+   "name": "Z-FS1",
+   "pages": [
+    55
+   ],
+   "files": [
+    {
+     "file": "Z-FS1_1.pdf",
+     "page": 55
+    }
+   ]
+  },
+  "ZFS2": {
+   "name": "Z-FS2",
+   "pages": [
+    56
+   ],
+   "files": [
+    {
+     "file": "Z-FS2_1.pdf",
+     "page": 56
+    }
+   ]
+  },
+  "ZGF31": {
+   "name": "Z-GF31",
+   "pages": [
+    116
+   ],
+   "files": [
+    {
+     "file": "Z-GF31_1.pdf",
+     "page": 116
+    }
+   ]
+  },
+  "ZGS1": {
+   "name": "Z-GS1",
+   "pages": [
+    123,
+    124
+   ],
+   "files": [
+    {
+     "file": "Z-GS1_1.pdf",
+     "page": 123
+    },
+    {
+     "file": "Z-GS1_2.pdf",
+     "page": 124
+    }
+   ]
+  },
+  "ZGS15": {
+   "name": "Z-GS15",
+   "pages": [
+    137
+   ],
+   "files": [
+    {
+     "file": "Z-GS15_1.pdf",
+     "page": 137
+    }
+   ]
+  },
+  "ZGS18": {
+   "name": "Z-GS18",
+   "pages": [
+    139
+   ],
+   "files": [
+    {
+     "file": "Z-GS18_1.pdf",
+     "page": 139
+    }
+   ]
+  },
+  "ZGS2": {
+   "name": "Z-GS2",
+   "pages": [
+    125
+   ],
+   "files": [
+    {
+     "file": "Z-GS2_1.pdf",
+     "page": 125
+    }
+   ]
+  },
+  "ZGS21": {
+   "name": "Z-GS21",
+   "pages": [
+    141
+   ],
+   "files": [
+    {
+     "file": "Z-GS21_1.pdf",
+     "page": 141
+    }
+   ]
+  },
+  "ZGS22": {
+   "name": "Z-GS22",
+   "pages": [
+    142
+   ],
+   "files": [
+    {
+     "file": "Z-GS22_1.pdf",
+     "page": 142
+    }
+   ]
+  },
+  "ZGS3": {
+   "name": "Z-GS3",
+   "pages": [
+    126
+   ],
+   "files": [
+    {
+     "file": "Z-GS3_1.pdf",
+     "page": 126
+    }
+   ]
+  },
+  "ZGS31": {
+   "name": "Z-GS31",
+   "pages": [
+    143
+   ],
+   "files": [
+    {
+     "file": "Z-GS31_1.pdf",
+     "page": 143
+    }
+   ]
+  },
+  "ZGS35": {
+   "name": "Z-GS35",
+   "pages": [
+    145
+   ],
+   "files": [
+    {
+     "file": "Z-GS35_1.pdf",
+     "page": 145
+    }
+   ]
+  },
+  "ZGS6": {
+   "name": "Z-GS6",
+   "pages": [
+    129
+   ],
+   "files": [
+    {
+     "file": "Z-GS6_1.pdf",
+     "page": 129
+    }
+   ]
+  },
+  "ZGS8": {
+   "name": "Z-GS8",
+   "pages": [
+    131
+   ],
+   "files": [
+    {
+     "file": "Z-GS8_1.pdf",
+     "page": 131
+    }
+   ]
+  },
+  "ZHD10": {
+   "name": "Z-HD10",
+   "pages": [
+    169
+   ],
+   "files": [
+    {
+     "file": "Z-HD10_1.pdf",
+     "page": 169
+    }
+   ]
+  },
+  "ZHD9": {
+   "name": "Z-HD9",
+   "pages": [
+    168
+   ],
+   "files": [
+    {
+     "file": "Z-HD9_1.pdf",
+     "page": 168
+    }
+   ]
+  },
+  "ZPS3": {
+   "name": "Z-PS3",
+   "pages": [
+    181
+   ],
+   "files": [
+    {
+     "file": "Z-PS3_1.pdf",
+     "page": 181
+    }
+   ]
+  },
+  "ZPS32": {
+   "name": "Z-PS32",
+   "pages": [
+    185
+   ],
+   "files": [
+    {
+     "file": "Z-PS32_1.pdf",
+     "page": 185
+    }
+   ]
+  },
+  "ZRC1": {
+   "name": "Z-RC1",
+   "pages": [
+    186,
+    187
+   ],
+   "files": [
+    {
+     "file": "Z-RC1_1.pdf",
+     "page": 186
+    },
+    {
+     "file": "Z-RC1_2.pdf",
+     "page": 187
+    }
+   ]
+  },
+  "ZRF10": {
+   "name": "Z-RF10",
+   "pages": [
+    205,
+    206
+   ],
+   "files": [
+    {
+     "file": "Z-RF10_1.pdf",
+     "page": 205
+    },
+    {
+     "file": "Z-RF10_2.pdf",
+     "page": 206
+    }
+   ]
+  },
+  "ZRF11": {
+   "name": "Z-RF11",
+   "pages": [
+    207
+   ],
+   "files": [
+    {
+     "file": "Z-RF11_1.pdf",
+     "page": 207
+    }
+   ]
+  },
+  "ZRF17": {
+   "name": "Z-RF17",
+   "pages": [
+    208
+   ],
+   "files": [
+    {
+     "file": "Z-RF17_1.pdf",
+     "page": 208
+    }
+   ]
+  },
+  "ZRF31": {
+   "name": "Z-RF31",
+   "pages": [
+    209
+   ],
+   "files": [
+    {
+     "file": "Z-RF31_1.pdf",
+     "page": 209
+    }
+   ]
+  },
+  "ZRF37": {
+   "name": "Z-RF37",
+   "pages": [
+    212
+   ],
+   "files": [
+    {
+     "file": "Z-RF37_1.pdf",
+     "page": 212
+    }
+   ]
+  },
+  "ZRS1": {
+   "name": "Z-RS1",
+   "pages": [
+    217,
+    218
+   ],
+   "files": [
+    {
+     "file": "Z-RS1_1.pdf",
+     "page": 217
+    },
+    {
+     "file": "Z-RS1_2.pdf",
+     "page": 218
+    }
+   ]
+  },
+  "ZRS10": {
+   "name": "Z-RS10",
+   "pages": [
+    225,
+    226
+   ],
+   "files": [
+    {
+     "file": "Z-RS10_1.pdf",
+     "page": 225
+    },
+    {
+     "file": "Z-RS10_2.pdf",
+     "page": 226
+    }
+   ]
+  },
+  "ZRS11": {
+   "name": "Z-RS11",
+   "pages": [
+    227,
+    228
+   ],
+   "files": [
+    {
+     "file": "Z-RS11_1.pdf",
+     "page": 227
+    },
+    {
+     "file": "Z-RS11_2.pdf",
+     "page": 228
+    }
+   ]
+  },
+  "ZRS13": {
+   "name": "Z-RS13",
+   "pages": [
+    229,
+    230
+   ],
+   "files": [
+    {
+     "file": "Z-RS13_1.pdf",
+     "page": 229
+    },
+    {
+     "file": "Z-RS13_2.pdf",
+     "page": 230
+    }
+   ]
+  },
+  "ZRS15": {
+   "name": "Z-RS15",
+   "pages": [
+    231
+   ],
+   "files": [
+    {
+     "file": "Z-RS15_1.pdf",
+     "page": 231
+    }
+   ]
+  },
+  "ZRS17": {
+   "name": "Z-RS17",
+   "pages": [
+    232
+   ],
+   "files": [
+    {
+     "file": "Z-RS17_1.pdf",
+     "page": 232
+    }
+   ]
+  },
+  "ZRS19": {
+   "name": "Z-RS19",
+   "pages": [
+    233
+   ],
+   "files": [
+    {
+     "file": "Z-RS19_1.pdf",
+     "page": 233
+    }
+   ]
+  },
+  "ZRS21": {
+   "name": "Z-RS21",
+   "pages": [
+    235
+   ],
+   "files": [
+    {
+     "file": "Z-RS21_1.pdf",
+     "page": 235
+    }
+   ]
+  },
+  "ZRS22": {
+   "name": "Z-RS22",
+   "pages": [
+    236
+   ],
+   "files": [
+    {
+     "file": "Z-RS22_1.pdf",
+     "page": 236
+    }
+   ]
+  },
+  "ZRS3": {
+   "name": "Z-RS3",
+   "pages": [
+    219,
+    220
+   ],
+   "files": [
+    {
+     "file": "Z-RS3_1.pdf",
+     "page": 219
+    },
+    {
+     "file": "Z-RS3_2.pdf",
+     "page": 220
+    }
+   ]
+  },
+  "ZRS31": {
+   "name": "Z-RS31",
+   "pages": [
+    238
+   ],
+   "files": [
+    {
+     "file": "Z-RS31_1.pdf",
+     "page": 238
+    }
+   ]
+  },
+  "ZRS32": {
+   "name": "Z-RS32",
+   "pages": [
+    239
+   ],
+   "files": [
+    {
+     "file": "Z-RS32_1.pdf",
+     "page": 239
+    }
+   ]
+  },
+  "ZRS35": {
+   "name": "Z-RS35",
+   "pages": [
+    240
+   ],
+   "files": [
+    {
+     "file": "Z-RS35_1.pdf",
+     "page": 240
+    }
+   ]
+  },
+  "ZRS37": {
+   "name": "Z-RS37",
+   "pages": [
+    242
+   ],
+   "files": [
+    {
+     "file": "Z-RS37_1.pdf",
+     "page": 242
+    }
+   ]
+  },
+  "ZRS5": {
+   "name": "Z-RS5",
+   "pages": [
+    221,
+    222
+   ],
+   "files": [
+    {
+     "file": "Z-RS5_1.pdf",
+     "page": 221
+    },
+    {
+     "file": "Z-RS5_2.pdf",
+     "page": 222
+    }
+   ]
+  },
+  "ZRS51": {
+   "name": "Z-RS51",
+   "pages": [
+    245
+   ],
+   "files": [
+    {
+     "file": "Z-RS51_1.pdf",
+     "page": 245
+    }
+   ]
+  },
+  "ZRS7": {
+   "name": "Z-RS7",
+   "pages": [
+    223,
+    224
+   ],
+   "files": [
+    {
+     "file": "Z-RS7_1.pdf",
+     "page": 223
+    },
+    {
+     "file": "Z-RS7_2.pdf",
+     "page": 224
+    }
+   ]
+  },
+  "ZRS70": {
+   "name": "Z-RS70",
+   "pages": [
+    247,
+    248
+   ],
+   "files": [
+    {
+     "file": "Z-RS70_1.pdf",
+     "page": 247
+    },
+    {
+     "file": "Z-RS70_2.pdf",
+     "page": 248
+    }
+   ]
+  },
+  "ZRS71": {
+   "name": "Z-RS71",
+   "pages": [
+    249,
+    250
+   ],
+   "files": [
+    {
+     "file": "Z-RS71_1.pdf",
+     "page": 249
+    },
+    {
+     "file": "Z-RS71_2.pdf",
+     "page": 250
+    }
+   ]
+  },
+  "ZS1": {
+   "name": "Z-S1",
+   "pages": [
+    59,
+    60,
+    61
+   ],
+   "files": [
+    {
+     "file": "Z-S1_1.pdf",
+     "page": 59
+    },
+    {
+     "file": "Z-S1_2.pdf",
+     "page": 60
+    },
+    {
+     "file": "Z-S1_3.pdf",
+     "page": 61
+    }
+   ]
+  },
+  "ZS2": {
+   "name": "Z-S2",
+   "pages": [
+    62
+   ],
+   "files": [
+    {
+     "file": "Z-S2_1.pdf",
+     "page": 62
+    }
+   ]
+  },
+  "ZS3": {
+   "name": "Z-S3",
+   "pages": [
+    63
+   ],
+   "files": [
+    {
+     "file": "Z-S3_1.pdf",
+     "page": 63
+    }
+   ]
+  },
+  "ZS7": {
+   "name": "Z-S7",
+   "pages": [
+    67
+   ],
+   "files": [
+    {
+     "file": "Z-S7_1.pdf",
+     "page": 67
+    }
+   ]
+  },
+  "ZS9": {
+   "name": "Z-S9",
+   "pages": [
+    69
+   ],
+   "files": [
+    {
+     "file": "Z-S9_1.pdf",
+     "page": 69
+    }
+   ]
+  },
+  "ZTR1": {
+   "name": "Z-TR1",
+   "pages": [
+    57
+   ],
+   "files": [
+    {
+     "file": "Z-TR1_1.pdf",
+     "page": 57
+    }
+   ]
+  },
+  "ZTR2": {
+   "name": "Z-TR2",
+   "pages": [
+    58
+   ],
+   "files": [
+    {
+     "file": "Z-TR2_1.pdf",
+     "page": 58
+    }
+   ]
+  }
+ }
+}
