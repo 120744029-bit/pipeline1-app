@@ -395,6 +395,7 @@ body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: c
     }
 }
 </style>
+<script src="xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -494,6 +495,9 @@ body { background: #EDEDED; min-height: 100vh; display: flex; justify-content: c
     <div class="toolbar" id="statusToolbar" style="display: none;">
         <button class="btn-primary" onclick="loadStatusData(false)">🔄 刷新</button>
 		<button class="btn-success" onclick="exportStatusExcel()">📥 导出 Excel</button>
+        <button class="btn-warning" onclick="document.getElementById('statusImportFile').click()">📤 导入表格</button>
+        <input type="file" id="statusImportFile" accept=".xlsx" style="display:none" onchange="importStatusXlsx(event)">
+        <button class="btn-secondary" onclick="clearStatusImport()">🧹 清除导入</button>
         <button class="btn-purple" onclick="exportData1Json()">📦 生成 data1.json 到仓库</button>
 		<button class="btn-cyan" onclick="pushRepoToGit()">☁️ 一键推送 Git</button>
     </div>
@@ -899,6 +903,16 @@ var currentTab = 'work';
 
 var notesLiveData = [], filteredNotesLive = [];
 var statusData = [], filteredStatusData = [];
+var STATUS_IMPORT_KEY = 'statusImportMap_v1';   // 导入表格的对比结果（本地持久化）
+var statusImportMap = {};  // key(支架号_管线号) -> { old, new, user, time }，仅存与库里不同的
+try { statusImportMap = JSON.parse(localStorage.getItem(STATUS_IMPORT_KEY) || '{}') || {}; } catch (e) { statusImportMap = {}; }
+function saveStatusImport() {
+    try {
+        var n = Object.keys(statusImportMap).length;
+        if (n) localStorage.setItem(STATUS_IMPORT_KEY, JSON.stringify(statusImportMap));
+        else localStorage.removeItem(STATUS_IMPORT_KEY);
+    } catch (e) {}
+}
 var valveLiveData = [], filteredValveLive = [];
 var valveData = [], filteredValveData = [];
 var tailsData = [], filteredTailsData = [];
@@ -1262,20 +1276,14 @@ function doEditNote() {
 
 function exportNotesLiveCSV() {
     if (filteredNotesLive.length === 0) { showStatus('⚠️ 没有数据', 'error'); return; }
-    var csv = '\uFEFF序号,支架号,管线号,备注内容,录入人,时间\n';
-    var idx = 0;
+    var rows = [], idx = 0;
     filteredNotesLive.forEach(function(item) {
         item.notes.forEach(function(n) {
             idx++;
-            csv += idx + ',"' + (item.bracketId || '').replace(/"/g, '""') + '","' +
-                (item.pipeNo || '').replace(/"/g, '""') + '","' +
-                (n.note || '').replace(/"/g, '""') + '","' +
-                (n.user || '').replace(/"/g, '""') + '","' +
-                (n.time || '').replace(/"/g, '""') + '"\n';
+            rows.push([idx, item.bracketId || '', item.pipeNo || '', n.note || '', n.user || '', n.time || '']);
         });
     });
-    downloadCSV(csv, '备注_' + today() + '.csv');
-    showStatus('✅ 已导出', 'success');
+    exportXlsx(['序号', '支架号', '管线号', '备注内容', '录入人', '时间'], rows, '备注_' + today() + '.xlsx');
 }
 
 function openAddNoteDialog() {
@@ -1561,32 +1569,29 @@ async function doBatchDeleteTails() {
     } catch (err) { showStatus('❌ 删除失败：' + err.message, 'error'); }
 }
 
+// ===== 通用：真 .xlsx 导出（SheetJS，离线可用；所有单元格按文本写入，避免长编号/日期被改写） =====
+function exportXlsx(headers, rows, filename) {
+    if (typeof XLSX === 'undefined') { showStatus('❌ xlsx 库未加载（缺 xlsx.full.min.js）', 'error'); return; }
+    var aoa = [headers];
+    rows.forEach(function (r) {
+        aoa.push(headers.map(function (_, i) {
+            var v = r[i];
+            return { v: (v == null ? '' : String(v)), t: 's' }; // 全部文本，保真支架号/时间
+        }));
+    });
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    XLSX.writeFile(wb, filename);
+    showStatus('✅ 已导出 ' + rows.length + ' 条到 ' + filename, 'success');
+}
+
 function exportTailsExcel() {
     if (filteredTailsData.length === 0) { showStatus('⚠️ 没有数据', 'error'); return; }
     var rows = filteredTailsData.map(function(item, i) {
         return [i + 1, item.subItem || '', item.lineNo || '', item.content || '', item.user || '', item.createdAt || ''];
     });
-    var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">';
-    html += '<style>td{mso-number-format:"\\@";border:1px solid #ccc;padding:4px 8px;font-size:12px;}';
-    html += 'th{background:#07C160;color:white;border:1px solid #ccc;padding:6px 8px;font-size:13px;font-weight:bold;}</style>';
-    html += '</head><body><table>';
-    html += '<tr><th>序号</th><th>子项号</th><th>管线号</th><th>尾项内容</th><th>录入人</th><th>时间</th></tr>';
-    rows.forEach(function(r) {
-        html += '<tr>';
-        r.forEach(function(c) {
-            html += '<td>' + String(c == null ? '' : c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>';
-        });
-        html += '</tr>';
-    });
-    html += '</table></body></html>';
-    var blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement('a');
-    link.href = url;
-    link.download = '尾项_' + today() + '.xls';
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    setTimeout(function() { URL.revokeObjectURL(url); }, 3000);
-    showStatus('✅ 已导出 ' + rows.length + ' 条到 Excel', 'success');
+    exportXlsx(['序号', '子项号', '管线号', '尾项内容', '录入人', '时间'], rows, '尾项_' + today() + '.xlsx');
 }
 
 // ============================================================
@@ -1597,27 +1602,7 @@ function exportStatusExcel() {
     var rows = filteredStatusData.map(function(item, i) {
         return [i + 1, item.bracketId || '', item.pipeNo || '', item.status || '', item.user || '', item.updateTime || ''];
     });
-    var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">';
-    html += '<style>td{mso-number-format:"\\@";border:1px solid #ccc;padding:4px 8px;font-size:12px;}';
-    html += 'th{background:#07C160;color:white;border:1px solid #ccc;padding:6px 8px;font-size:13px;font-weight:bold;}</style>';
-    html += '</head><body><table>';
-    html += '<tr><th>序号</th><th>支架号</th><th>管线号</th><th>状态</th><th>录入人</th><th>更新时间</th></tr>';
-    rows.forEach(function(r) {
-        html += '<tr>';
-        r.forEach(function(c) {
-            html += '<td>' + String(c == null ? '' : c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>';
-        });
-        html += '</tr>';
-    });
-    html += '</table></body></html>';
-    var blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement('a');
-    link.href = url;
-    link.download = '支架状态_' + today() + '.xls';
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    setTimeout(function() { URL.revokeObjectURL(url); }, 3000);
-    showStatus('✅ 已导出 ' + rows.length + ' 条到 Excel', 'success');
+    exportXlsx(['序号', '支架号', '管线号', '状态', '录入人', '更新时间'], rows, '支架状态_' + today() + '.xlsx');
 }
 
 // ============================================================
@@ -1638,27 +1623,7 @@ function exportValveExcel() {
             item.hasPending ? '待导出' : '已同步'
         ];
     });
-    var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">';
-    html += '<style>td{mso-number-format:"\\@";border:1px solid #ccc;padding:4px 8px;font-size:12px;}';
-    html += 'th{background:#07C160;color:white;border:1px solid #ccc;padding:6px 8px;font-size:13px;font-weight:bold;}</style>';
-    html += '</head><body><table>';
-    html += '<tr><th>序号</th><th>阀门位号</th><th>管线号</th><th>阀门名称</th><th>焊口号1</th><th>焊口号2</th><th>序列号</th><th>录入人</th><th>状态</th></tr>';
-    rows.forEach(function(r) {
-        html += '<tr>';
-        r.forEach(function(c) {
-            html += '<td>' + String(c == null ? '' : c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>';
-        });
-        html += '</tr>';
-    });
-    html += '</table></body></html>';
-    var blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement('a');
-    link.href = url;
-    link.download = '阀门数据_' + today() + '.xls';
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    setTimeout(function() { URL.revokeObjectURL(url); }, 3000);
-    showStatus('✅ 已导出 ' + rows.length + ' 条到 Excel', 'success');
+    exportXlsx(['序号', '阀门位号', '管线号', '阀门名称', '焊口号1', '焊口号2', '序列号', '录入人', '状态'], rows, '阀门数据_' + today() + '.xlsx');
 }
 
 // ============================================================
@@ -2430,29 +2395,10 @@ function exportWorkExcel() {
         row.push(note);
         rows.push(row);
     });
-    var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">';
-    html += '<style>td{mso-number-format:"\\@";border:1px solid #ccc;padding:4px 8px;font-size:12px;}';
-    html += 'th{background:#07C160;color:white;border:1px solid #ccc;padding:6px 8px;font-size:13px;font-weight:bold;}</style>';
-    html += '</head><body><table>';
-    html += '<tr><th>区域</th><th>管工</th><th>焊工</th><th>普工</th>';
-    workViewColumns.forEach(function (col) { html += '<th>' + escapeHtml(col.col_name) + '</th>'; });
-    html += '<th>备注</th></tr>';
-    rows.forEach(function (r) {
-        html += '<tr>';
-        r.forEach(function (c) {
-            html += '<td>' + String(c == null ? '' : c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>';
-        });
-        html += '</tr>';
-    });
-    html += '</table></body></html>';
-    var blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement('a');
-    link.href = url;
-    link.download = '工作量_' + (workMode === 'day' ? workCurrentDate : 'range') + '_' + today() + '.xls';
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
-    showStatus('✅ 已导出到 Excel', 'success');
+    var heads = ['区域', '管工', '焊工', '普工'];
+    workViewColumns.forEach(function (col) { heads.push(col.col_name); });
+    heads.push('备注');
+    exportXlsx(heads, rows, '工作量_' + (workMode === 'day' ? workCurrentDate : 'range') + '_' + today() + '.xlsx');
 }
 // 有效数量：只有 >0 才算数；小于 0 / 0 / 空白 / 非数字一律当作「没填数量」。
 // 日报里这类人直接用备注作工作内容，合计也不让负数把正数抵掉。（与桌面端 reportQty 一致）
@@ -2622,13 +2568,41 @@ function loadStatusData(silent) {
                     status: info.note, updateTime: info.time || '', user: info.user || '', hasPending: true
                 });
             });
-            statusData.sort(function(a, b) { return a.hasPending === b.hasPending ? 0 : (a.hasPending ? -1 : 1); });
+            // 叠加「导入表格」对比结果：有变化的显示 旧——>新，录入人/时间用 Excel 里的
+            var impKeys = Object.keys(statusImportMap || {});
+            if (impKeys.length) {
+                statusData.forEach(function (r) {
+                    var c = statusImportMap[r.key];
+                    if (!c) return;
+                    r.oldStatus = r.status;
+                    r.status = c.new;
+                    r.user = c.user || r.user;
+                    r.updateTime = c.time || r.updateTime;
+                    r.hasImport = true;
+                });
+                impKeys.forEach(function (key) {
+                    if (statusData.some(function (r) { return r.key === key; })) return;
+                    var c = statusImportMap[key], parts = key.split('_');
+                    statusData.push({
+                        key: key, bracketId: parts[0], pipeNo: parts.slice(1).join('_'),
+                        oldStatus: c.old, status: c.new, user: c.user || '', updateTime: c.time || '',
+                        hasPending: false, hasImport: true
+                    });
+                });
+            }
+            statusData.sort(function(a, b) {
+                var pa = a.hasImport ? 2 : (a.hasPending ? 1 : 0);
+                var pb = b.hasImport ? 2 : (b.hasPending ? 1 : 0);
+                return pa === pb ? 0 : (pa > pb ? -1 : 1);
+            });
             filteredStatusData = statusData;
             statusPage = 1;
             renderStatusTable();
             if (!silent) {
                 var pend = statusData.filter(function(s){ return s.hasPending; }).length;
-                showStatus('✅ 已加载 ' + statusData.length + ' 条（待导出 ' + pend + ' 条）', 'success');
+                var imp = statusData.filter(function(s){ return s.hasImport; }).length;
+                showStatus('✅ 已加载 ' + statusData.length + ' 条（待导出 ' + pend + ' 条' +
+                           (imp ? '，待生成 ' + imp + ' 条' : '') + '）', 'success');
             }
         })
         .catch(function(err) { if (!silent) showStatus('❌ 加载失败：' + err.message, 'error'); });
@@ -2640,29 +2614,124 @@ function renderStatusTable() {
     if (statusPage > statusPages) statusPage = statusPages;
     if (statusPage < 1) statusPage = 1;
     renderCardList(box, filteredStatusData, function(item, idx) {
-        var badge = item.hasPending ? ' <span class="badge-new">⏳ 待导出</span>' : '';
+        var badge = item.hasImport ? ' <span class="badge-new">⏳ 待生成</span>'
+                  : (item.hasPending ? ' <span class="badge-new">⏳ 待导出</span>' : '');
+        var statusHtml = item.hasImport
+            ? '<span style="color:#dc2626;text-decoration:line-through">' + escapeHtml(item.oldStatus || '') + '</span>' +
+              ' <span style="color:#9ca3af">——></span> ' +
+              '<span style="color:#07C160;font-weight:600">' + escapeHtml(item.status) + '</span>'
+            : escapeHtml(item.status);
         return '<div class="card">' +
             '<div class="card-head">' +
                 '<div class="title">' + escapeHtml(item.bracketId) + badge + '</div>' +
                 '<div class="index">#' + idx + '</div>' +
             '</div>' +
             cardRow('管线号', escapeHtml(item.pipeNo)) +
-            cardRow('状态', escapeHtml(item.status), '#07C160') +
+            cardRow('状态', statusHtml, '#07C160') +
             renderUserRow(item.user) +
             cardRow('更新时间', escapeHtml(item.updateTime)) +
         '</div>';
     }, statusPage, statusPages, filteredStatusData.length);
 }
 
+// ===== 导入表格（xlsx）：解析 -> 与库(data1.json)对比 -> 只记变化项 =====
+function xlsxCellText(v) {
+    if (v == null) return '';
+    if (v instanceof Date) {
+        var p = function (n) { return n < 10 ? '0' + n : '' + n; };
+        return v.getFullYear() + '/' + p(v.getMonth() + 1) + '/' + p(v.getDate()) +
+               ' ' + p(v.getHours()) + ':' + p(v.getMinutes()) + ':' + p(v.getSeconds());
+    }
+    return String(v).trim();
+}
+function findCol(head, names) {
+    for (var i = 0; i < head.length; i++) {
+        for (var j = 0; j < names.length; j++) {
+            if (String(head[i] || '').trim().indexOf(names[j]) !== -1) return i;
+        }
+    }
+    return -1;
+}
+async function importStatusXlsx(ev) {
+    var file = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    if (typeof XLSX === 'undefined') { showStatus('❌ xlsx 库未加载', 'error'); return; }
+    showStatus('📥 正在解析 ' + file.name + ' ...', 'loading');
+    try {
+        var buf = await file.arrayBuffer();
+        var wb = XLSX.read(buf, { type: 'array', cellDates: true });
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+        if (aoa.length < 2) { showStatus('❌ 表格没有数据行', 'error'); return; }
+        var head = aoa[0].map(function (h) { return String(h || '').trim(); });
+        var cB = findCol(head, ['支架号']), cP = findCol(head, ['管线号']);
+        var cS = findCol(head, ['状态']), cU = findCol(head, ['录入人']), cT = findCol(head, ['更新时间', '时间']);
+        if (cB < 0 || cP < 0 || cS < 0) { showStatus('❌ 表头缺「支架号/管线号/状态」列', 'error'); return; }
+
+        var data1Res = await fetch(DATA1_URL + '?t=' + Date.now());
+        var lib = await data1Res.json();
+        var map = {}, changed = 0, noKey = 0;
+        for (var i = 1; i < aoa.length; i++) {
+            var row = aoa[i];
+            var b = xlsxCellText(row[cB]), p = xlsxCellText(row[cP]);
+            if (!b || !p) continue;
+            var key = b + '_' + p;
+            var cur = lib[key];
+            if (!cur) { noKey++; continue; }
+            var newStatus = xlsxCellText(row[cS]);
+            var oldStatus = cur.status || '';
+            if (newStatus === oldStatus) continue;              // 只看有变化的
+            map[key] = {
+                old: oldStatus, new: newStatus,
+                user: cU >= 0 ? xlsxCellText(row[cU]) : (cur.user || ''),
+                time: cT >= 0 ? xlsxCellText(row[cT]) : (cur.updateTime || '')
+            };
+            changed++;
+        }
+        statusImportMap = map;
+        saveStatusImport();
+        if (typeof loadStatusData === 'function') loadStatusData(true);
+        showStatus('✅ 导入对比完成：' + changed + ' 条有变化' + (noKey ? '，' + noKey + ' 条库中不存在(已跳过)' : '') +
+                   '。点「生成 data1.json」写入仓库', 'success');
+    } catch (err) { showStatus('❌ 导入失败：' + err.message, 'error'); }
+}
+function clearStatusImport() {
+    var n = Object.keys(statusImportMap).length;
+    if (!n) { showStatus('没有待生成的导入改动', 'error'); return; }
+    if (!confirm('清除全部 ' + n + ' 条导入对比结果？')) return;
+    statusImportMap = {};
+    saveStatusImport();
+    if (typeof loadStatusData === 'function') loadStatusData(true);
+    showStatus('✅ 已清除导入对比', 'success');
+}
+
 async function exportData1Json() {
     showStatus('📥 正在生成...', 'loading');
     try {
-        var notesRes = await fetch(GET_NOTES_API + '&t=' + Date.now());
-        var notesObj = await notesRes.json();
         var data1Res = await fetch(DATA1_URL + '?t=' + Date.now());
         var oldStatusMap = await data1Res.json();
         var newStatusMap = JSON.parse(JSON.stringify(oldStatusMap));
+        var importKeys = Object.keys(statusImportMap || {});
         var updated = 0, skipped = 0;
+
+        if (importKeys.length) {
+            // 优先：用导入表格的对比结果（保留 Excel 里的录入人和更新时间）
+            importKeys.forEach(function (key) {
+                if (!oldStatusMap[key]) { skipped++; return; }
+                var c = statusImportMap[key];
+                var item = { status: c.new, updateTime: c.time || oldStatusMap[key].updateTime || '' };
+                if (c.user) item.user = c.user;
+                newStatusMap[key] = item;
+                updated++;
+            });
+            // 写入成功后由用户点「🧹清除导入」再清空，避免取消写入时误丢对比结果
+            return writeRepoJson('data1.json', newStatusMap, '导入表格更新 ' + updated + ' 条，跳过 ' + skipped + ' 条');
+        }
+
+        // 回退：没有导入时，沿用动态备注库逻辑
+        var notesRes = await fetch(GET_NOTES_API + '&t=' + Date.now());
+        var notesObj = await notesRes.json();
         Object.keys(notesObj || {}).forEach(function(key) {
             var item = notesObj[key];
             if (!item || !item.notes || item.notes.length === 0) return;
@@ -2678,7 +2747,7 @@ async function exportData1Json() {
             newStatusMap[statusKey] = {
                 status: (lastDash === -1) ? noteText : (oldStatus.substring(0, lastDash + 1) + noteText),
                 updateTime: notes[0].time || new Date().toLocaleString(),
-                user: notes[0].user || ''                                  // ✅ 补上
+                user: notes[0].user || ''
             };
             updated++;
         });
@@ -2800,17 +2869,11 @@ function doEditValveLive() {
 
 function exportValveLiveCSV() {
     if (filteredValveLive.length === 0) { showStatus('⚠️ 没有数据', 'error'); return; }
-    var csv = '\uFEFF序号,阀门位号,焊口号1,焊口号2,阀门序列号,录入人,更新时间\n';
-    filteredValveLive.forEach(function(item, index) {
-        csv += (index + 1) + ',"' + (item.valveTag || '').replace(/"/g, '""') + '","' +
-            (item.weldNo1 || '').replace(/"/g, '""') + '","' +
-            (item.weldNo2 || '').replace(/"/g, '""') + '","' +
-            (item.serialNo || '').replace(/"/g, '""') + '","' +
-            (item.user || '').replace(/"/g, '""') + '","' +
-            (item.updateTime || '').replace(/"/g, '""') + '"\n';
+    var rows = filteredValveLive.map(function(item, index) {
+        return [index + 1, item.valveTag || '', item.weldNo1 || '', item.weldNo2 || '',
+                item.serialNo || '', item.user || '', item.updateTime || ''];
     });
-    downloadCSV(csv, '阀门动态库_' + today() + '.csv');
-    showStatus('✅ 已导出', 'success');
+    exportXlsx(['序号', '阀门位号', '焊口号1', '焊口号2', '阀门序列号', '录入人', '更新时间'], rows, '阀门动态库_' + today() + '.xlsx');
 }
 
 function openAddValveDialog() {
@@ -3180,27 +3243,7 @@ function exportTotalExcel() {
         rows.push(['工区 ' + (a.area || ''), Number(a.total) || 0, Number(a.welded) || 0, Number(a.unwelded) || 0, a.note || '']);
     });
 
-    var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">';
-    html += '<style>td{mso-number-format:"\\@";border:1px solid #ccc;padding:4px 8px;font-size:12px;}';
-    html += 'th{background:#07C160;color:white;border:1px solid #ccc;padding:6px 8px;font-size:13px;font-weight:bold;}</style>';
-    html += '</head><body><table>';
-    html += '<tr><th>工区</th><th>总量(寸)</th><th>焊接完成(寸)</th><th>焊接未完成(寸)</th><th>备注</th></tr>';
-    rows.forEach(function(r) {
-        html += '<tr>';
-        r.forEach(function(c) {
-            html += '<td>' + String(c == null ? '' : c).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>';
-        });
-        html += '</tr>';
-    });
-    html += '</table></body></html>';
-    var blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement('a');
-    link.href = url;
-    link.download = '总量_' + today() + '.xls';
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    setTimeout(function() { URL.revokeObjectURL(url); }, 3000);
-    showStatus('✅ 已导出总量 Excel', 'success');
+    exportXlsx(['工区', '总量(寸)', '焊接完成(寸)', '焊接未完成(寸)', '备注'], rows, '总量_' + today() + '.xlsx');
 }
 
 // ============================================================
