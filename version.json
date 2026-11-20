@@ -1,6 +1,6 @@
 {
-    "version": "4.1.7",
-    "updateTime": "2026-11-20 10:58:00",
+    "version": "4.1.8",
+    "updateTime": "2026-11-20 11:16:00",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "修复 Mate80/鸿蒙等高版本安卓上图纸、支架图单页搜不到的问题：新增「📁 系统选目录」，用系统文件选择器授权文件夹，绕过公共目录访问限制；默认路径不变，不授权则一切照旧"
+    "updateLog": "修复「系统选目录」在红米 K80 等系统上列出 0 份的问题（Native.js 传 JS 数组当 String[] 失败）；目录列举失败时显示诊断信息"
 }

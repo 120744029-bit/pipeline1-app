@@ -656,12 +656,14 @@
         var html = '';
 
         if (!s.count && !scanning) {
+            var safNote = s.saf && typeof SafDir !== 'undefined' && SafDir.diag
+                ? ('<br><span style="color:var(--text-tertiary);font-size:11px">诊断：' + esc(SafDir.diag()) + '</span>') : '';
             html = '<div class="dw-empty">还没扫描到图纸文件。<br><br>' +
                    '① 点下方 <b>📁 系统选目录</b>，在系统文件管理器里选中图纸文件夹（Mate80/鸿蒙推荐，绕过目录拦截）；<br>' +
                    '② 或把<b>解压好的 PDF 文件夹</b>拷进手机 <b>Download/图纸/</b>，点「刷新索引」；<br>' +
                    '③ 换路径用「限定目录」。<br><br>' +
                    '当前扫描位置：' + esc(s.roots.join('、')) + '<br>' +
-                   '支持 PDF / DWG / DXF / 图片等；只索引文件名，不复制不解压，不占额外空间。</div>';
+                   '支持 PDF / DWG / DXF / 图片等；只索引文件名，不复制不解压，不占额外空间。' + safNote + '</div>';
         } else if (!isoNo) {
             html = '<div class="dw-empty">输入图号搜索，或在查询结果里点「📐 图纸」按钮。</div>';
         } else if (!res.total) {

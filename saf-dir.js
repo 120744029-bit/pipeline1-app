@@ -24,6 +24,7 @@
     var REQ_TREE_BRACKET = 9202;
     var pending = null;                // { code, cb }
     var hooked = false;
+    var lastDiag = '';                 // 最近一次 listTree 的诊断，供界面显示
 
     function cls(name) { return plus.android.importClass(name); }
     function inv(obj, method) {
@@ -111,7 +112,10 @@
             inv(intent, 'addFlags', Intent.FLAG_GRANT_READ_URI_PERMISSION |
                                     Intent.FLAG_GRANT_WRITE_URI_PERMISSION |
                                     Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-            inv(main, 'startActivityForResult', intent, code);
+            // 官方示例是直接调用 main.startActivityForResult(intent, code)；
+            // 部分基座上 plus.android.invoke 对重载方法匹配失败，优先直调，失败再退回 invoke。
+            try { main.startActivityForResult(intent, code); }
+            catch (e2) { inv(main, 'startActivityForResult', intent, code); }
         } catch (e) {
             pending = null;
             toast('无法打开系统目录选择器：' + (e && e.message ? e.message : '未知错误'));
@@ -121,56 +125,90 @@
 
     // ---- 列目录（递归，只取文件名 + 单文件 URI）-----------------------
     // cb(list)，list = [{ n:文件名, uri:单文件contentUri }]
+    //
+    // ⚠️ 坑（红米 K80 实测选完目录显示 0 份）：早期用
+    //   cr.query(kidsUri, ['_display_name','document_id','mime_type'], null,null,null)
+    // 把 JS 数组当 Java String[] 传，部分系统（MIUI/HyperOS）Native.js 转换失败抛异常，
+    // 被 catch 吞掉后返回空列表。改为 null projection + getColumnIndex 按列名取值，
+    // 兼容所有 DocumentsProvider。
     function listTree(treeUri, cb) {
         var out = [];
-        if (!available() || !treeUri) { if (cb) cb(out); return; }
+        lastDiag = '';
+        if (!available() || !treeUri) {
+            lastDiag = '环境不可用或 URI 为空';
+            if (cb) cb(out); return;
+        }
+        var d = { roots: 0, dirs: 0, files: 0, err: [] };
         try {
             var main = plus.android.runtimeMainActivity();
             var Uri = cls('android.net.Uri');
             var DC = cls('android.provider.DocumentsContract');
             var tree = inv(Uri, 'parse', treeUri);
-            var rootId = inv(DC, 'getTreeDocumentId', tree);
+            var rootId = '';
+            try { rootId = String(inv(DC, 'getTreeDocumentId', tree) || ''); }
+            catch (e) { d.err.push('rootId:' + (e.message || e)); }
+            if (!rootId) {
+                // 部分 provider 没有 getTreeDocumentId：从 URI 里解 document id
+                var m = String(treeUri).match(/(?:tree|document)\/([^/]+)$/);
+                if (m) { try { rootId = decodeURIComponent(m[1]); } catch (e) { rootId = m[1]; } }
+            }
+            d.rootId = rootId;
             var cr = inv(main, 'getContentResolver');
-            walk(DC, Uri, cr, tree, rootId, out, 0, {});
-        } catch (e) { /* 返回已收集到的部分 */ }
+            walk(DC, Uri, cr, tree, rootId, out, 0, {}, d);
+        } catch (e) {
+            d.err.push('init:' + (e && e.message ? e.message : e));
+        }
+        lastDiag = '目录项 ' + d.roots + ' / 子目录 ' + d.dirs + ' / 文件 ' + d.files +
+                   (d.rootId ? ' · rootId=' + d.rootId : '') +
+                   (d.err.length ? ' · 错误:' + d.err.slice(0, 3).join(';') : '');
         if (cb) cb(out);
     }
 
-    function walk(DC, Uri, cr, tree, docId, out, depth, seen) {
+    function walk(DC, Uri, cr, tree, docId, out, depth, seen, d) {
         if (depth > 8 || out.length >= 20000) return;
-        var kidsUri;
+        if (!docId) return;
         var rows = [];
         try {
-            kidsUri = inv(DC, 'buildChildDocumentsUriUsingTree', tree, docId);
-            var cols = ['_display_name', 'document_id', 'mime_type'];
-            var cursor = inv(cr, 'query', kidsUri, cols, null, null, null);
-            if (!cursor) return;
+            var kidsUri = inv(DC, 'buildChildDocumentsUriUsingTree', tree, docId);
+            // null projection：返回所有列，再用 getColumnIndex 按名字定位，避免 JS 数组→String[] 转换坑
+            var cursor = inv(cr, 'query', kidsUri, null, null, null, null);
+            if (!cursor) { if (d) d.err.push('query返回null@' + depth); return; }
             try {
+                var iName = inv(cursor, 'getColumnIndex', '_display_name');
+                var iDoc = inv(cursor, 'getColumnIndex', 'document_id');
+                var iMime = inv(cursor, 'getColumnIndex', 'mime_type');
                 while (inv(cursor, 'moveToNext')) {
-                    var name = String(inv(cursor, 'getString', 0) || '');
-                    var cid = String(inv(cursor, 'getString', 1) || '');
-                    var mime = String(inv(cursor, 'getString', 2) || '');
+                    if (d) d.roots++;
+                    var name = iName >= 0 ? String(inv(cursor, 'getString', iName) || '') : '';
+                    var cid = iDoc >= 0 ? String(inv(cursor, 'getString', iDoc) || '') : '';
+                    var mime = iMime >= 0 ? String(inv(cursor, 'getString', iMime) || '') : '';
                     rows.push({ n: name, id: cid, dir: /directory/.test(mime) });
                 }
             } finally {
                 try { inv(cursor, 'close'); } catch (e) {}
             }
-        } catch (e) { return; }
+        } catch (e) {
+            if (d) d.err.push('walk' + depth + ':' + (e && e.message ? e.message : e));
+            return;
+        }
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
-            if (!r.n) continue;
+            if (!r.n || !r.id) continue;
             if (r.dir) {
-                walk(DC, Uri, cr, tree, r.id, out, depth + 1, seen);
+                if (d) d.dirs++;
+                walk(DC, Uri, cr, tree, r.id, out, depth + 1, seen, d);
             } else {
                 var fileUri = '';
                 try { fileUri = String(inv(inv(DC, 'buildDocumentUriUsingTree', tree, r.id), 'toString')); }
-                catch (e) { continue; }
+                catch (e) { if (d) d.err.push('uri:' + (e.message || e)); continue; }
                 if (seen[fileUri]) continue;
                 seen[fileUri] = 1;
                 out.push({ n: r.n, uri: fileUri });
+                if (d) d.files++;
             }
         }
     }
+    function diag() { return lastDiag; }
 
     // ---- 用 content URI 打开文件（ACTION_VIEW + 临时读授权）-----------
     function openUri(uri, name) {
@@ -208,6 +246,7 @@
         getRoot: getRoot,
         setRoot: setRoot,
         clearRoot: clearRoot,
+        diag: diag,
         dirLabel: function () { return '系统授权目录（SAF）'; }
     };
 })();
