@@ -75,6 +75,10 @@
     function saveConf() {
         try { localStorage.setItem(LS_CONF, JSON.stringify(conf)); } catch (e) {}
     }
+    // SAF 系统授权目录（Mate80 等鸿蒙/高版本 Android 上，硬编码公共路径会被拦）
+    function safRoot() {
+        return (typeof SafDir !== 'undefined' && SafDir.getRoot) ? SafDir.getRoot('drawing') : null;
+    }
     function fileKey(f) { return f.p || f.u || ((f.d || '') + '/' + f.n); }
     function dedupFiles(list) {
         var seen = {}, out = [];
@@ -109,6 +113,10 @@
         });
     }
     function loadIndex() {
+        // 已切到 SAF 授权目录时不读旧路径模式的磁盘缓存（那是给硬编码路径用的），
+        // 否则会先显示一堆旧路径文件，点开全失败。SAF 每次重扫即可。
+        var sr = safRoot();
+        if (sr && sr.uri) { files = []; zips = []; builtAt = 0; return; }
         // 旧版索引含大量重复项，直接丢弃；下次扫描会重建干净索引
         try { localStorage.removeItem(LEGACY_INDEX); } catch (e) {}
         try {
@@ -155,8 +163,10 @@
     function status() {
         return {
             ready: ready, scanning: scanning, count: files.length, zips: zips.length,
-            builtAt: builtAt, subDir: conf ? conf.subDir : '',
-            roots: (conf && conf.subDir && conf.subDir.charAt(0) === '/') ? [conf.subDir] : rootPaths(),
+            builtAt: builtAt, subDir: (safRoot() ? safRoot().name : (conf ? conf.subDir : '')),
+            saf: !!(safRoot() && safRoot().uri),
+            roots: (safRoot() && safRoot().name) ? [safRoot().name]
+                   : ((conf && conf.subDir && conf.subDir.charAt(0) === '/') ? [conf.subDir] : rootPaths()),
             stale: Date.now() - builtAt > STALE_MS,
             readRounds: lastReadRounds, expanded: true,
             cacheOk: lastCacheOk, cacheBytes: lastCacheBytes
@@ -277,6 +287,37 @@
         setStatus('正在扫描图纸目录…');
         var out = [], zlist = [], seen = {};
         var chain = Promise.resolve();
+        var sroot = safRoot();
+        // 已授权系统目录：走 SAF 列举，不碰被系统拦截的公共路径
+        if (sroot && sroot.uri && typeof SafDir !== 'undefined' && SafDir.listTree) {
+            return new Promise(function (resolve) {
+                SafDir.listTree(sroot.uri, function (items) {
+                    items = items || [];
+                    items.forEach(function (it) {
+                        if (!DRAW_EXT.test(it.n)) {
+                            if (ZIP_EXT.test(it.n)) zlist.push({ n: it.n, p: it.uri, u: it.uri, d: sroot.name });
+                            return;
+                        }
+                        var rec = { n: it.n, p: it.uri, u: it.uri, d: sroot.name, saf: true };
+                        var key = fileKey(rec);
+                        if (seen[key]) return;
+                        seen[key] = 1; out.push(rec);
+                    });
+                    files = dedupFiles(out);
+                    zips = dedupFiles(zlist);
+                    builtAt = Date.now();
+                    scanning = false;
+                    // SAF 文件的 content URI 无法塞进旧的压缩索引（会被还原成目录+文件名，
+                    // 丢掉 URI 导致打不开）。SAF 走 ContentResolver 列举很快，每次重扫即可，
+                    // 不落盘，也避免污染旧路径模式的缓存。
+                    try { localStorage.removeItem(LS_INDEX); } catch (e) {}
+                    setStatus('共 ' + files.length + ' 份图纸（' + sroot.name + '） · ' +
+                        new Date(builtAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
+                    if (panel && panel.classList.contains('active')) render(isoNo, isoVer);
+                    resolve(status());
+                });
+            });
+        }
         return ensurePermission().then(function () {
             // 绝对路径（默认就是 Download/图纸/）时只扫这一处，不枚举 Download 根目录，最快
             var roots = (conf.subDir && conf.subDir.charAt(0) === '/')
@@ -402,6 +443,11 @@
         var res = search(isoNo, isoVer);
         var item = res.items[idx];
         if (!item) return;
+        // SAF 授权文件：必须用 ACTION_VIEW + content URI，不能用 plus.runtime.openFile（路径形态）
+        if (item.saf && item.p && typeof SafDir !== 'undefined' && SafDir.openUri) {
+            if (SafDir.openUri(item.p, item.n)) return;
+            openFail(item); return;
+        }
         var candidates = [];
         if (item.p) candidates.push(item.p);
         if (item.u) candidates.push(item.u);
@@ -461,6 +507,7 @@
               '<div class="dw-list" id="dwList"></div>' +
               '<div class="dw-foot">' +
                 '<button class="dw-btn ghost" id="dwRefresh">刷新索引</button>' +
+                '<button class="dw-btn ghost" id="dwSafDir">📁 系统选目录</button>' +
                 '<button class="dw-btn ghost" id="dwFolder">限定目录</button>' +
                 '<span class="dw-status" id="dwStatus"></span>' +
               '</div>' +
@@ -488,6 +535,7 @@
             scan(true).then(function (s) { toast('索引已刷新：' + s.count + ' 份图纸'); });
         });
         document.getElementById('dwFolder').addEventListener('click', setFolder);
+        document.getElementById('dwSafDir').addEventListener('click', setSafDir);
         document.getElementById('dwZip').addEventListener('click', function (e) {
             if (!e.target || !e.target.getAttribute) return;
             var zi = e.target.getAttribute('data-zip');
@@ -496,7 +544,43 @@
         return panel;
     }
 
+    // 系统目录授权（SAF）：Mate80 等鸿蒙/高版本 Android 上，硬编码公共路径被系统拦截，
+    // 由用户在系统文件管理器里点选图纸文件夹，系统发 content URI 持久授权，绕开拦截。
+    function setSafDir() {
+        if (typeof SafDir === 'undefined' || !SafDir.available()) {
+            toast('当前环境不支持系统选目录，请用「限定目录」填路径'); return;
+        }
+        var cur = SafDir.getRoot('drawing');
+        var msg = '点「选择」后在系统文件管理器里选中【图纸文件夹】并确认。\n\n' +
+                  '选中后系统会把这个文件夹永久授权给 APP，图纸从这里读，不再受公共目录限制。\n' +
+                  (cur ? ('当前已授权：' + cur.name + '\n\n') : '');
+        var cb = function (e) {
+            if (e.index !== 0) return;
+            SafDir.openTree('drawing', function (r) {
+                if (!r) { toast('未选择目录或授权失败'); return; }
+                toast('已授权：' + r.name + '，正在扫描');
+                files = []; zips = []; builtAt = 0;
+                scan(true);
+            });
+        };
+        var buttons = cur ? ['重新选择', '取消授权', '取消'] : ['选择', '取消'];
+        plus.nativeUI.confirm(msg, function (e) {
+            if (e.index === 0) cb({ index: 0 });
+            else if (cur && e.index === 1) {
+                SafDir.clearRoot('drawing');
+                files = []; zips = []; builtAt = 0;
+                try { localStorage.removeItem(LS_INDEX); } catch (err) {}
+                toast('已取消授权，恢复扫描默认目录');
+                scan(true);
+            }
+        }, '系统选目录（图纸）', buttons);
+    }
+
     function setFolder() {
+        // 走硬编码路径前先清掉 SAF 授权，避免两套目录互相干扰
+        if (typeof SafDir !== 'undefined' && SafDir.getRoot('drawing')) {
+            SafDir.clearRoot('drawing'); files = []; zips = []; builtAt = 0;
+        }
         var msg = '默认是 /storage/emulated/0/Download/图纸/，只扫这一个文件夹，最快。\n' +
                   '可改成别的完整路径；想扫全部 Download 就填 /storage/emulated/0/Download/（会慢很多）。\n\n' +
                   '首次使用会申请存储权限，请点「允许」。';
@@ -573,10 +657,10 @@
 
         if (!s.count && !scanning) {
             html = '<div class="dw-empty">还没扫描到图纸文件。<br><br>' +
-                   '① 电脑上把<b>解压好的 PDF 文件夹</b>拷进手机 <b>Download/图纸/</b>（推荐，扫描最快）；<br>' +
-                   '② 首次使用会弹「允许访问存储」，请点允许；<br>' +
-                   '③ 点下方「刷新索引」；换目录请用「限定目录」。<br><br>' +
-                   '当前扫描路径：' + esc(s.roots.join('、')) + '<br>' +
+                   '① 点下方 <b>📁 系统选目录</b>，在系统文件管理器里选中图纸文件夹（Mate80/鸿蒙推荐，绕过目录拦截）；<br>' +
+                   '② 或把<b>解压好的 PDF 文件夹</b>拷进手机 <b>Download/图纸/</b>，点「刷新索引」；<br>' +
+                   '③ 换路径用「限定目录」。<br><br>' +
+                   '当前扫描位置：' + esc(s.roots.join('、')) + '<br>' +
                    '支持 PDF / DWG / DXF / 图片等；只索引文件名，不复制不解压，不占额外空间。</div>';
         } else if (!isoNo) {
             html = '<div class="dw-empty">输入图号搜索，或在查询结果里点「📐 图纸」按钮。</div>';

@@ -5,3 +5,5 @@ dist
 __pycache__/
 *.pyc
 支架图单页/
+*.pdf
+*.PDF
