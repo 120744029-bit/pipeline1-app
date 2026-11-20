@@ -126,11 +126,30 @@
     // ---- 列目录（递归，只取文件名 + 单文件 URI）-----------------------
     // cb(list)，list = [{ n:文件名, uri:单文件contentUri }]
     //
-    // ⚠️ 坑（红米 K80 实测选完目录显示 0 份）：早期用
-    //   cr.query(kidsUri, ['_display_name','document_id','mime_type'], null,null,null)
-    // 把 JS 数组当 Java String[] 传，部分系统（MIUI/HyperOS）Native.js 转换失败抛异常，
-    // 被 catch 吞掉后返回空列表。改为 null projection + getColumnIndex 按列名取值，
-    // 兼容所有 DocumentsProvider。
+    // ⚠️ 坑记录：
+    //  1) 红米 K80 选完目录显示 0 份：cr.query 把 JS 数组当 Java String[] 传，
+    //     MIUI/HyperOS Native.js 转换失败抛异常被吞 → 改 null projection + getColumnIndex。
+    //  2) K80 + Mate80 都报 NullPointerException: uri at ContentResolver.query：
+    //     DocumentsContract.buildChildDocumentsUriUsingTree() 静态方法经 Native.js 调用
+    //     返回 null。改为按 SAF 标准格式自己拼 children/document URI，不再依赖这俩静态方法。
+    function treeDocIdFromUri(s) {
+        var m = String(s).match(/\/tree\/([^/]+)/);
+        if (!m) return '';
+        try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; }
+    }
+    function authorityBaseOf(s) {
+        var m = String(s).match(/^(content:\/\/[^\/]+)/i);
+        return m ? m[1] : String(s).split('/tree/')[0].split('/document/')[0];
+    }
+    function childrenUriOf(treeUri, docId) {
+        // 标准：content://authority/tree/<treeId>/children/<encodedParentId>
+        return treeUri + '/children/' + encodeURIComponent(docId);
+    }
+    function documentUriOf(treeUri, docId) {
+        // 标准：content://authority/document/<encodedDocId>
+        return authorityBaseOf(treeUri) + '/document/' + encodeURIComponent(docId);
+    }
+
     function listTree(treeUri, cb) {
         var out = [];
         lastDiag = '';
@@ -142,35 +161,31 @@
         try {
             var main = plus.android.runtimeMainActivity();
             var Uri = cls('android.net.Uri');
-            var DC = cls('android.provider.DocumentsContract');
-            var tree = inv(Uri, 'parse', treeUri);
-            var rootId = '';
-            try { rootId = String(inv(DC, 'getTreeDocumentId', tree) || ''); }
-            catch (e) { d.err.push('rootId:' + (e.message || e)); }
-            if (!rootId) {
-                // 部分 provider 没有 getTreeDocumentId：从 URI 里解 document id
-                var m = String(treeUri).match(/(?:tree|document)\/([^/]+)$/);
-                if (m) { try { rootId = decodeURIComponent(m[1]); } catch (e) { rootId = m[1]; } }
-            }
+            // rootId 直接从 treeUri 的 /tree/<id> 段解，不再依赖 getTreeDocumentId
+            var rootId = treeDocIdFromUri(treeUri);
             d.rootId = rootId;
             var cr = inv(main, 'getContentResolver');
-            walk(DC, Uri, cr, tree, rootId, out, 0, {}, d);
+            walk(Uri, cr, String(treeUri), rootId, out, 0, {}, d);
         } catch (e) {
             d.err.push('init:' + (e && e.message ? e.message : e));
         }
         lastDiag = '目录项 ' + d.roots + ' / 子目录 ' + d.dirs + ' / 文件 ' + d.files +
                    (d.rootId ? ' · rootId=' + d.rootId : '') +
+                   (d.kidsUri ? ' · children=' + d.kidsUri : '') +
+                   (d.sampleUri ? ' · file=' + d.sampleUri : '') +
                    (d.err.length ? ' · 错误:' + d.err.slice(0, 3).join(';') : '');
         if (cb) cb(out);
     }
 
-    function walk(DC, Uri, cr, tree, docId, out, depth, seen, d) {
+    function walk(Uri, cr, treeUri, docId, out, depth, seen, d) {
         if (depth > 8 || out.length >= 20000) return;
         if (!docId) return;
         var rows = [];
         try {
-            var kidsUri = inv(DC, 'buildChildDocumentsUriUsingTree', tree, docId);
-            // null projection：返回所有列，再用 getColumnIndex 按名字定位，避免 JS 数组→String[] 转换坑
+            var kidsStr = childrenUriOf(treeUri, docId);
+            if (d && depth === 0) d.kidsUri = kidsStr;
+            // 用 Uri.parse 把拼好的字符串转 Uri 对象再 query（Uri.parse 已验证可用）
+            var kidsUri = inv(Uri, 'parse', kidsStr);
             var cursor = inv(cr, 'query', kidsUri, null, null, null, null);
             if (!cursor) { if (d) d.err.push('query返回null@' + depth); return; }
             try {
@@ -196,11 +211,10 @@
             if (!r.n || !r.id) continue;
             if (r.dir) {
                 if (d) d.dirs++;
-                walk(DC, Uri, cr, tree, r.id, out, depth + 1, seen, d);
+                walk(Uri, cr, treeUri, r.id, out, depth + 1, seen, d);
             } else {
-                var fileUri = '';
-                try { fileUri = String(inv(inv(DC, 'buildDocumentUriUsingTree', tree, r.id), 'toString')); }
-                catch (e) { if (d) d.err.push('uri:' + (e.message || e)); continue; }
+                var fileUri = documentUriOf(treeUri, r.id);
+                if (d && !d.sampleUri) d.sampleUri = fileUri;
                 if (seen[fileUri]) continue;
                 seen[fileUri] = 1;
                 out.push({ n: r.n, uri: fileUri });

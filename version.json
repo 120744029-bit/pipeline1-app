@@ -1,6 +1,6 @@
 {
-    "version": "4.1.8",
-    "updateTime": "2026-11-20 11:16:00",
+    "version": "4.1.9",
+    "updateTime": "2026-11-20 11:40:00",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "修复「系统选目录」在红米 K80 等系统上列出 0 份的问题（Native.js 传 JS 数组当 String[] 失败）；目录列举失败时显示诊断信息"
+    "updateLog": "修复「系统选目录」在红米 K80 / Mate80 上列出 0 份、报 ContentResolver.query uri 为空的问题：不再依赖系统静态方法拼目录 URI，改按 SAF 标准格式自行拼接，两台一次解决"
 }
