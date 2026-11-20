@@ -77,26 +77,42 @@
         } catch (e) { cb(''); }
     }
 
-    function downloadAndInstall(wgtUrl) {
+    function short(base) { return base === BACKUP ? '备站' : '主站'; }
+    function otherOf(base) { return base === PRIMARY ? BACKUP : PRIMARY; }
+
+    // 把 version.json 里给的 wgtUrl 归一到指定站：
+    // json 里写死哪个域名都不影响，一律改成从【实际拿到 version.json 的那个站】下载。
+    // 主站整个挂掉时 json 从备站拿到，包也自动从备站取。
+    function normalizeWgtUrl(wgtUrl, base) {
+        if (!wgtUrl) return '';
+        if (wgtUrl.charAt(0) === '/') return base + wgtUrl;
+        if (wgtUrl.indexOf(PRIMARY) === 0) return base + wgtUrl.slice(PRIMARY.length);
+        if (wgtUrl.indexOf(BACKUP) === 0) return base + wgtUrl.slice(BACKUP.length);
+        return wgtUrl;   // 第三方完整 URL，原样保留
+    }
+
+    var downloadFallbackTried = false;   // 本次更新是否已换站重试过
+
+    function downloadAndInstall(wgtUrl, base) {
         if (updating) return;
         updating = true;
+        downloadFallbackTried = false;
         try {
-            log('开始下载更新包：' + wgtUrl);
+            log('开始下载更新包（' + short(base) + '）：' + wgtUrl);
             plus.nativeUI.showWaiting('正在下载新版本...', { modal: true });
             // 先删旧包再下
             try {
                 plus.io.resolveLocalFileSystemURL('_doc/update.wgt', function (entry) {
-                    try { entry.remove(function () { doDownload(wgtUrl); }, function () { doDownload(wgtUrl); }); }
-                    catch (e) { doDownload(wgtUrl); }
-                }, function () { doDownload(wgtUrl); });
-            } catch (e) { doDownload(wgtUrl); }
+                    try { entry.remove(function () { doDownload(wgtUrl, base); }, function () { doDownload(wgtUrl, base); }); }
+                    catch (e) { doDownload(wgtUrl, base); }
+                }, function () { doDownload(wgtUrl, base); });
+            } catch (e) { doDownload(wgtUrl, base); }
         } catch (e) {
-            updating = false;
-            try { plus.nativeUI.closeWaiting(); } catch (e2) {}
+            finishDownloadFail();
         }
     }
 
-    function doDownload(wgtUrl) {
+    function doDownload(wgtUrl, base) {
         try {
             var dtask = plus.downloader.createDownload(
                 wgtUrl + (wgtUrl.indexOf('?') >= 0 ? '&' : '?') + 't=' + new Date().getTime(),
@@ -109,21 +125,42 @@
                                 install(entry.fullPath);
                             }, function () {
                                 try { plus.nativeUI.closeWaiting(); plus.nativeUI.toast('更新包保存失败'); } catch (e) {}
-                                updating = false;
+                                log('更新包保存失败');
+                                onDownloadFail(wgtUrl, base);
                             });
                         } else {
-                            try { plus.nativeUI.closeWaiting(); } catch (e) {}
-                            updating = false;
-                            log('下载失败 status=' + status + ' state=' + (task && task.state));
+                            log('下载失败（' + short(base) + '）status=' + status + ' state=' + (task && task.state));
+                            onDownloadFail(wgtUrl, base);
                         }
-                    } catch (e) { updating = false; }
+                    } catch (e) { onDownloadFail(wgtUrl, base); }
                 }
             );
             dtask.start();
-        } catch (e) {
-            try { plus.nativeUI.closeWaiting(); } catch (e2) {}
-            updating = false;
+        } catch (e) { onDownloadFail(wgtUrl, base); }
+    }
+
+    // 下载失败：换另一站重试一次（把 URL 从失败站的域名剥掉换成另一站），
+    // 两站都失败才真正放弃。
+    function onDownloadFail(failedUrl, base) {
+        if (!downloadFallbackTried) {
+            downloadFallbackTried = true;
+            var other = otherOf(base);
+            var altUrl = (base && failedUrl.indexOf(base) === 0)
+                ? other + failedUrl.slice(base.length)
+                : failedUrl;
+            log('下载失败，换' + short(other) + '重试：' + altUrl);
+            try { doDownload(altUrl, other); } catch (e) { finishDownloadFail(); }
+        } else {
+            log('主备站下载均失败，放弃本次更新');
+            finishDownloadFail();
         }
+    }
+
+    function finishDownloadFail() {
+        updating = false;
+        downloadFallbackTried = false;
+        try { plus.nativeUI.closeWaiting(); } catch (e) {}
+        try { plus.nativeUI.toast('暂时无法获取更新，稍后自动重试'); } catch (e) {}
     }
 
     function install(filePath) {
@@ -147,6 +184,56 @@
         }
     }
 
+    // 请求单个站的 version.json，成功 cb({data,base})，失败 cb(null)。
+    // 三种失败都要兜住：status≠200、网络错误 onerror、迟迟不回调（超时 abort）。
+    function fetchVersion(base, cb) {
+        var done = false;
+        var timer = null;
+        function finish(r) {
+            if (done) return;
+            done = true;
+            if (timer) { try { clearTimeout(timer); } catch (e) {} }
+            cb(r);
+        }
+        try {
+            var url = base + '/version.json?t=' + Date.now();
+            var xhr = new plus.net.XMLHttpRequest();
+            xhr.onreadystatechange = function () {
+                try {
+                    if (done || xhr.readyState !== 4) return;
+                    if (xhr.status !== 200) { finish(null); return; }
+                    var data = JSON.parse(xhr.responseText);
+                    if (!data || !data.version || !data.wgtUrl) { finish(null); return; }
+                    finish({ data: data, base: base });
+                } catch (e) { finish(null); }
+            };
+            xhr.onerror = function () { finish(null); };
+            xhr.ontimeout = function () { finish(null); };
+            xhr.open('GET', url);
+            xhr.send();
+            timer = setTimeout(function () { try { xhr.abort(); } catch (e) {} finish(null); }, 8000);
+        } catch (e) { finish(null); }
+    }
+
+    // 拿到 version.json 后统一处理：wgtUrl 归一到实际成功的站，再比版本、下载。
+    function onVersionGot(r) {
+        try {
+            var data = r.data;
+            var base = r.base;
+            var remoteVer = data.version;
+            // json 里 wgtUrl 写死哪个域名都不管，一律归一到【真正拿到 json 的那个站】。
+            // 主站整个挂掉 → json 来自备站 → 包也从备站取，不再碰挂掉的主站。
+            var wgtUrl = normalizeWgtUrl(data.wgtUrl, base);
+            log('线上版本=' + remoteVer + '（来源 ' + short(base) + '）');
+            currentVersion(function (localVer) {
+                try {
+                    log('本地版本=' + (localVer || '(空)') + ' 线上=' + remoteVer);
+                    if (isNewer(localVer, remoteVer)) downloadAndInstall(wgtUrl, base);
+                } catch (e) {}
+            });
+        } catch (e) { log('处理版本信息失败：' + (e && e.message)); }
+    }
+
     function check() {
         try {
             if (updating) return;
@@ -160,41 +247,18 @@
             }
 
             var base = getBase();
-            var url = base + '/version.json?t=' + now;
-            log('检查版本：' + url);
+            var other = otherOf(base);
+            log('检查版本：先试' + short(base));
 
-            var xhr = new plus.net.XMLHttpRequest();
-            xhr.onreadystatechange = function () {
-                try {
-                    if (xhr.readyState !== 4 || xhr.status !== 200) return;
-                    var data = JSON.parse(xhr.responseText);
-                    var remoteVer = data.version;
-                    var wgtUrl = data.wgtUrl;
-                    log('线上版本=' + remoteVer + '（本地稍后读取）');
-                    if (!remoteVer || !wgtUrl) return;
-
-                    // 处理 wgtUrl：无论 version.json 里写的是主站还是备站域名，
-                    // 都归一到【当前生效的站点】，保证"切到哪一站，版本和包都从哪一站取"。
-                    if (wgtUrl.charAt(0) === '/') {
-                        wgtUrl = base + wgtUrl;
-                    } else if (wgtUrl.indexOf(PRIMARY) === 0) {
-                        wgtUrl = base + wgtUrl.slice(PRIMARY.length);
-                    } else if (wgtUrl.indexOf(BACKUP) === 0) {
-                        wgtUrl = base + wgtUrl.slice(BACKUP.length);
-                    }
-
-                    currentVersion(function (localVer) {
-                        try {
-                            log('本地版本=' + (localVer || '(空)') + ' 线上=' + remoteVer);
-                            if (isNewer(localVer, remoteVer)) {
-                                downloadAndInstall(wgtUrl);
-                            }
-                        } catch (e) {}
-                    });
-                } catch (e) { log('解析版本失败：' + (e && e.message)); }
-            };
-            xhr.open('GET', url);
-            xhr.send();
+            // 先试当前站；失败（含主站整个挂掉）自动换另一站。任一站拿到就用哪站。
+            fetchVersion(base, function (r) {
+                if (r) { onVersionGot(r); return; }
+                log(short(base) + '不可用，改试' + short(other));
+                fetchVersion(other, function (r2) {
+                    if (r2) { onVersionGot(r2); return; }
+                    log('主备站都无法获取 version.json，本次跳过');
+                });
+            });
         } catch (e) { log('检查异常：' + (e && e.message)); }
     }
 

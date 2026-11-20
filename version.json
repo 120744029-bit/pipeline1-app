@@ -1,6 +1,6 @@
 {
-    "version": "4.1.9",
-    "updateTime": "2026-11-20 11:40:00",
+    "version": "4.2.0",
+    "updateTime": "2026-11-20 11:45:00",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "修复「系统选目录」在红米 K80 / Mate80 上列出 0 份、报 ContentResolver.query uri 为空的问题：不再依赖系统静态方法拼目录 URI，改按 SAF 标准格式自行拼接，两台一次解决"
+    "updateLog": "热更新哨兵加固：主站整个挂掉（请求失败/超时/网络错误）时自动转备站获取版本和更新包，包也跟着从实际成功的站下载；下载失败同样自动换站重试，不会再卡在旧版本无法更新"
 }
