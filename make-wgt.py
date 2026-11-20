@@ -34,7 +34,6 @@ ADDON = os.path.join(HERE, 'drawing-mobile.js')
 GUARD = os.path.join(HERE, 'update-guard.js')
 BFDATA = os.path.join(HERE, 'bracketFormData.js')
 BFJS = os.path.join(HERE, 'bracketForm.js')
-SAF = os.path.join(HERE, 'saf-dir.js')
 WGT = os.path.join(HERE, 'update.wgt')
 DIST = os.path.join(HERE, 'dist')
 VERSION_JSON = os.path.join(HERE, 'version.json')
@@ -59,7 +58,7 @@ def main():
     ap.add_argument('--version', help='新版本号，如 4.0.8；默认在当前 wgt 基础上 +1')
     args = ap.parse_args()
 
-    for f in (INDEX, ADDON, GUARD, BFDATA, BFJS, SAF, WGT):
+    for f in (INDEX, ADDON, GUARD, BFDATA, BFJS, WGT):
         if not os.path.isfile(f):
             print('缺少文件：' + f)
             return 1
@@ -74,10 +73,8 @@ def main():
         bfdata_js = fp.read()
     with open(BFJS, 'r', encoding='utf-8') as fp:
         bf_js = fp.read()
-    with open(SAF, 'r', encoding='utf-8') as fp:
-        saf_js = fp.read()
 
-    for tag in ('saf-dir.js', 'drawing-mobile.js', 'update-guard.js', 'bracketFormData.js', 'bracketForm.js'):
+    for tag in ('drawing-mobile.js', 'update-guard.js', 'bracketFormData.js', 'bracketForm.js'):
         if '<script src="' + tag + '"></script>' not in index_html:
             print('index.html 里没有引用 ' + tag + '，已中止（避免打出缺文件的包）')
             return 1
@@ -113,7 +110,6 @@ def main():
         z.writestr('update-guard.js', lf(guard_js).encode('utf-8'))
         z.writestr('bracketFormData.js', lf(bfdata_js).encode('utf-8'))
         z.writestr('bracketForm.js', lf(bf_js).encode('utf-8'))
-        z.writestr('saf-dir.js', lf(saf_js).encode('utf-8'))
         for d in dirs:
             z.writestr(d, b'')
 
@@ -129,7 +125,7 @@ def main():
     print('  wgt 热更新包已生成：' + WGT)
     print('  大小：%.1f KB   appid：%s   版本：%s -> %s (code %d)' %
           (size / 1024.0, old_manifest.get('id', '?'), old_ver, new_ver, code_of(new_ver)))
-    print('  包含：index.html / manifest.json / saf-dir.js / drawing-mobile.js / update-guard.js' +
+    print('  包含：index.html / manifest.json / drawing-mobile.js / update-guard.js' +
           ' / bracketFormData.js / bracketForm.js' + (''.join(' / ' + d for d in dirs)))
     print('  旧包已备份：' + bak + '（回滚就把它复制回 update.wgt）')
     print('=' * 62)

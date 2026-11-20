@@ -17,10 +17,6 @@
     var DATA = window.BRACKET_FORM_DATA || { form: {}, models: {} };
     var PDF_DIR = '/storage/emulated/0/Download/支架图/单页/';
     var panel = null;
-    // SAF 系统授权目录：Mate80 等鸿蒙/高版本 Android 上硬编码公共路径被拦，
-    // 由用户点选「支架图单页」文件夹，系统发 content URI，按文件名映射后打开。
-    var safNameMap = null;   // { 文件名: contentUri }
-    var safMapAt = 0;
 
     function esc(s) {
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -35,20 +31,14 @@
         if (/Html5Plus|uni-app|DCloud|HBuilder|Android|iPhone|iPad|Mobile|wv/i.test(ua)) return false;
         return true;
     }
-    function safRoot() {
-        return (typeof SafDir !== 'undefined' && SafDir.getRoot) ? SafDir.getRoot('bracket') : null;
-    }
-    // 把授权目录里的文件名 -> content URI 建成映射（异步，结果缓存）
-    function buildSafMap(cb) {
-        var root = safRoot();
-        if (!root || !root.uri || typeof SafDir === 'undefined') { cb(null); return; }
-        if (safNameMap && Date.now() - safMapAt < 60000) { cb(safNameMap); return; }
-        SafDir.listTree(root.uri, function (items) {
-            safNameMap = {};
-            (items || []).forEach(function (it) { safNameMap[it.n] = it.uri; });
-            safMapAt = Date.now();
-            cb(safNameMap);
-        });
+    function hasAllFilesAccess() {
+        try {
+            if (typeof plus === 'undefined' || !plus.android) return true;
+            var Env = plus.android.importClass('android.os.Environment');
+            var Build = plus.android.importClass('android.os.Build');
+            if (Build.VERSION.SDK_INT < 30) return true;
+            return !!Env.isExternalStorageManager();
+        } catch (e) { return true; }
     }
     function formKey(form) {
         var s = String(form || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -112,15 +102,15 @@
                 '<button class="bf-x" id="bfClose" aria-label="关闭">✕</button></div>' +
               '<div class="bf-meta" id="bfMeta" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
                 '<span id="bfMetaText" style="flex:1"></span>' +
-                '<button class="bf-saf" id="bfSafDir" style="border:1px solid var(--border-light);' +
+                '<button class="bf-saf" id="bfAllFiles" style="border:1px solid var(--border-light);' +
                 'background:var(--bg-hover);color:var(--text-primary);border-radius:4px;' +
-                'padding:4px 9px;font-size:11px;cursor:pointer;white-space:nowrap">📁 选目录</button>' +
+                'padding:4px 9px;font-size:11px;cursor:pointer;white-space:nowrap">🔓 权限</button>' +
               '</div>' +
               '<div class="bf-list" id="bfList"></div>' +
             '</div>';
         document.body.appendChild(panel);
         document.getElementById('bfClose').addEventListener('click', close);
-        document.getElementById('bfSafDir').addEventListener('click', setSafDir);
+        document.getElementById('bfAllFiles').addEventListener('click', grantAllFiles);
         panel.addEventListener('click', function (e) { if (e.target === panel) close(); });
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
         document.getElementById('bfList').addEventListener('click', function (e) {
@@ -153,72 +143,56 @@
                 '（型号 ' + esc(key) + ' 在书签里未找到）</div>';
             return;
         }
-        // 有 SAF 授权目录时先把文件名映射成 content URI，再渲染
-        function paint(map) {
-            if (!panel.classList.contains('active')) return;
-            currentFiles = model.files;
-            var metaText = document.getElementById('bfMetaText') || meta;
-            var root = safRoot();
-            metaText.textContent = '共 ' + model.files.length + ' 页 · 点击任一页打开' +
-                (root && root.name ? '（' + root.name + '）' : '');
-            var miss = 0;
-            list.innerHTML = model.files.map(function (f, i) {
-                var uri = map ? map[f.file] : null;
-                if (map && !uri) miss++;
-                var path = uri || (PDF_DIR + f.file);
-                return '<div class="bf-item" data-i="' + i + '">' +
-                         '<div class="bf-row1"><span class="bf-page">第 ' + (f.page || (i + 1)) + ' 页</span>' +
-                           '<span style="font-size:calc(11px * var(--font-scale));color:var(--text-secondary)">点此打开 →</span></div>' +
-                         '<div class="bf-name">' + esc(f.file) + '</div>' +
-                         '<div class="bf-path">' + esc(path) + '</div>' +
-                       '</div>';
-            }).join('');
-            if (map && miss) {
-                metaText.textContent += ' · ' + miss + ' 页在授权目录里未找到，请确认选的是「支架图单页」文件夹';
-            }
-            list.scrollTop = 0;
-        }
-        if (safRoot()) {
-            buildSafMap(paint);
-        } else {
-            paint(null);
-        }
+        currentFiles = model.files;
+        var metaText = document.getElementById('bfMetaText') || meta;
+        metaText.textContent = '共 ' + model.files.length + ' 页 · 点击任一页打开';
+        list.innerHTML = model.files.map(function (f, i) {
+            var path = PDF_DIR + f.file;
+            return '<div class="bf-item" data-i="' + i + '">' +
+                     '<div class="bf-row1"><span class="bf-page">第 ' + (f.page || (i + 1)) + ' 页</span>' +
+                       '<span style="font-size:calc(11px * var(--font-scale));color:var(--text-secondary)">点此打开 →</span></div>' +
+                     '<div class="bf-name">' + esc(f.file) + '</div>' +
+                     '<div class="bf-path">' + esc(path) + '</div>' +
+                   '</div>';
+        }).join('');
+        list.scrollTop = 0;
     }
 
-    // 系统目录授权（SAF）：选「支架图单页」文件夹，绕开公共目录拦截
-    function setSafDir() {
-        if (typeof SafDir === 'undefined' || !SafDir.available()) {
-            toast('当前环境不支持系统选目录'); return;
+    // 「所有文件访问」权限引导：安卓 11+ 读公共目录需要这个开关，开一次永久生效。
+    function grantAllFiles() {
+        if (typeof plus === 'undefined' || !plus.android) { toast('请在 APP 内使用'); return; }
+        if (hasAllFilesAccess()) {
+            plus.nativeUI.alert('「所有文件访问」已经开启。\n\n如果打不开支架图，请确认单页 PDF 已拷进 Download/支架图/单页/。', function () {}, '权限状态');
+            return;
         }
-        var cur = safRoot();
-        var msg = '在系统文件管理器里选中【支架图单页】文件夹（里面是 Z-RS13_1.pdf 这种单页文件）。\n\n' +
-                  '选完后系统永久授权，APP 从该目录读图，不再受公共目录限制。\n' +
-                  (cur ? ('当前已授权：' + cur.name + '\n\n') : '');
-        var buttons = cur ? ['重新选择', '取消授权', '取消'] : ['选择', '取消'];
-        plus.nativeUI.confirm(msg, function (e) {
-            if (e.index === 0) {
-                SafDir.openTree('bracket', function (r) {
-                    if (!r) { toast('未选择目录或授权失败'); return; }
-                    safNameMap = null;
-                    toast('已授权：' + r.name);
-                    if (panel && panel.classList.contains('active')) {
-                        var title = document.getElementById('bfTitle').textContent;
-                        // 用当前标题里的支架号重渲染
-                        var m = title.match(/^📐\s*(\S+?)\s*·/);
-                        if (m) open(m[1]);
+        plus.nativeUI.confirm(
+            '支架图打不开通常是因为没开「所有文件访问」权限。\n\n' +
+            '点「去开启」打开系统设置，把「允许访问所有文件」开关打开，再返回 APP 重试。\n' +
+            '只需开一次，之后永久生效。',
+            function (e) {
+                if (e.index !== 0) return;
+                try {
+                    var main = plus.android.runtimeMainActivity();
+                    var Intent = plus.android.importClass('android.content.Intent');
+                    var Uri = plus.android.importClass('android.net.Uri');
+                    var intent = null;
+                    try {
+                        intent = new Intent('android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION');
+                        intent.setData(Uri.parse('package:' + main.getPackageName()));
+                    } catch (e1) { intent = null; }
+                    if (!intent) {
+                        try { intent = new Intent('android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION'); }
+                        catch (e2) { intent = null; }
                     }
-                });
-            } else if (cur && e.index === 1) {
-                SafDir.clearRoot('bracket');
-                safNameMap = null;
-                toast('已取消授权，恢复默认路径');
-                if (panel && panel.classList.contains('active')) {
-                    var title2 = document.getElementById('bfTitle').textContent;
-                    var m2 = title2.match(/^📐\s*(\S+?)\s*·/);
-                    if (m2) open(m2[1]);
+                    if (!intent) { toast('无法打开设置页，请到 设置→应用→权限→文件 手动开启'); return; }
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    main.startActivity(intent);
+                } catch (err) {
+                    toast('无法打开设置页，请到 设置→应用→权限→文件 手动开启');
                 }
-            }
-        }, '系统选目录（支架图）', buttons);
+            },
+            '开启所有文件访问', ['去开启', '取消']
+        );
     }
 
     function close() {
@@ -232,13 +206,12 @@
         } catch (e) {}
     }
     function openFail(f) {
-        var root = safRoot();
-        var path = (root && root.name ? root.name + '/' : PDF_DIR) + f.file;
-        copyText(f.file);
+        var path = PDF_DIR + f.file;
+        copyText(path);
         try {
             plus.nativeUI.alert('无法打开这个支架图页。\n\n文件：' + f.file +
-                '\n位置：' + path + '\n\n请点面板上的「📁 选目录」重新授权「支架图单页」文件夹，' +
-                '或确认已装 WPS / 系统 PDF 阅读器。',
+                '\n位置：' + path + '\n\n路径已复制。请确认：① 已开启「所有文件访问」权限（点面板「🔓 权限」）；' +
+                '② 单页 PDF 已拷进 Download/支架图/单页/；③ 已装 WPS / 系统 PDF 阅读器。',
                 function () {}, '打开失败');
         } catch (e) { toast('打开失败：' + path); }
     }
@@ -246,14 +219,6 @@
         var f = currentFiles[idx];
         if (!f) return;
         if (typeof plus === 'undefined' || !plus.runtime) { toast('请在 APP 内打开'); return; }
-        // SAF 授权：用映射到的 content URI 走 ACTION_VIEW
-        var uri = safNameMap ? safNameMap[f.file] : null;
-        if (uri && typeof SafDir !== 'undefined' && SafDir.openUri) {
-            if (SafDir.openUri(uri, f.file)) return;
-            openFail(f); return;
-        }
-        // SAF 已授权但这个文件没映射到，别再退回被拦截的硬编码路径（必然失败）
-        if (safRoot()) { toast('授权目录里没找到 ' + f.file); return; }
         var raw = PDF_DIR + f.file;
         var candidates = [raw];
         if (raw.indexOf('file://') !== 0) candidates.push('file://' + raw);

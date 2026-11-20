@@ -1,6 +1,6 @@
 {
-    "version": "4.2.1",
-    "updateTime": "2026-11-20 12:46:00",
+    "version": "4.2.2",
+    "updateTime": "2026-11-20 13:12:00",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "彻底修复「系统选目录」在红米 K80 / 鸿蒙 Mate80 上列 0 份图纸的问题：真机定位到 Native.js 用 invoke 调静态方法（Uri.parse 等）返回 null，改为直接点方法 + DocumentsContract 标准 URI，真机基座实测列出 1457 份图纸；默认路径不变"
+    "updateLog": "修复图纸很卡、打不开：移除「系统选目录」(SAF)——它的授权重启后失效会卡在旧分支导致 0 份、10 秒卡顿。恢复原路径扫描（真机实测 1457 份、秒开），并清除历史授权残留；新增「所有文件访问」权限按钮作兜底"
 }
