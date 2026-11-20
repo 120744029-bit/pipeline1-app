@@ -27,9 +27,17 @@
     var lastDiag = '';                 // 最近一次 listTree 的诊断，供界面显示
 
     function cls(name) { return plus.android.importClass(name); }
+    // 实例方法走 invoke（K80/Mate80 实测 cursor/query 这样可用）
     function inv(obj, method) {
         var args = Array.prototype.slice.call(arguments, 2);
         return plus.android.invoke.apply(plus.android, [obj, method].concat(args));
+    }
+    // ⚠️ 静态方法（Uri.parse / DocumentsContract.* / takePersistableUriPermission）
+    // 在 MIUI/HyperOS 上用 plus.android.invoke 调会返回 null 或抛 InvocationTargetException，
+    // 必须直接点方法调用。K80 真机基座实测：invoke(Uri,'parse')→null，Uri.parse()→正常对象。
+    function stat(obj, method) {
+        var args = Array.prototype.slice.call(arguments, 2);
+        return obj[method].apply(obj, args);
     }
     function available() {
         return typeof plus !== 'undefined' && !!plus.android && !!plus.runtime &&
@@ -71,12 +79,13 @@
                         var Intent = cls('android.content.Intent');
                         var FLAG_R = Intent.FLAG_GRANT_READ_URI_PERMISSION;
                         var FLAG_W = Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
-                        var uri = inv(data, 'getData');
+                        var uri = data.getData();   // 实例方法直接点（基座实测可用）
                         if (uri) {
                             // 持久授权：重启后仍可访问，热更新 wgt 不掉权限
-                            try { inv(main, 'takePersistableUriPermission', uri, FLAG_R | FLAG_W); }
+                            // 直接点方法，invoke 调它在 K80 上抛 InvocationTargetException
+                            try { main.takePersistableUriPermission(uri, FLAG_R | FLAG_W); }
                             catch (e) {}
-                            var uriStr = String(inv(uri, 'toString'));
+                            var uriStr = String(uri.toString());
                             var name = displayNameOf(uriStr);
                             if (p.cb) p.cb({ uri: uriStr, name: name });
                         } else if (p.cb) p.cb(null);
@@ -132,22 +141,16 @@
     //  2) K80 + Mate80 都报 NullPointerException: uri at ContentResolver.query：
     //     DocumentsContract.buildChildDocumentsUriUsingTree() 静态方法经 Native.js 调用
     //     返回 null。改为按 SAF 标准格式自己拼 children/document URI，不再依赖这俩静态方法。
+    // ⚠️ 官方工具类静态方法必须【直接点方法】，不能用 plus.android.invoke：
+    //    K80/Mate80 真机基座实测 invoke 调静态方法返回 null 或抛 InvocationTargetException；
+    //    直接点 Uri.parse / DocumentsContract.* 全部正常。
+    //    另外 children URI 必须是 buildChildDocumentsUriUsingTree 生成的
+    //    .../tree/<id>/document/<id>/children 格式，自己拼 .../children/<id> 会报
+    //    UnsupportedOperationException: Unsupported Uri。
     function treeDocIdFromUri(s) {
         var m = String(s).match(/\/tree\/([^/]+)/);
         if (!m) return '';
         try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; }
-    }
-    function authorityBaseOf(s) {
-        var m = String(s).match(/^(content:\/\/[^\/]+)/i);
-        return m ? m[1] : String(s).split('/tree/')[0].split('/document/')[0];
-    }
-    function childrenUriOf(treeUri, docId) {
-        // 标准：content://authority/tree/<treeId>/children/<encodedParentId>
-        return treeUri + '/children/' + encodeURIComponent(docId);
-    }
-    function documentUriOf(treeUri, docId) {
-        // 标准：content://authority/document/<encodedDocId>
-        return authorityBaseOf(treeUri) + '/document/' + encodeURIComponent(docId);
     }
 
     function listTree(treeUri, cb) {
@@ -161,11 +164,16 @@
         try {
             var main = plus.android.runtimeMainActivity();
             var Uri = cls('android.net.Uri');
-            // rootId 直接从 treeUri 的 /tree/<id> 段解，不再依赖 getTreeDocumentId
-            var rootId = treeDocIdFromUri(treeUri);
+            var DC = cls('android.provider.DocumentsContract');
+            var tree = Uri.parse(String(treeUri));
+            // rootId 用官方静态方法直接点获取，失败再从 URI 解
+            var rootId = '';
+            try { rootId = String(DC.getTreeDocumentId(tree) || ''); }
+            catch (e) { d.err.push('rootId:' + (e && e.message ? e.message : e)); }
+            if (!rootId) rootId = treeDocIdFromUri(treeUri);
             d.rootId = rootId;
             var cr = inv(main, 'getContentResolver');
-            walk(Uri, cr, String(treeUri), rootId, out, 0, {}, d);
+            walk(DC, cr, tree, rootId, out, 0, {}, d);
         } catch (e) {
             d.err.push('init:' + (e && e.message ? e.message : e));
         }
@@ -177,15 +185,14 @@
         if (cb) cb(out);
     }
 
-    function walk(Uri, cr, treeUri, docId, out, depth, seen, d) {
+    function walk(DC, cr, tree, docId, out, depth, seen, d) {
         if (depth > 8 || out.length >= 20000) return;
         if (!docId) return;
         var rows = [];
         try {
-            var kidsStr = childrenUriOf(treeUri, docId);
-            if (d && depth === 0) d.kidsUri = kidsStr;
-            // 用 Uri.parse 把拼好的字符串转 Uri 对象再 query（Uri.parse 已验证可用）
-            var kidsUri = inv(Uri, 'parse', kidsStr);
+            // 官方静态方法直接点：生成标准 children URI
+            var kidsUri = DC.buildChildDocumentsUriUsingTree(tree, docId);
+            if (d && depth === 0) { try { d.kidsUri = kidsUri.toString(); } catch (e) {} }
             var cursor = inv(cr, 'query', kidsUri, null, null, null, null);
             if (!cursor) { if (d) d.err.push('query返回null@' + depth); return; }
             try {
@@ -211,9 +218,12 @@
             if (!r.n || !r.id) continue;
             if (r.dir) {
                 if (d) d.dirs++;
-                walk(Uri, cr, treeUri, r.id, out, depth + 1, seen, d);
+                walk(DC, cr, tree, r.id, out, depth + 1, seen, d);
             } else {
-                var fileUri = documentUriOf(treeUri, r.id);
+                // 官方静态方法直接点：生成标准 document URI（供 ACTION_VIEW 打开）
+                var fileUri = '';
+                try { fileUri = String(DC.buildDocumentUriUsingTree(tree, r.id).toString()); }
+                catch (e) { if (d) d.err.push('uri:' + (e && e.message ? e.message : e)); continue; }
                 if (d && !d.sampleUri) d.sampleUri = fileUri;
                 if (seen[fileUri]) continue;
                 seen[fileUri] = 1;
@@ -232,7 +242,8 @@
             var Intent = cls('android.content.Intent');
             var Uri = cls('android.net.Uri');
             var intent = new Intent(Intent.ACTION_VIEW);
-            inv(intent, 'setDataAndType', inv(Uri, 'parse', uri), mimeOf(name));
+            // Uri.parse 直接点方法（invoke 调静态在 K80 上返回 null）
+            inv(intent, 'setDataAndType', Uri.parse(uri), mimeOf(name));
             inv(intent, 'addFlags', Intent.FLAG_GRANT_READ_URI_PERMISSION |
                                     Intent.FLAG_ACTIVITY_NEW_TASK);
             inv(main, 'startActivity', intent);

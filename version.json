@@ -1,6 +1,6 @@
 {
-    "version": "4.2.0",
-    "updateTime": "2026-11-20 11:45:00",
+    "version": "4.2.1",
+    "updateTime": "2026-11-20 12:46:00",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "热更新哨兵加固：主站整个挂掉（请求失败/超时/网络错误）时自动转备站获取版本和更新包，包也跟着从实际成功的站下载；下载失败同样自动换站重试，不会再卡在旧版本无法更新"
+    "updateLog": "彻底修复「系统选目录」在红米 K80 / 鸿蒙 Mate80 上列 0 份图纸的问题：真机定位到 Native.js 用 invoke 调静态方法（Uri.parse 等）返回 null，改为直接点方法 + DocumentsContract 标准 URI，真机基座实测列出 1457 份图纸；默认路径不变"
 }
