@@ -1,6 +1,6 @@
 {
-    "version": "4.2.3",
-    "updateTime": "2026-11-20 13:33:00",
+    "version": "4.2.4",
+    "updateTime": "2026-11-22 16:31:08",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "强制刷新：确保图纸/支架面板彻底换成「🔓 所有文件访问」，清掉旧版「系统选目录」(SAF) 界面残留；扫描逻辑与默认路径不变，真机实测 1457 份秒开"
+    "updateLog": "修复「所有支架状态」按管线号后缀兜底导致串图：改为以图号唯一匹配 data.json 的支架清单，再精确取状态。"
 }

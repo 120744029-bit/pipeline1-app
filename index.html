@@ -3408,8 +3408,8 @@ function doPipelineSearch(q, subItem) {
 // ============================================================
 //        📊 所有支架状态：管线查线 → 管线号后的按钮
 //   数据来自 data1.json（每天由动态库转出的静态库），键为「支架号_管线号」。
-//   取并集：单线图 brackets 字段 + 状态库里所有以 _管线号 结尾的记录，
-//           这样即使 brackets 没写全，也不会漏掉已录状态的支架。
+//   支架清单以 data.json 里同一图号 isoNo 的记录为准（图号唯一），
+//   再用「支架号_管线号」精确取状态。不用管线号后缀兜底——管线号跨区域重复，会串图。
 //   网页版 / 桌面版同样可用（桌面版读的是本地 data1 快照）。
 // ============================================================
 (function () {
@@ -3481,6 +3481,7 @@ function doPipelineSearch(q, subItem) {
     }
     function collect(item) {
         var line = item.lineNo || '';
+        var iso = item.isoNo || '';
         var map = mapNow();
         var seen = {}, ids = [];
         function add(raw) {
@@ -3488,12 +3489,19 @@ function doPipelineSearch(q, subItem) {
             if (!id || seen[id]) return;
             seen[id] = 1; ids.push(id);
         }
-        (item.brackets || '').split(/[,，\s]+/).forEach(add);
-        var suffix = '_' + line;
-        Object.keys(map).forEach(function (k) {
-            if (k.length > suffix.length && k.slice(-suffix.length) === suffix) {
-                add(k.slice(0, -suffix.length));
+        // 图号唯一：以 data.json 中同一 isoNo 的记录为准，取该图所有支架号。
+        // 只认 brackets，不再用「状态库里所有 _管线号 结尾的 key」兜底——
+        // 管线号跨区域重复，兜底会把别的图的支架串进来。
+        var src = [item];
+        try {
+            if (iso && typeof pipelineData !== 'undefined' && pipelineData && pipelineData.length) {
+                var byIso = [];
+                pipelineData.forEach(function (p) { if (p.isoNo === iso) byIso.push(p); });
+                if (byIso.length) src = byIso;
             }
+        } catch (e) {}
+        src.forEach(function (p) {
+            (p.brackets || '').split(/[,，\s]+/).forEach(add);
         });
         ids.sort(function (a, b) { return a < b ? -1 : (a > b ? 1 : 0); });
         var rows = ids.map(function (id) {
@@ -3501,7 +3509,7 @@ function doPipelineSearch(q, subItem) {
             return { id: id, status: rec.status || '', user: rec.user || '', time: rec.updateTime || '' };
         });
         var setCount = rows.filter(function (r) { return !!r.status; }).length;
-        return { line: line, iso: item.isoNo || '', sub: item.subItem || '', rows: rows,
+        return { line: line, iso: iso, sub: item.subItem || '', rows: rows,
                  setCount: setCount, mapSize: Object.keys(map).length };
     }
     function category(s) {
