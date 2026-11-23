@@ -1366,6 +1366,8 @@ var WORK_API       = ''; // 工作量已改为 data6.json 静态库
 var TAIL_ITEMS_API = API_BASE_URL + '/tails?action=get-all';
 var TAIL_GET_API   = API_BASE_URL + '/tails?action=get';
 var TAIL_SAVE_API  = API_BASE_URL + '/tails?action=save';
+var TAIL_CLEAR_API = API_BASE_URL + '/tails?action=clear';
+var TAIL_UNDO_API  = API_BASE_URL + '/tails?action=undo-clear';
 
 // ============================================================
 //                    全局状态
@@ -2732,7 +2734,10 @@ function loadTailItemsFromServer() {
                             id: t.id,
                             content: t.content || '',
                             time: t.createdAt || t.time || '',
-                            user: t.user || ''            // ✅ 补上
+                            user: t.user || '',
+                            id: t.id || null,
+                            clearedBy: t.clearedBy || '',
+                            clearedAt: t.clearedAt || ''
                         };
                     });
                 });
@@ -2785,15 +2790,30 @@ function changeTailUser() {
     }
 }
 function closeTailDialog() { document.getElementById('tailDialog').classList.remove('active'); }
+// 统一渲染一行尾项：已消除=绿底+消除人+撤销；未消除=原样+消除按钮
+function tailRowHtml(t, i) {
+    var cleared = !!(t.clearedBy || t.clearedAt);
+    var pendingTag = t._pending ? '<span style="color:#f59e0b;font-size:12px;margin-left:6px;">⏳ 待同步</span>' : '';
+    var userTag = t.user ? '<span style="color:var(--text-secondary);font-size:12px;margin-left:6px;">— ' + escapeHtml(t.user) + '</span>' : '';
+    var style = cleared
+        ? 'background:var(--green-bg,#e8f5e9);border-radius:4px;padding:4px 6px;color:var(--green-text,#2e7d32);font-size:14px;margin:2px 0;'
+        : 'font-size:14px;color:var(--text-value);padding:2px 0;';
+    var act = '';
+    if (cleared) {
+        var by = escapeHtml(t.clearedBy || '未知');
+        act = '<span style="font-size:12px;margin-left:6px;">✅ 已消除 · ' + by + '</span>' +
+              (t.id ? '<button onclick="undoClearTail(\'' + escapeJs(String(t.id)) + '\')" style="margin-left:8px;padding:2px 8px;background:transparent;border:1px solid var(--green-primary);border-radius:4px;font-size:11px;color:var(--green-text);cursor:pointer;">↩️ 撤销</button>' : '');
+    } else if (t.id) {
+        act = '<button onclick="clearTailById(\'' + escapeJs(String(t.id)) + '\')" style="margin-left:8px;padding:2px 8px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;">✅ 消除尾项</button>';
+    }
+    return '<div style="' + style + '">尾项' + (i + 1) + '  ' + escapeHtml(t.content) + userTag + pendingTag + act + '</div>';
+}
 function renderTailList(key, safeId) {
     var area = document.getElementById('tail-area-' + safeId);
     if (!area) return;
+    area.setAttribute('data-key', key);
     var list = tailItemsCache[key] || [];
-    var listHtml = list.map(function (t, i) {
-        var pendingTag = t._pending ? '<span style="color:#f59e0b;font-size:12px;margin-left:6px;">⏳ 待同步</span>' : '';
-        var userTag = t.user ? '<span style="color:var(--text-secondary);font-size:12px;margin-left:6px;">— ' + escapeHtml(t.user) + '</span>' : '';
-        return '<div style="font-size:14px;color:var(--text-value);padding:2px 0;">尾项' + (i + 1) + '  ' + escapeHtml(t.content) + pendingTag + userTag + '</div>';
-    }).join('');
+    var listHtml = list.map(tailRowHtml).join('');
     var listEl = area.querySelector('.tail-list');
     if (listEl) listEl.innerHTML = listHtml;
 }
@@ -2852,7 +2872,9 @@ function refreshOneTail(subItem, lineNo, safeId) {
                     id: t.id,
                     content: t.content || '',
                     time: t.createdAt || t.time || '',
-                    user: t.user || ''            // ✅ 补上
+                    user: t.user || '',
+                    clearedBy: t.clearedBy || '',
+                    clearedAt: t.clearedAt || ''
                 };
             }) : [];
             var pendingList = tailPendingMap[key] || [];
@@ -2869,6 +2891,88 @@ function refreshOneTail(subItem, lineNo, safeId) {
             renderTailList(key, safeId);
         })
         .catch(function () {});
+}
+// 找到某条尾项所在的分组 key
+function findTailKeyById(id) {
+    var keys = Object.keys(tailItemsCache);
+    for (var i = 0; i < keys.length; i++) {
+        var hit = (tailItemsCache[keys[i]] || []).some(function (t) { return String(t.id) === String(id); });
+        if (hit) return keys[i];
+    }
+    return null;
+}
+function requireTailUser() {
+    if (!currentUser) { showToast('请先在顶部设置姓名'); promptUserName(); return false; }
+    return true;
+}
+// 消除尾项：先改本地（即时变绿），再上传；失败回滚
+function clearTailById(id) {
+    if (!requireTailUser()) return;
+    var key = findTailKeyById(id);
+    if (!key) return;
+    var list = tailItemsCache[key] || [];
+    var item = list.filter(function (t) { return String(t.id) === String(id); })[0];
+    if (!item || item.clearedBy) return;
+    var oldBy = item.clearedBy || '', oldAt = item.clearedAt || '';
+    item.clearedBy = currentUser;
+    item.clearedAt = new Date().toISOString();
+    lsSet('tailItemsCache', tailItemsCache);
+    refreshAllTailViews();
+    showToast('✅ 已消除，正在同步…');
+    if (!navigator.onLine) { showToast('已本地标记，联网后同步'); return; }
+    fetch(TAIL_CLEAR_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, user: currentUser })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+        if (!res || !res.success) throw new Error('同步失败');
+        item.clearedAt = res.clearedAt || item.clearedAt;
+        lsSet('tailItemsCache', tailItemsCache);
+        refreshAllTailViews();
+    })
+    .catch(function () {
+        item.clearedBy = oldBy; item.clearedAt = oldAt;
+        lsSet('tailItemsCache', tailItemsCache);
+        refreshAllTailViews();
+        showToast('消除同步失败，请重试');
+    });
+}
+// 撤销消除
+function undoClearTail(id) {
+    var key = findTailKeyById(id);
+    if (!key) return;
+    var list = tailItemsCache[key] || [];
+    var item = list.filter(function (t) { return String(t.id) === String(id); })[0];
+    if (!item) return;
+    var oldBy = item.clearedBy || '', oldAt = item.clearedAt || '';
+    item.clearedBy = ''; item.clearedAt = '';
+    lsSet('tailItemsCache', tailItemsCache);
+    refreshAllTailViews();
+    if (!navigator.onLine) { showToast('已本地撤销，联网后同步'); return; }
+    fetch(TAIL_UNDO_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+        if (!res || !res.success) throw new Error('同步失败');
+    })
+    .catch(function () {
+        item.clearedBy = oldBy; item.clearedAt = oldAt;
+        lsSet('tailItemsCache', tailItemsCache);
+        refreshAllTailViews();
+        showToast('撤销同步失败，请重试');
+    });
+}
+// 重绘所有可见的尾项区域（弹窗 + 查询结果卡片），各区域用自己的 data-key
+function refreshAllTailViews() {
+    var areas = document.querySelectorAll('[id^="tail-area-"]');
+    for (var i = 0; i < areas.length; i++) {
+        var key = areas[i].getAttribute('data-key') || '';
+        var listEl = areas[i].querySelector('.tail-list');
+        if (listEl) listEl.innerHTML = (tailItemsCache[key] || []).map(tailRowHtml).join('');
+    }
 }
 function syncPendingTails() {
     if (!navigator.onLine) return;
@@ -3376,11 +3480,7 @@ function doPipelineSearch(q, subItem) {
         }).join('');
         var tailKey = item.subItem + '_' + item.lineNo;
         var tails = tailItemsCache[tailKey] || [];
-        var tailHtml = tails.map(function (t, i) {
-            var pendingTag = t._pending ? '<span style="color:#f59e0b;font-size:12px;margin-left:6px;">⏳ 待同步</span>' : '';
-            var userTag = t.user ? '<span style="color:var(--text-secondary);font-size:12px;margin-left:6px;">— ' + escapeHtml(t.user) + '</span>' : '';
-            return '<div style="font-size:14px;color:var(--text-value);padding:2px 0;">尾项' + (i + 1) + '  ' + escapeHtml(t.content) + pendingTag + userTag + '</div>';
-        }).join('');
+        var tailHtml = tails.map(tailRowHtml).join('');
         html += '<div class="result-card">' +
             '<div class="card-row"><div class="label">子项号</div><div class="value" style="color:#7c3aed;">' + escapeHtml(item.subItem) + '</div></div>' +
             '<div class="card-row"><div class="label">管线号</div><div class="value" style="color:#1a5fb0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + escapeHtml(item.lineNo) +
@@ -3394,7 +3494,7 @@ function doPipelineSearch(q, subItem) {
             '<div class="card-row"><div class="label">探伤比例</div><div class="value">' + escapeHtml(item.testRatio || '未设置') + '</div></div>' +
             '<div class="card-row"><div class="label">保温厚度</div><div class="value">' + escapeHtml(item.insulationThickness || '未设置') + '</div></div>' +
             '<div style="padding:10px 0;border-top:1px solid var(--border-light);">' +
-                '<div id="tail-area-' + safeId + '">' +
+                '<div id="tail-area-' + safeId + '" data-key="' + escapeHtml(tailKey) + '">' +
                     '<div class="tail-list">' + tailHtml + '</div>' +
                     '<button onclick="openTailDialog(\'' + escapeJs(item.subItem) + '\', \'' + escapeJs(item.lineNo) + '\', \'' + safeId + '\')" style="margin-top:6px;padding:6px 16px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:13px;cursor:pointer;">➕ 添加尾项</button>' +
                 '</div>' +

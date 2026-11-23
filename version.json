@@ -1,6 +1,6 @@
 {
-    "version": "4.2.4",
-    "updateTime": "2026-11-22 16:31:08",
+    "version": "4.2.5",
+    "updateTime": "2026-11-23 20:28:57",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "修复「所有支架状态」按管线号后缀兜底导致串图：改为以图号唯一匹配 data.json 的支架清单，再精确取状态。"
+    "updateLog": "尾项新增「消除尾项/撤销消除」：消除后变绿显示消除人，可撤销。"
 }

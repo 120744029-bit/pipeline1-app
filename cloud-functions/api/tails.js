@@ -3,6 +3,18 @@
 // ============================================================
 import { neon } from '@neondatabase/serverless';
 
+// 消除字段惰性建列（每个云函数实例只跑一次，幂等）
+let _clearColsReady = null;
+async function ensureClearCols(sql) {
+  if (!_clearColsReady) {
+    _clearColsReady = (async function () {
+      await sql`ALTER TABLE tail_items ADD COLUMN IF NOT EXISTS cleared_by TEXT NOT NULL DEFAULT ''`;
+      await sql`ALTER TABLE tail_items ADD COLUMN IF NOT EXISTS cleared_at TEXT NOT NULL DEFAULT ''`;
+    })().catch(function (e) { _clearColsReady = null; throw e; });
+  }
+  return _clearColsReady;
+}
+
 // ============================================================
 //              EdgeOne 入口（必须叫 onRequest）
 // ============================================================
@@ -67,6 +79,40 @@ async function originalHandler(req, res) {
   try {
     const sql = neon(process.env.DATABASE_URL);
 
+    // 幂等建列：消除状态存在同一张表里，不需要额外存储
+    if (action === 'init') {
+      await ensureClearCols(sql);
+      const cols = await sql`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'tail_items' AND column_name IN ('cleared_by','cleared_at')
+      `;
+      return res.status(200).json({ success: true, columns: cols.map(c => c.column_name) });
+    }
+
+    // 消除尾项（记录消除人+时间）
+    if (action === 'clear') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+      const { id, user } = req.body || {};
+      if (!id) return res.status(400).json({ error: 'id required' });
+      const now = new Date().toISOString();
+      const r = await sql`
+        UPDATE tail_items SET cleared_by = ${user || ''}, cleared_at = ${now}
+        WHERE id = ${id}
+        RETURNING id, cleared_by, cleared_at
+      `;
+      if (r.length === 0) return res.status(404).json({ error: 'Item not found' });
+      return res.status(200).json({ success: true, clearedBy: r[0].cleared_by, clearedAt: r[0].cleared_at });
+    }
+
+    // 撤销消除
+    if (action === 'undo-clear') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+      const { id } = req.body || {};
+      if (!id) return res.status(400).json({ error: 'id required' });
+      await sql`UPDATE tail_items SET cleared_by = '', cleared_at = '' WHERE id = ${id}`;
+      return res.status(200).json({ success: true });
+    }
+
     // ============================================================
     // 1. 保存尾项
     // ============================================================
@@ -101,8 +147,9 @@ async function originalHandler(req, res) {
       if (!subItem || !lineNo) {
         return res.status(400).json({ error: 'subItem and lineNo required' });
       }
+      await ensureClearCols(sql);
       const rows = await sql`
-        SELECT id, content, created_at, user_name
+        SELECT id, content, created_at, user_name, cleared_by, cleared_at
         FROM tail_items
         WHERE sub_item = ${subItem} AND line_no = ${lineNo}
         ORDER BY created_at ASC
@@ -112,7 +159,9 @@ async function originalHandler(req, res) {
           id: r.id,
           content: r.content,
           createdAt: r.created_at,
-          user: r.user_name || ''
+          user: r.user_name || '',
+          clearedBy: r.cleared_by || '',
+          clearedAt: r.cleared_at || ''
         }))
       });
     }
@@ -122,8 +171,9 @@ async function originalHandler(req, res) {
     // ============================================================
     if (action === 'get-all') {
       if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+      await ensureClearCols(sql);
       const rows = await sql`
-        SELECT id, sub_item, line_no, content, created_at, user_name
+        SELECT id, sub_item, line_no, content, created_at, user_name, cleared_by, cleared_at
         FROM tail_items
         ORDER BY sub_item, line_no, created_at ASC
       `;
@@ -135,7 +185,9 @@ async function originalHandler(req, res) {
           id: r.id,
           content: r.content,
           createdAt: r.created_at,
-          user: r.user_name || ''
+          user: r.user_name || '',
+          clearedBy: r.cleared_by || '',
+          clearedAt: r.cleared_at || ''
         });
       });
       return res.status(200).json(grouped);
