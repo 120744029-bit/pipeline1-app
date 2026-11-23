@@ -1,6 +1,6 @@
 {
-    "version": "4.2.5",
-    "updateTime": "2026-11-23 20:28:57",
+    "version": "4.2.6",
+    "updateTime": "2026-11-23 20:39:11",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "尾项新增「消除尾项/撤销消除」：消除后变绿显示消除人，可撤销。"
+    "updateLog": "尾项消除后不再在APP端显示撤销按钮，撤销统一移到桌面版数据控制台。"
 }

@@ -2801,8 +2801,7 @@ function tailRowHtml(t, i) {
     var act = '';
     if (cleared) {
         var by = escapeHtml(t.clearedBy || '未知');
-        act = '<span style="font-size:12px;margin-left:6px;">✅ 已消除 · ' + by + '</span>' +
-              (t.id ? '<button onclick="undoClearTail(\'' + escapeJs(String(t.id)) + '\')" style="margin-left:8px;padding:2px 8px;background:transparent;border:1px solid var(--green-primary);border-radius:4px;font-size:11px;color:var(--green-text);cursor:pointer;">↩️ 撤销</button>' : '');
+        act = '<span style="font-size:12px;margin-left:6px;">✅ 已消除 · ' + by + '</span>';
     } else if (t.id) {
         act = '<button onclick="clearTailById(\'' + escapeJs(String(t.id)) + '\')" style="margin-left:8px;padding:2px 8px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;">✅ 消除尾项</button>';
     }
