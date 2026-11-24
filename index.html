@@ -20,7 +20,7 @@
             --bg-nav: #EDEDED;
             --bg-tab: #F7F7F7;
             --bg-dialog: #FFFFFF;
-            --bg-toast: rgba(0,0,0,0.8);
+            --bg-toast: rgba(0,0,0,0.9);
             --text-primary: #000000;
             --text-secondary: #7F7F7F;
             --text-tertiary: #AAB7C9;
@@ -52,7 +52,7 @@
             --bg-nav: #1A1A1A;
             --bg-tab: #1A1A1A;
             --bg-dialog: #2C2C2C;
-            --bg-toast: rgba(255,255,255,0.15);
+            --bg-toast: rgba(0,0,0,0.9);
             --text-primary: #E0E0E0;
             --text-secondary: #A0A0A0;
             --text-tertiary: #6B6B6B;
@@ -536,7 +536,7 @@
             transition: background 0.2s;
         }
         .dialog h3 { font-size: calc(17px * var(--font-scale)); color: var(--text-primary); margin-bottom: 12px; }
-        .dialog p { font-size: calc(13px * var(--font-scale)); color: var(--text-secondary); margin-bottom: 12px; }
+        .dialog p { font-size: calc(15px * var(--font-scale)); color: var(--text-primary); margin-bottom: 12px; }
         .dialog textarea {
             width: 100%; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: 4px;
             font-size: calc(14px * var(--font-scale)); font-family: system-ui, sans-serif; resize: vertical; outline: none;
@@ -548,9 +548,11 @@
         /* ============ Toast ============ */
         .toast {
             position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
-            background: var(--bg-toast); color: var(--text-primary); padding: 10px 20px;
-            border-radius: 4px; font-size: calc(14px * var(--font-scale)); z-index: 9999;
-            display: none; max-width: 80%; text-align: center;
+            background: var(--bg-toast); color: #FFFFFF; padding: 12px 24px;
+            border-radius: 8px; font-size: calc(16px * var(--font-scale)); font-weight: 600;
+            line-height: 1.5; z-index: 9999;
+            display: none; max-width: 82%; text-align: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
             transition: background 0.2s, color 0.2s;
         }
         .toast.show { display: block; animation: toastIn 0.3s ease; }

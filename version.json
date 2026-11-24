@@ -1,6 +1,6 @@
 {
-    "version": "4.2.8",
-    "updateTime": "2026-11-24 13:19:27",
+    "version": "4.2.9",
+    "updateTime": "2026-11-24 17:48:05",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "消除尾项加确认弹窗：点消除后先确认尾项内容与消除人，防止误点。"
+    "updateLog": "提示弹框更易读： toast 改成白字深底加大加粗，修复黑底黑字看不清；弹窗正文放大。"
 }
