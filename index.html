@@ -2924,30 +2924,41 @@ function clearTailById(id) {
     var list = tailItemsCache[key] || [];
     var item = list.filter(function (t) { return String(t.id) === String(id); })[0];
     if (!item || item.clearedBy) return;
-    var oldBy = item.clearedBy || '', oldAt = item.clearedAt || '';
-    item.clearedBy = currentUser;
-    item.clearedAt = new Date().toISOString();
-    lsSet('tailItemsCache', tailItemsCache);
-    refreshAllTailViews();
-    showToast('✅ 已消除，正在同步…');
-    if (!navigator.onLine) { showToast('已本地标记，联网后同步'); return; }
-    fetch(TAIL_CLEAR_API, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id, user: currentUser })
-    })
-    .then(function (r) { return r.json(); })
-    .then(function (res) {
-        if (!res || !res.success) throw new Error('同步失败');
-        item.clearedAt = res.clearedAt || item.clearedAt;
+    // 双重确认：显示尾项内容 + 消除人，确认后才真正消除
+    var content = item.content || '';
+    var who = item.user ? ('\n原始登记：' + item.user) : '';
+    var msg = '确认消除这条尾项？\n\n' + content + who + '\n\n消除人：' + currentUser;
+    function doClearTail() {
+        var oldBy = item.clearedBy || '', oldAt = item.clearedAt || '';
+        item.clearedBy = currentUser;
+        item.clearedAt = new Date().toISOString();
         lsSet('tailItemsCache', tailItemsCache);
         refreshAllTailViews();
-    })
-    .catch(function () {
-        item.clearedBy = oldBy; item.clearedAt = oldAt;
-        lsSet('tailItemsCache', tailItemsCache);
-        refreshAllTailViews();
-        showToast('消除同步失败，请重试');
-    });
+        showToast('✅ 已消除，正在同步…');
+        if (!navigator.onLine) { showToast('已本地标记，联网后同步'); return; }
+        fetch(TAIL_CLEAR_API, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id, user: currentUser })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            if (!res || !res.success) throw new Error('同步失败');
+            item.clearedAt = res.clearedAt || item.clearedAt;
+            lsSet('tailItemsCache', tailItemsCache);
+            refreshAllTailViews();
+        })
+        .catch(function () {
+            item.clearedBy = oldBy; item.clearedAt = oldAt;
+            lsSet('tailItemsCache', tailItemsCache);
+            refreshAllTailViews();
+            showToast('消除同步失败，请重试');
+        });
+    }
+    if (typeof plus !== 'undefined' && plus.nativeUI && plus.nativeUI.confirm) {
+        plus.nativeUI.confirm(msg, function (e) { if (e.index === 0) doClearTail(); }, '✅ 消除尾项', ['确认消除', '取消']);
+    } else {
+        if (confirm(msg)) doClearTail();
+    }
 }
 // 撤销消除
 function undoClearTail(id) {
