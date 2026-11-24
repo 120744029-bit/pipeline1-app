@@ -122,6 +122,21 @@ async function originalHandler(req, res) {
       if (!subItem || !lineNo || !content) {
         return res.status(400).json({ error: 'subItem, lineNo, content required' });
       }
+      // 幂等：同一管线 + 同一内容只保留一条，防止网络重试/重复点产生重复尾项
+      const dup = await sql`
+        SELECT id, content, created_at, user_name FROM tail_items
+        WHERE sub_item = ${subItem} AND line_no = ${lineNo} AND content = ${content}
+        ORDER BY created_at ASC LIMIT 1
+      `;
+      if (dup.length) {
+        return res.status(200).json({
+          success: true, duplicated: true,
+          item: {
+            id: dup[0].id, content: dup[0].content,
+            createdAt: dup[0].created_at, user: dup[0].user_name || ''
+          }
+        });
+      }
       const result = await sql`
         INSERT INTO tail_items (sub_item, line_no, content, user_name)
         VALUES (${subItem}, ${lineNo}, ${content}, ${user || ''})

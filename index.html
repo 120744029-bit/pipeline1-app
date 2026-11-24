@@ -2823,6 +2823,15 @@ function saveTailFromDialog() {
 
     var d = tailDialogData;
     var key = d.subItem + '_' + d.lineNo;
+    // 防重复：同管线同内容（未消除）已存在就不再添加，网络重试也不会产生第二条
+    var dup = (tailItemsCache[key] || []).some(function (x) {
+        return x && (x.content || '') === content && !x.clearedBy;
+    });
+    if (dup) {
+        closeTailDialog();
+        showToast('这条尾项已存在，未重复添加');
+        return;
+    }
     var now = new Date().toLocaleString();
     var item = { content: content, time: now, user: currentUser };
 
@@ -2859,7 +2868,10 @@ function uploadTailToCloud(subItem, lineNo, content, time, safeId, user) {
             if (safeId) refreshOneTail(subItem, lineNo, safeId);
         }
     })
-    .catch(function () {});
+    .catch(function () {
+        // 失败不再静默：保留本地 pending，联网后自动补传，同时明确告诉用户
+        showToast('⚠️ 网络异常，尾项已存本地，联网后自动同步（请勿重复添加）');
+    });
 }
 function refreshOneTail(subItem, lineNo, safeId) {
     var key = subItem + '_' + lineNo;

@@ -1,6 +1,6 @@
 {
-    "version": "4.2.6",
-    "updateTime": "2026-11-23 20:39:11",
+    "version": "4.2.7",
+    "updateTime": "2026-11-24 12:51:35",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "尾项消除后不再在APP端显示撤销按钮，撤销统一移到桌面版数据控制台。"
+    "updateLog": "尾项添加防重复：同管线同内容只保留一条，网络重试不再重复；后端也加幂等查重。"
 }
