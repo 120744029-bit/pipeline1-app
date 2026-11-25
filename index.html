@@ -3671,6 +3671,10 @@ function doPipelineSearch(q, subItem) {
         '.bo-chip.ok{background:var(--green-bg);color:var(--green-text)}',
         '.bo-chip.bad{background:var(--red-bg);color:var(--red-text)}',
         '.bo-chip.warn{background:var(--amber-bg);color:var(--amber-text)}',
+        '.bo-fbtn{border:1px solid var(--border-light);background:var(--bg-card);color:var(--text-secondary);border-radius:6px;padding:5px 10px;font-size:calc(11px * var(--font-scale));cursor:pointer;white-space:nowrap}',
+        '.bo-fbtn b{font-weight:700;color:var(--text-value);margin-left:2px}',
+        '.bo-fbtn.active{background:var(--green-primary);border-color:var(--green-primary);color:var(--text-inverse)}',
+        '.bo-fbtn.active b{color:var(--text-inverse)}',
         '.bo-warn{margin:10px 12px 0;padding:9px 12px;border-radius:6px;background:var(--amber-bg);color:var(--amber-text);font-size:calc(12px * var(--font-scale));line-height:1.6}',
         '.bo-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px 12px}',
         '.bo-item{background:var(--bg-card);border:1px solid var(--border-light);border-radius:8px;padding:11px 12px;margin-bottom:9px;cursor:pointer}',
@@ -3694,6 +3698,8 @@ function doPipelineSearch(q, subItem) {
     var current = null;   // { line, iso, sub, rows:[], setCount, mapSize }
     var curItem = null;
     var autoRefreshed = false;
+    var BO_CATS = ['全部', '已安装', '已焊接', '已到', '已预制', '其他'];
+    var boFilter = '全部';
 
     function esc(s) {
         return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -3754,21 +3760,22 @@ function doPipelineSearch(q, subItem) {
                  setCount: setCount, mapSize: Object.keys(map).length };
     }
     function category(s) {
-        if (!s) return '未设置';
+        if (!s) return '其他';
         if (s.indexOf('已安装') !== -1 || s.indexOf('已验收') !== -1) return '已安装';
-        if (s.indexOf('已到现场') !== -1) return '已到现场';
-        if (s.indexOf('到货已领') !== -1 || s.indexOf('到货未领') !== -1 || s.indexOf('已到货') !== -1) return '到货';
+        if (s.indexOf('已焊接') !== -1 || s.indexOf('己焊接') !== -1 ||
+            s.indexOf('焊接完成') !== -1 || s.indexOf('己焊完') !== -1) return '已焊接';
+        // 到货/已到货/到货已领/到货未领 全部归「其他」，不进「已到」
+        if (s.indexOf('到货') !== -1) return '其他';
+        if (s.indexOf('已到') !== -1 || s.indexOf('己到') !== -1) return '已到';
         if (s.indexOf('已预制') !== -1) return '已预制';
-        if (s.indexOf('未预制') !== -1 || s.indexOf('未到货') !== -1 || s.indexOf('未安装') !== -1) return '未预制/未到货';
         return '其他';
     }
-    // 状态标签配色与上面的分类保持一致（不用 getStatusClass，它把「已到现场」归成紫色 other）
+    // 状态标签配色与上面的分类保持一致
     function badgeClass(s) {
+        if (!s) return 'status-none';
         var c = category(s);
         if (c === '已安装' || c === '已预制') return 'status-installed';
-        if (c === '已到现场' || c === '到货') return 'status-checking';
-        if (c === '未预制/未到货') return 'status-not-installed';
-        if (c === '未设置') return 'status-none';
+        if (c === '已焊接' || c === '已到') return 'status-checking';
         return 'status-other';
     }
     function render(data) {
@@ -3776,25 +3783,22 @@ function doPipelineSearch(q, subItem) {
         document.getElementById('boTitle').textContent = '📊 ' + data.line + ' · 所有支架状态';
         document.getElementById('boSub').textContent =
             (data.iso ? data.iso + ' ｜ ' : '') + (data.sub ? '子项 ' + data.sub + ' ｜ ' : '') +
-            '共 ' + data.rows.length + ' 个支架';
+            '共 ' + data.rows.length + ' 个支架' + (boFilter === '全部' ? '' : ' · 筛选：' + boFilter);
 
-        var counts = {}, order = ['已安装', '已到现场', '已预制', '到货', '未预制/未到货', '其他', '未设置'];
+        var counts = {};
         data.rows.forEach(function (r) {
             var c = category(r.status);
             counts[c] = (counts[c] || 0) + 1;
         });
-        var chips = '';
-        order.forEach(function (c) {
-            if (!counts[c]) return;
-            var cls = (c === '已安装' || c === '已预制') ? 'ok' :
-                      (c === '未预制/未到货' || c === '未设置') ? 'bad' :
-                      (c === '已到现场' || c === '到货') ? 'warn' : '';
-            chips += '<span class="bo-chip ' + cls + '">' + esc(c) + ' ' + counts[c] + '</span>';
-        });
+        var buttons = BO_CATS.map(function (c) {
+            var n = c === '全部' ? data.rows.length : (counts[c] || 0);
+            return '<button type="button" class="bo-fbtn' + (boFilter === c ? ' active' : '') +
+                   '" data-bfilter="' + c + '">' + c + '<b>' + n + '</b></button>';
+        }).join('');
         document.getElementById('boSummary').innerHTML =
             '<div class="bo-total">共 <b>' + data.rows.length + '</b> 个支架，已录状态 <b>' + data.setCount +
             '</b> 个，未设置 <b>' + (data.rows.length - data.setCount) + '</b> 个</div>' +
-            '<div class="bo-chips">' + (chips || '<span class="bo-chip">暂无状态</span>') + '</div>';
+            '<div class="bo-chips">' + buttons + '</div>';
 
         var warn = document.getElementById('boWarn');
         if (!data.mapSize) {
@@ -3803,10 +3807,15 @@ function doPipelineSearch(q, subItem) {
         } else { warn.style.display = 'none'; warn.innerHTML = ''; }
 
         var list = document.getElementById('boList');
+        var shown = boFilter === '全部' ? data.rows : data.rows.filter(function (r) {
+            return category(r.status) === boFilter;
+        });
         if (!data.rows.length) {
             list.innerHTML = '<div class="bo-empty">这条管线没有登记支架。<br>（data.json 的 brackets 字段为空，状态库里也没有该管线号的记录）</div>';
+        } else if (!shown.length) {
+            list.innerHTML = '<div class="bo-empty">「' + esc(boFilter) + '」分类暂无支架</div>';
         } else {
-            list.innerHTML = data.rows.map(function (r, i) {
+            list.innerHTML = shown.map(function (r, i) {
                 var cls = badgeClass(r.status);
                 var info = [];
                 if (r.user) info.push('录入：' + esc(r.user));
@@ -3853,6 +3862,13 @@ function doPipelineSearch(q, subItem) {
         document.getElementById('boClose').addEventListener('click', close);
         panel.addEventListener('click', function (e) { if (e.target === panel) close(); });
         panel.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+        document.getElementById('boSummary').addEventListener('click', function (e) {
+            var b = e.target;
+            while (b && b !== panel && !(b.getAttribute && b.getAttribute('data-bfilter'))) b = b.parentNode;
+            if (!b || !b.getAttribute) return;
+            boFilter = b.getAttribute('data-bfilter') || '全部';
+            if (current) render(current);
+        });
         document.getElementById('boList').addEventListener('click', function (e) {
             var el = e.target;
             while (el && el !== panel && !(el.getAttribute && el.getAttribute('data-bid'))) el = el.parentNode;
@@ -3914,6 +3930,7 @@ function doPipelineSearch(q, subItem) {
         if (!item) { toast('查询结果已变化，请重新查一次'); return; }
         closeValves();                 // 两个面板不同时出现
         curItem = item;
+        boFilter = '全部';
         build().classList.add('active');
         var data = collect(item);
         render(data);

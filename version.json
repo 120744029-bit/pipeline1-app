@@ -1,6 +1,6 @@
 {
-    "version": "4.3.1",
-    "updateTime": "2026-11-25 16:20:01",
+    "version": "4.3.2",
+    "updateTime": "2026-11-25 17:45:06",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "尾项改用独立存储，不再被图纸/支架缓存挤爆；旧尾项数据自动迁移。支架/阀门静态缓存去重，释放本地空间。"
+    "updateLog": "所有支架状态改固定筛选栏：全部/已安装/已焊接/已到/已预制/其他，点击只看这一类；分类与桌面版一致。"
 }
