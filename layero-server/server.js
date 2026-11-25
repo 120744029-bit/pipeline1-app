@@ -11,6 +11,7 @@ import { handler as kvHandler }         from './api/kv.js';
 import { handler as workHandler }       from './api/work.js';
 import { handler as tailsHandler }      from './api/tails.js';
 import { handler as adminNotesHandler } from './api/admin-notes.js';
+import { handler as authHandler }       from './api/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,7 +22,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Password');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Password, X-App-Token, Authorization');
     if (req.method === 'OPTIONS') return res.status(200).end();
     next();
 });
@@ -66,6 +67,7 @@ app.all('/api/kv', adapt(kvHandler));
 app.all('/api/work', adapt(workHandler));
 app.all('/api/tails', adapt(tailsHandler));
 app.all('/api/admin-notes', adapt(adminNotesHandler));
+app.all('/api/auth', adapt(authHandler));
 
 // ---------- 健康检查 ----------
 app.get('/api/health', (req, res) => {
