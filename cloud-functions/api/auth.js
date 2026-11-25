@@ -174,7 +174,7 @@ export async function handler(req, res) {
     }
 
     // ---------- 账号管理：只有 owner ----------
-    if (['list-users', 'add-user', 'disable-user', 'enable-user', 'reset-password', 'set-role'].indexOf(action) !== -1) {
+    if (['list-users', 'add-user', 'disable-user', 'enable-user', 'reset-password', 'set-role', 'update-user', 'delete-user'].indexOf(action) !== -1) {
       if (me.role !== 'owner') return res.status(403).json({ success: false, message: '只有超级管理员能管理账号' });
 
       if (action === 'list-users') {
@@ -226,6 +226,42 @@ export async function handler(req, res) {
         if (!rows.length) return res.status(404).json({ success: false, message: '账号不存在' });
         if (rows[0].role === 'owner') return res.status(403).json({ success: false, message: '超级管理员角色不可改' });
         await sql`UPDATE users SET role = ${role} WHERE id = ${id}`;
+        return res.status(200).json({ success: true });
+      }
+
+      // 修改账号：账号名 / 姓名 / 角色（超管改自己时只放行账号名和姓名）
+      if (action === 'update-user') {
+        const { id, username, name, role } = req.body || {};
+        if (!id) return res.status(400).json({ success: false, message: 'id 必填' });
+        const rows = await sql`SELECT id, username, name, role FROM users WHERE id = ${id}`;
+        if (!rows.length) return res.status(404).json({ success: false, message: '账号不存在' });
+        const cur = rows[0];
+        const newUsername = username === undefined ? cur.username : String(username).trim();
+        const newName = name === undefined ? cur.name : String(name).trim();
+        const newRole = role === undefined ? cur.role : role;
+        if (!newUsername || !newName) return res.status(400).json({ success: false, message: '账号和姓名不能为空' });
+        if (['owner', 'admin', 'user'].indexOf(newRole) === -1) return res.status(400).json({ success: false, message: '角色参数错误' });
+        if (cur.role === 'owner' && newRole !== 'owner') return res.status(403).json({ success: false, message: '超级管理员角色不可改' });
+        if (cur.role !== 'owner' && newRole === 'owner') return res.status(403).json({ success: false, message: '不能设置超级管理员' });
+        if (newUsername !== cur.username) {
+          const dup = await sql`SELECT id FROM users WHERE username = ${newUsername} AND id <> ${id}`;
+          if (dup.length) return res.status(400).json({ success: false, message: '账号名已存在' });
+        }
+        await sql`UPDATE users SET username = ${newUsername}, name = ${newName}, role = ${newRole} WHERE id = ${id}`;
+        const out = { id: cur.id, username: newUsername, name: newName, role: newRole };
+        const self = Number(id) === Number(me.uid);
+        return res.status(200).json({ success: true, user: out, token: self ? signToken({ id: cur.id, username: newUsername, name: newName, role: newRole }) : undefined });
+      }
+
+      // 删除账号：超管不可删、自己不可删
+      if (action === 'delete-user') {
+        const { id } = req.body || {};
+        if (!id) return res.status(400).json({ success: false, message: 'id 必填' });
+        if (Number(id) === Number(me.uid)) return res.status(403).json({ success: false, message: '不能删除当前账号' });
+        const rows = await sql`SELECT role FROM users WHERE id = ${id}`;
+        if (!rows.length) return res.status(404).json({ success: false, message: '账号不存在' });
+        if (rows[0].role === 'owner') return res.status(403).json({ success: false, message: '超级管理员不能被删除' });
+        await sql`DELETE FROM users WHERE id = ${id}`;
         return res.status(200).json({ success: true });
       }
     }
