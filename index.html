@@ -1232,8 +1232,28 @@ function installFetchPolyfill(retry) {
                 });
             }
 
+            // ★ 凭据必须在原生 XHR 上直接注入：
+            //   外层 fetch 鉴权包装会被本 polyfill 架空（这里不调用 nativeFetch），
+            //   只靠外层包装会导致 /api/ 请求缺 X-App-Token，后端返回"未授权的应用"。
+            if (typeof url === 'string' && (url.indexOf('/api/') !== -1 || url.indexOf('/api?') !== -1)) {
+                xhr.setRequestHeader('X-App-Token', APP_TOKEN);
+                if (typeof authToken !== 'undefined' && authToken) {
+                    xhr.setRequestHeader('Authorization', 'Bearer ' + authToken);
+                }
+            }
+
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4) {
+                    // 401 且处于登录态：清掉登录态回到游客（与外层包装行为一致）
+                    if (xhr.status === 401 && typeof authToken !== 'undefined' && authToken) {
+                        authToken = ''; authUser = null;
+                        try {
+                            authStoreSet('pd.auth.token', '');
+                            authStoreSet('pd.auth.user', null);
+                            updateUserBadge();
+                            showToast('登录已过期，已切回游客');
+                        } catch (e) {}
+                    }
                     var response = {
                         ok: xhr.status >= 200 && xhr.status < 300,
                         status: xhr.status,
