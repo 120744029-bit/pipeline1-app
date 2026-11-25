@@ -36,9 +36,15 @@ function safeJsonParse(str) {
 export async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Password');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-App-Token, Authorization, X-Admin-Password');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
+
+    // 应用凭据校验
+    const _appTok = (req.headers && req.headers['x-app-token']) || req.query.token || '';
+    if (_appTok !== 'pd-app-f174c8613578189b') {
+      return res.status(401).json({ success: false, message: '未授权的应用' });
+    }
 
     const password = req.headers['x-admin-password'] || req.query.password;
     if (password !== ADMIN_PASSWORD) {

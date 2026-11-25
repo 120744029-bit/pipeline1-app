@@ -1,6 +1,6 @@
 {
-    "version": "4.3.2",
-    "updateTime": "2026-11-25 17:45:06",
+    "version": "4.3.3",
+    "updateTime": "2026-11-25 20:26:39",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "所有支架状态改固定筛选栏：全部/已安装/已焊接/已到/已预制/其他，点击只看这一类；分类与桌面版一致。"
+    "updateLog": "新增账号登录：游客功能不变；管理员登录后可用尾项修改/删除/撤销；接口加应用鉴权。"
 }

@@ -3,6 +3,41 @@
 // ============================================================
 import { neon } from '@neondatabase/serverless';
 
+
+// ---------- 统一鉴权：应用凭据 + JWT 角色 ----------
+import crypto from 'crypto';
+const APP_TOKEN = 'pd-app-f174c8613578189b';
+const JWT_SECRET = 'fd68a9a239318fb25324d8c076512413e3de66a4fccb9374bf192a5d206beb12';
+function _tok(req) {
+  let t = (req.headers && req.headers.authorization) || '';
+  t = t.replace(/^Bearer\s+/i, '');
+  return t || (req.query && req.query._token) || '';
+}
+function _role(req) {
+  const tok = _tok(req);
+  if (!tok) return '';
+  const p = String(tok).split('.');
+  if (p.length !== 3) return '';
+  const sig = crypto.createHmac('sha256', JWT_SECRET).update(p[0] + '.' + p[1]).digest('base64url');
+  const a = Buffer.from(sig), b = Buffer.from(p[2]);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return '';
+  try {
+    const pl = JSON.parse(Buffer.from(p[1], 'base64url').toString());
+    if (!pl.exp || pl.exp < Date.now()) return '';
+    return pl.role || '';
+  } catch (e) { return ''; }
+}
+function _checkApp(req, res) {
+  const t = (req.headers && req.headers['x-app-token']) || req.query.token || '';
+  if (t !== APP_TOKEN) { res.status(401).json({ success: false, message: '未授权的应用' }); return false; }
+  return true;
+}
+function _needAdmin(req, res) {
+  const r = _role(req);
+  if (r !== 'owner' && r !== 'admin') { res.status(403).json({ success: false, message: '需要管理员权限' }); return false; }
+  return true;
+}
+
 // 消除字段惰性建列（每个云函数实例只跑一次，幂等）
 let _clearColsReady = null;
 async function ensureClearCols(sql) {
@@ -28,7 +63,7 @@ export async function onRequest(context) {
             headers: {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type'
+                'Access-Control-Allow-Headers': 'Content-Type, X-App-Token, Authorization'
             }
         });
     }
@@ -71,10 +106,12 @@ export async function onRequest(context) {
 async function originalHandler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-App-Token, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { action } = req.query;
+  if (!_checkApp(req, res)) return;
+  if (['update', 'delete', 'undo-clear'].indexOf(action) !== -1 && !_needAdmin(req, res)) return;
 
   try {
     const sql = neon(process.env.DATABASE_URL);

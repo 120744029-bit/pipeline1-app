@@ -684,7 +684,7 @@
     <!-- 顶部导航栏 -->
     <div class="navbar">
         <span class="status-badge online" id="statusBadge">✅ 在线</span>
-        <span class="status-badge" id="userBadge" onclick="promptUserName()" style="left:auto;right:60px;background:var(--bg-hover);color:var(--text-primary);display:none;cursor:pointer;">👤</span>
+        <span class="status-badge" id="userBadge" onclick="authUser ? authMenu() : promptUserName()" style="left:auto;right:60px;background:var(--bg-hover);color:var(--text-primary);display:none;cursor:pointer;">👤</span>
         <h1 id="mainTitle">工作量</h1>
         <button class="right-btn" onclick="showInfo()">⋯</button>
     </div>
@@ -1054,7 +1054,7 @@
 <!-- ============ 添加尾项弹窗 ============ -->
 <div class="dialog-overlay" id="tailDialog">
     <div class="dialog">
-        <h3>➕ 添加尾项</h3>
+        <h3 id="tailDialogTitle">➕ 添加尾项</h3>
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">
             录入人：<span id="tailDialogUser" style="color:var(--green-primary);font-weight:600;">—</span>
             <button onclick="changeTailUser()" style="margin-left:8px;padding:3px 10px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:4px;font-size:12px;cursor:pointer;">修改</button>
@@ -1062,7 +1062,7 @@
         <input type="text" id="tailDialogInput" placeholder="请输入尾项内容..." class="dialog-input">
         <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
             <button onclick="closeTailDialog()" style="padding:8px 18px;background:var(--bg-hover);border:none;border-radius:4px;font-size:14px;cursor:pointer;color:var(--text-primary);">取消</button>
-            <button onclick="saveTailFromDialog()" style="padding:8px 18px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:14px;cursor:pointer;">上传</button>
+            <button id="tailDialogSave" onclick="saveTailFromDialog()" style="padding:8px 18px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:14px;cursor:pointer;">上传</button>
         </div>
     </div>
 </div>
@@ -1113,8 +1113,13 @@
             </div>
         </div>	
 		
+        <!-- 账号登录 -->
+        <div class="settings-row" style="border-bottom:none;justify-content:center;padding-top:8px;">
+            <button id="authBtn" onclick="authUser ? authMenu() : showLoginDialog()" style="padding:10px 28px;background:var(--blue-soft);border:1px solid var(--blue);border-radius:6px;font-size:14px;cursor:pointer;color:var(--blue);font-weight:500;">🔐 登录 / 账号</button>
+        </div>
+
         <!-- 恢复默认 -->
-        <div class="settings-row" style="border-bottom:none;justify-content:center;padding-top:20px;">
+        <div class="settings-row" style="border-bottom:none;justify-content:center;padding-top:12px;">
             <button onclick="resetAllSettings()" style="padding:10px 28px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:6px;font-size:14px;cursor:pointer;color:var(--text-primary);font-weight:500;">恢复默认设置</button>
         </div>	       
     </div>
@@ -1271,6 +1276,150 @@ function installFetchPolyfill(retry) {
 // ============================================================
 var APP_VERSION = '4.0.0';
 var currentVersion = APP_VERSION;
+
+// ============================================================
+//  账号鉴权（游客 / 普通 / 管理员 / 超级管理员）
+//  应用凭据前端可见，只挡"随便拿地址调"的脚本；角色在后端 JWT 校验
+// ============================================================
+var APP_TOKEN = 'pd-app-f174c8613578189b';
+var AUTH_API = null;  // 后端确定后初始化
+var authUser = null;  // { username, name, role }，null=游客
+var authToken = '';
+
+function authStoreGet(key, def) {
+    if (typeof plus !== 'undefined' && plus.storage && plus.storage.getItem) {
+        try { var v = plus.storage.getItem(key); return v != null ? JSON.parse(v) : def; } catch (e) {}
+    }
+    return lsGet(key, def);
+}
+function authStoreSet(key, val) {
+    var s = JSON.stringify(val);
+    if (typeof plus !== 'undefined' && plus.storage && plus.storage.setItem) {
+        try { plus.storage.setItem(key, s); return true; } catch (e) {}
+    }
+    return lsSet(key, val);
+}
+function isAdmin() { return !!authUser && (authUser.role === 'admin' || authUser.role === 'owner'); }
+function isOwner() { return !!authUser && authUser.role === 'owner'; }
+
+// 统一 fetch：所有 /api/ 请求自动带应用凭据；登录态带 JWT
+(function () {
+    var _fetch = window.fetch;
+    if (!_fetch) return;
+    window.fetch = function (input, init) {
+        var url = typeof input === 'string' ? input : (input && input.url) || '';
+        if (url.indexOf('/api/') !== -1 || url.indexOf('/api?') !== -1) {
+            init = init || {};
+            var h = {};
+            var src = init.headers || {};
+            if (src && typeof src.forEach === 'function') {
+                src.forEach(function (v, k) { h[k] = v; });
+            } else if (src && typeof src === 'object') {
+                Object.keys(src).forEach(function (k) { h[k] = src[k]; });
+            }
+            h['X-App-Token'] = APP_TOKEN;
+            if (authToken) h['Authorization'] = 'Bearer ' + authToken;
+            init.headers = h;
+            // 401：登录态失效 → 退回游客
+            return _fetch(input, init).then(function (r) {
+                if (r.status === 401 && authToken) {
+                    authToken = ''; authUser = null;
+                    authStoreSet('pd.auth.token', '');
+                    authStoreSet('pd.auth.user', null);
+                    updateUserBadge();
+                    showToast('登录已过期，已切回游客');
+                }
+                return r;
+            });
+        }
+        return _fetch(input, init);
+    };
+})();
+
+// 登录弹窗（自绘，不用浏览器 prompt）
+function showLoginDialog() {
+    var mask = document.getElementById('loginMask');
+    if (mask) { mask.classList.add('active'); var u = document.getElementById('loginUser'); if (u) u.focus(); return; }
+    mask = document.createElement('div');
+    mask.id = 'loginMask';
+    mask.className = 'dialog-overlay active';
+    mask.innerHTML =
+        '<div class="dialog" style="max-width:360px">' +
+        '<h3>🔐 账号登录</h3>' +
+        '<p>游客功能不变；登录后可用尾项修改/删除/撤销</p>' +
+        '<label>账号 <input type="text" id="loginUser" autocomplete="off" style="width:100%;margin:6px 0;padding:8px;box-sizing:border-box"></label>' +
+        '<label>密码 <input type="password" id="loginPass" style="width:100%;margin:6px 0;padding:8px;box-sizing:border-box"></label>' +
+        '<div id="loginErr" style="color:#dc2626;font-size:13px;min-height:18px;margin-top:4px"></div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">' +
+        '<button class="mini" onclick="closeLoginDialog()">取消</button>' +
+        '<button class="mini" style="background:var(--blue);color:#fff" onclick="doLogin()">登录</button>' +
+        '</div></div>';
+    document.body.appendChild(mask);
+}
+function closeLoginDialog() {
+    var mask = document.getElementById('loginMask');
+    if (mask) mask.classList.remove('active');
+}
+function doLogin() {
+    var u = (document.getElementById('loginUser') || {}).value || '';
+    var p = (document.getElementById('loginPass') || {}).value || '';
+    if (!u.trim() || !p) { var e = document.getElementById('loginErr'); if (e) e.textContent = '请输入账号和密码'; return; }
+    fetch(AUTH_API + '?action=login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u.trim(), password: p })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+        if (!res || !res.success) {
+            var e = document.getElementById('loginErr');
+            if (e) e.textContent = (res && res.message) || '登录失败';
+            return;
+        }
+        authToken = res.token || '';
+        authUser = res.user || null;
+        authStoreSet('pd.auth.token', authToken);
+        authStoreSet('pd.auth.user', authUser);
+        // 登录态下录入人用账号姓名
+        if (authUser && authUser.name) setCurrentUser(authUser.name);
+        closeLoginDialog();
+        updateUserBadge();
+        refreshAllTailViews();
+        showToast('✅ 已登录：' + (authUser ? authUser.name : ''));
+    })
+    .catch(function () { var e = document.getElementById('loginErr'); if (e) e.textContent = '网络异常，请重试'; });
+}
+function doLogout() {
+    authToken = ''; authUser = null;
+    authStoreSet('pd.auth.token', '');
+    authStoreSet('pd.auth.user', null);
+    updateUserBadge();
+    refreshAllTailViews();
+    showToast('已退出登录');
+}
+function authMenu() {
+    if (authUser) {
+        var msg = '当前账号：' + authUser.name + '（' + authUser.role + '）\n\n1. 退出登录';
+        if (typeof plus !== 'undefined' && plus.nativeUI && plus.nativeUI.actionSheet) {
+            plus.nativeUI.actionSheet({ title: '账号', cancel: '取消', buttons: [{ title: '退出登录' }] }, function (e) {
+                if (e.index === 1) doLogout();
+            });
+        } else if (confirm(msg)) doLogout();
+    } else {
+        showLoginDialog();
+    }
+}
+function requireAdmin() {
+    if (isAdmin()) return true;
+    showLoginDialog();
+    showToast('此操作需要管理员登录');
+    return false;
+}
+function restoreAuth() {
+    authToken = authStoreGet('pd.auth.token', '') || '';
+    authUser = authStoreGet('pd.auth.user', null) || null;
+    if (authToken && authUser) updateUserBadge();
+}
+
 // ============================================================
 //  主后端 + 备用后端配置
 // ============================================================
@@ -1352,6 +1501,7 @@ function checkBackendHealth() {
 
 var UPDATE_URL   = BASE + '/version.json';
 var API_BASE_URL = BASE + '/api';
+AUTH_API = API_BASE_URL + '/auth';
 var DATA1_URL    = BASE + '/data1.json';
 var DATA2_URL    = BASE + '/data2.json';
 var DATA3_URL    = BASE + '/data3.json';
@@ -1638,10 +1788,15 @@ function setCurrentUser(name) {
 function updateUserBadge() {
     var el = document.getElementById('userBadge');
     if (!el) return;
-    if (currentUser) {
+    if (authUser) {
+        el.textContent = (authUser.role === 'owner' ? '👑' : '🔐') + ' ' + (authUser.name || authUser.username);
+        el.title = '已登录 · 点击账号菜单';
+    } else if (currentUser) {
         el.textContent = '👤 ' + currentUser;
+        el.title = '游客 · 点击设置姓名 / 登录';
     } else {
         el.textContent = '👤 设置姓名';
+        el.title = '游客 · 点击设置姓名 / 登录';
     }
     el.style.display = '';
 }
@@ -2857,6 +3012,7 @@ function loadTailItemsFromServer() {
         .catch(function (err) { console.warn('尾项加载失败:', err); });
 }
 function openTailDialog(subItem, lineNo, safeId) {
+    restoreTailDialog();
     tailDialogData.subItem = subItem;
     tailDialogData.lineNo = lineNo;
     tailDialogData.safeId = safeId;
@@ -2904,6 +3060,14 @@ function tailRowHtml(t, i) {
         act = '<span style="font-size:12px;margin-left:6px;">✅ 已消除 · ' + by + '</span>';
     } else if (t.id) {
         act = '<button onclick="clearTailById(\'' + escapeJs(String(t.id)) + '\')" style="margin-left:8px;padding:2px 8px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;">✅ 消除尾项</button>';
+    }
+    // 管理员专属：修改 / 删除 / 撤销消除（游客和普通账号看不到）
+    if (isAdmin() && t.id) {
+        act += '<button onclick="adminEditTail(\'' + escapeJs(String(t.id)) + '\')" style="margin-left:6px;padding:2px 8px;background:var(--blue,#2563eb);color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;">✏️ 修改</button>' +
+               '<button onclick="adminDeleteTail(\'' + escapeJs(String(t.id)) + '\')" style="margin-left:6px;padding:2px 8px;background:#dc2626;color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;">🗑️ 删除</button>';
+        if (cleared) {
+            act += '<button onclick="undoClearTail(\'' + escapeJs(String(t.id)) + '\')" style="margin-left:6px;padding:2px 8px;background:#6b7280;color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;">↩️ 撤销</button>';
+        }
     }
     return '<div style="' + style + '">尾项' + (i + 1) + '  ' + escapeHtml(t.content) + userTag + pendingTag + act + '</div>';
 }
@@ -3079,8 +3243,100 @@ function clearTailById(id) {
         if (confirm(msg)) doClearTail();
     }
 }
+// ========== 管理员特权：修改 / 删除尾项 ==========
+// 修改尾项：复用录入弹窗，预填原文，提交 update
+function adminEditTail(id) {
+    if (!requireAdmin()) return;
+    if (!navigator.onLine) { showToast('联网后才能修改尾项'); return; }
+    var key = findTailKeyById(id);
+    if (!key) return;
+    var item = (tailItemsCache[key] || []).filter(function (t) { return String(t.id) === String(id); })[0];
+    if (!item) return;
+    var input = document.getElementById('tailDialogInput');
+    if (!input) return;
+    tailDialogData = { subItem: key.split('_')[0], lineNo: key.slice(key.indexOf('_') + 1), safeId: '' };
+    document.getElementById('tailDialogTitle').textContent = '✏️ 修改尾项';
+    input.value = item.content || '';
+    var saveBtn = document.getElementById('tailDialogSave');
+    saveBtn.textContent = '保存修改';
+    saveBtn.setAttribute('onclick', 'adminSaveTail("' + escapeJs(String(id)) + '")');
+    document.getElementById('tailDialog').classList.add('active');
+    input.focus();
+}
+function adminSaveTail(id) {
+    var content = (document.getElementById('tailDialogInput') || {}).value || '';
+    content = content.trim();
+    if (!content) { showToast('尾项内容不能为空'); return; }
+    if (!navigator.onLine) { showToast('联网后才能修改尾项'); return; }
+    var key = findTailKeyById(id);
+    if (!key) return;
+    fetch(TAIL_ITEMS_API.replace('action=get-all', 'action=update'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, content: content })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+        if (!res || !res.success) { showToast((res && res.message) || '修改失败'); return; }
+        var item = (tailItemsCache[key] || []).filter(function (t) { return String(t.id) === String(id); })[0];
+        if (item) item.content = content;
+        tailStoreSet('tailItemsCache', tailItemsCache);
+        closeTailDialog();
+        restoreTailDialog();
+        refreshAllTailViews();
+        showToast('✅ 尾项已修改');
+    })
+    .catch(function () { showToast('网络异常，修改未成功'); });
+}
+// 删除尾项：二次确认后调 delete
+function adminDeleteTail(id) {
+    if (!requireAdmin()) return;
+    if (!navigator.onLine) { showToast('联网后才能删除尾项'); return; }
+    var key = findTailKeyById(id);
+    if (!key) return;
+    var item = (tailItemsCache[key] || []).filter(function (t) { return String(t.id) === String(id); })[0];
+    var msg = '确认删除这条尾项？删除后不可恢复。\n\n' + (item ? item.content : '');
+    function doDelete() {
+        fetch(TAIL_ITEMS_API.replace('action=get-all', 'action=delete'), {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            if (!res || !res.success) { showToast((res && res.message) || '删除失败'); return; }
+            if (tailItemsCache[key]) {
+                tailItemsCache[key] = tailItemsCache[key].filter(function (t) { return String(t.id) !== String(id); });
+                if (!tailItemsCache[key].length) delete tailItemsCache[key];
+            }
+            if (tailPendingMap[key]) {
+                tailPendingMap[key] = tailPendingMap[key].filter(function (t) { return String(t.id) !== String(id); });
+                if (!tailPendingMap[key].length) delete tailPendingMap[key];
+            }
+            tailStoreSet('tailItemsCache', tailItemsCache);
+            tailStoreSet('tailPendingMap', tailPendingMap);
+            refreshAllTailViews();
+            showToast('✅ 尾项已删除');
+        })
+        .catch(function () { showToast('网络异常，删除未成功'); });
+    }
+    if (typeof plus !== 'undefined' && plus.nativeUI && plus.nativeUI.confirm) {
+        plus.nativeUI.confirm(msg, function (e) { if (e.index === 0) doDelete(); }, '🗑️ 删除尾项', ['确认删除', '取消']);
+    } else if (confirm(msg)) doDelete();
+}
+// 录入弹窗恢复默认（修改完还原，避免下次录入变成"保存修改"）
+function restoreTailDialog() {
+    var title = document.getElementById('tailDialogTitle');
+    var saveBtn = document.getElementById('tailDialogSave');
+    if (title) title.textContent = '➕ 添加尾项';
+    if (saveBtn) {
+        saveBtn.textContent = '保存';
+        saveBtn.setAttribute('onclick', 'saveTailFromDialog()');
+    }
+}
+
 // 撤销消除
 function undoClearTail(id) {
+    if (!requireAdmin()) return;
+    if (!navigator.onLine) { showToast('联网后才能撤销消除'); return; }
     var key = findTailKeyById(id);
     if (!key) return;
     var list = tailItemsCache[key] || [];
@@ -4610,6 +4866,9 @@ function startApp() {
     console.log('⚙️ 加载本地设置...');
     loadSettings();
     currentUser = getCurrentUser();
+    restoreAuth();
+    // 登录态姓名优先于本地手填姓名（特权操作用账号姓名）
+    if (authUser && authUser.name) { currentUser = authUser.name; }
     updateUserBadge();
     updateNetworkStatus();
     buildKeyboard();
