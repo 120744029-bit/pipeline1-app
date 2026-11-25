@@ -1544,8 +1544,17 @@ document.getElementById('settingsPanel').addEventListener('click', function(e) {
 function lsGet(key, def) {
     try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch(e) { return def; }
 }
-function lsSet(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+function lsSet(key, val, onFail) {
+    try { localStorage.setItem(key, JSON.stringify(val)); return true; }
+    catch (e) {
+        // 旧值占着额度时先删再写通常能成功（和 drawing-mobile.js 同一套）
+        try { localStorage.removeItem(key); localStorage.setItem(key, JSON.stringify(val)); return true; }
+        catch (e2) {
+            if (typeof onFail === 'function') onFail(e2);
+            else console.warn('本地存储写入失败:', key, e2);
+            return false;
+        }
+    }
 }
 
 // ========== 当前用户相关 ==========
@@ -2721,6 +2730,27 @@ function closeWeldDialog() { document.getElementById('weldDialog').classList.rem
 // ============================================================
 //                    尾项
 // ============================================================
+// 尾项按"内容"做身份标识（本地未上传的没有 id，time 格式也和云端不一致）。
+// 合并原则：云端返回的条目用云端（带 id/消除状态），云端没有但本地有的保留本地，
+// 绝不因某次云端查询为空就把本地缓存删光。
+function tailSig(t) {
+    if (!t) return '';
+    // 内容为空时用 id/time 兜底，避免多条空内容被并成一条
+    return t.content ? ('c:' + t.content) : (t.id ? ('i:' + t.id) : ('t:' + (t.time || Math.random())));
+}
+function mergeTailList(cloudList, localList) {
+    var map = {};
+    (cloudList || []).forEach(function (t) { map[tailSig(t)] = t; });
+    (localList || []).forEach(function (t) {
+        var sig = tailSig(t);
+        if (!map[sig]) map[sig] = t;              // 云端没有 → 保留本地（未上传/查询延迟/失败）
+        else if (t._pending && !map[sig]._pending) {
+            // 云端已有同内容，本地 pending 可去掉，但要保留云端的消除状态
+            map[sig] = cloudList.filter(function (c) { return tailSig(c) === sig; })[0];
+        }
+    });
+    return Object.keys(map).map(function (k) { return map[k]; });
+}
 function loadTailItemsFromServer() {
     tailItemsCache = lsGet('tailItemsCache', {});
     tailPendingMap = lsGet('tailPendingMap', {});
@@ -2743,17 +2773,21 @@ function loadTailItemsFromServer() {
                         };
                     });
                 });
-                tailItemsCache = normalized;
-                Object.keys(tailPendingMap).forEach(function (key) {
-                    if (!tailItemsCache[key]) tailItemsCache[key] = [];
-                    var exist = {};
-                    tailItemsCache[key].forEach(function (t) { exist[(t.content || '') + '|' + (t.time || '')] = true; });
-                    tailPendingMap[key].forEach(function (t) {
-                        var sig = (t.content || '') + '|' + (t.time || '');
-                        if (!exist[sig]) tailItemsCache[key].push(t);
+                // 合并而不是覆盖：云端有的用云端，云端没有的保留本地，pending 也并进去
+                Object.keys(normalized).forEach(function (key) {
+                    var local = tailItemsCache[key] || [];
+                    var merged = mergeTailList(normalized[key], local);
+                    tailPendingMap[key] && tailPendingMap[key].forEach(function (t) {
+                        var sig = tailSig(t);
+                        if (!merged.some(function (m) { return tailSig(m) === sig; })) {
+                            merged.push({ content: t.content, time: t.time, user: t.user || '', _pending: true });
+                        }
                     });
+                    tailItemsCache[key] = merged;
                 });
+                // 本地有但云端这次没返回的分组，原样保留，绝不动
                 lsSet('tailItemsCache', tailItemsCache);
+                refreshAllTailViews();
             }
         })
         .catch(function (err) { console.warn('尾项加载失败:', err); });
@@ -2837,15 +2871,17 @@ function saveTailFromDialog() {
     var now = new Date().toLocaleString();
     var item = { content: content, time: now, user: currentUser };
 
+    var onStoreFail = function () { showToast('⚠️ 本地空间已满，尾项未能保存！请清理图纸缓存或减少缓存后重试'); };
     if (!tailItemsCache[key]) tailItemsCache[key] = [];
     tailItemsCache[key].push(item);
-    lsSet('tailItemsCache', tailItemsCache);
+    var okCache = lsSet('tailItemsCache', tailItemsCache, onStoreFail);
 
     if (!tailPendingMap[key]) tailPendingMap[key] = [];
     tailPendingMap[key].push(item);
-    lsSet('tailPendingMap', tailPendingMap);
+    var okPending = lsSet('tailPendingMap', tailPendingMap, onStoreFail);
 
     closeTailDialog();
+    if (!(okCache && okPending)) return;   // 写入失败：不弹"成功"，不上传，避免误以为存住了
     showToast('✅ 已保存到本地');
     renderTailList(key, d.safeId);
     uploadTailToCloud(d.subItem, d.lineNo, content, now, d.safeId, currentUser);
@@ -2860,14 +2896,31 @@ function uploadTailToCloud(subItem, lineNo, content, time, safeId, user) {
     .then(function (r) { return r.json(); })
     .then(function (res) {
         if (res && res.success) {
-            if (tailPendingMap[key]) {
-                tailPendingMap[key] = tailPendingMap[key].filter(function (t) {
-                    return !(t.content === content && t.time === time);
+            // 只有后端真的落库（返回 item.id）才算上传成功；否则保留 pending 等补传
+            var confirmed = !!(res.item && res.item.id);
+            if (confirmed) {
+                if (tailPendingMap[key]) {
+                    tailPendingMap[key] = tailPendingMap[key].filter(function (t) {
+                        return !(t.content === content && t.time === time);
+                    });
+                    if (tailPendingMap[key].length === 0) delete tailPendingMap[key];
+                    lsSet('tailPendingMap', tailPendingMap);
+                }
+                // 立刻把云端 id/时间写回本地缓存，避免刷新间隙本地条目没 id 被当成脏数据
+                (tailItemsCache[key] || []).forEach(function (t) {
+                    if (t.content === content && !t.id) {
+                        t.id = res.item.id;
+                        t.time = res.item.createdAt || time;
+                        t._pending = false;
+                    }
                 });
-                if (tailPendingMap[key].length === 0) delete tailPendingMap[key];
-                lsSet('tailPendingMap', tailPendingMap);
+                lsSet('tailItemsCache', tailItemsCache);
+                if (safeId) refreshOneTail(subItem, lineNo, safeId);
+            } else {
+                showToast('⚠️ 服务端未确认，尾项已留在本地待重试');
             }
-            if (safeId) refreshOneTail(subItem, lineNo, safeId);
+        } else {
+            showToast('⚠️ 上传未成功，尾项已留在本地待重试');
         }
     })
     .catch(function () {
@@ -2890,16 +2943,16 @@ function refreshOneTail(subItem, lineNo, safeId) {
                     clearedAt: t.clearedAt || ''
                 };
             }) : [];
-            var pendingList = tailPendingMap[key] || [];
-            var merged = cloudList.slice();
-            var exist = {};
-            cloudList.forEach(function (t) { exist[(t.content || '') + '|' + (t.time || '')] = true; });
-            pendingList.forEach(function (t) {
-                var sig = (t.content || '') + '|' + (t.time || '');
-                if (!exist[sig]) merged.push({ content: t.content, time: t.time, _pending: true });
+            // 合并而不是重建：云端为空/查询失败时保留本地，绝不 delete
+            var localList = tailItemsCache[key] || [];
+            var merged = mergeTailList(cloudList, localList);
+            (tailPendingMap[key] || []).forEach(function (t) {
+                var sig = tailSig(t);
+                if (!merged.some(function (m) { return tailSig(m) === sig; })) {
+                    merged.push({ content: t.content, time: t.time, user: t.user || '', _pending: true });
+                }
             });
-            if (merged.length > 0) tailItemsCache[key] = merged;
-            else delete tailItemsCache[key];
+            tailItemsCache[key] = merged;
             lsSet('tailItemsCache', tailItemsCache);
             renderTailList(key, safeId);
         })

@@ -1,6 +1,6 @@
 {
-    "version": "4.2.9",
-    "updateTime": "2026-11-24 17:48:05",
+    "version": "4.3.0",
+    "updateTime": "2026-11-25 10:27:47",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "提示弹框更易读： toast 改成白字深底加大加粗，修复黑底黑字看不清；弹窗正文放大。"
+    "updateLog": "修复尾项偶发丢失：云端同步改为合并不覆盖，未上传成功的本地保留；服务端确认落库后才清除待传；本地空间满会明确提示。"
 }
