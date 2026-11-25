@@ -1,6 +1,6 @@
 {
-    "version": "4.3.0",
-    "updateTime": "2026-11-25 10:27:47",
+    "version": "4.3.1",
+    "updateTime": "2026-11-25 16:20:01",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "修复尾项偶发丢失：云端同步改为合并不覆盖，未上传成功的本地保留；服务端确认落库后才清除待传；本地空间满会明确提示。"
+    "updateLog": "尾项改用独立存储，不再被图纸/支架缓存挤爆；旧尾项数据自动迁移。支架/阀门静态缓存去重，释放本地空间。"
 }

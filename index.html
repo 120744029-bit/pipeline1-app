@@ -1557,6 +1557,71 @@ function lsSet(key, val, onFail) {
     }
 }
 
+// ============================================================
+//      独立存储：尾项专用（plus.storage 不受 localStorage 额度影响）
+// ============================================================
+var TAIL_STORE_MIGRATED_KEY = 'pd.tail.storage.migrated.v1';
+function hasPlusStorage() {
+    return typeof plus !== 'undefined' && !!plus && !!plus.storage &&
+        typeof plus.storage.getItem === 'function' && typeof plus.storage.setItem === 'function';
+}
+function tailStoreGet(key, def) {
+    if (hasPlusStorage()) {
+        try {
+            var raw = plus.storage.getItem(key);
+            if (raw !== null && raw !== undefined && raw !== '') return JSON.parse(raw);
+        } catch (e) {}
+    }
+    return lsGet(key, def);
+}
+function tailStoreSet(key, val, onFail) {
+    if (hasPlusStorage()) {
+        try { plus.storage.setItem(key, JSON.stringify(val)); return true; } catch (e) {}
+    }
+    return lsSet(key, val, onFail);
+}
+function migrateTailStorage() {
+    if (!hasPlusStorage()) return;
+    try {
+        if (plus.storage.getItem(TAIL_STORE_MIGRATED_KEY)) return;
+        var ok = true;
+        ['tailItemsCache', 'tailPendingMap'].forEach(function (key) {
+            var dest = plus.storage.getItem(key);
+            if (dest !== null && dest !== undefined && dest !== '') return;  // 已迁过，不覆盖
+            var old = null;
+            try { old = localStorage.getItem(key); } catch (e) {}
+            if (old !== null && old !== undefined && old !== '') {
+                try { plus.storage.setItem(key, old); } catch (e) { ok = false; }
+            }
+        });
+        if (!ok) return;
+        plus.storage.setItem(TAIL_STORE_MIGRATED_KEY, '1');
+        // 确认已迁成功再删旧键，腾出 localStorage 空间给图纸/支架等大缓存
+        ['tailItemsCache', 'tailPendingMap'].forEach(function (key) {
+            try { localStorage.removeItem(key); } catch (e) {}
+        });
+    } catch (e) { console.warn('尾项独立存储迁移失败:', e); }
+}
+
+// 同一份静态数据只留一份缓存：primary 存在则用 primary，否则从 legacy 迁移过来
+function getSharedCache(primary, legacy) {
+    var v = lsGet(primary, null);
+    if (v) return v;
+    v = lsGet(legacy, null);
+    if (!v) return null;
+    if (lsSet(primary, v)) {
+        try { localStorage.removeItem(legacy); } catch (e) {}
+    }
+    return v;
+}
+function setSharedCache(primary, legacy, val) {
+    var ok = lsSet(primary, val);
+    if (ok) {
+        try { localStorage.removeItem(legacy); } catch (e) {}
+    }
+    return ok;
+}
+
 // ========== 当前用户相关 ==========
 function getCurrentUser() {
     return lsGet(CURRENT_USER_KEY, '');
@@ -2196,10 +2261,9 @@ function refreshBracketData() {
     fetch(DATA1_URL + '?t=' + Date.now(), { cache: 'no-store' })
         .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
         .then(function(data) {
-            // 3. 写入两份缓存
+            // 3. 只写一份缓存（data1 的旧重复 key 会顺手清掉）
             bracketStatusMap = data || {};
-            lsSet('bracketStatus', bracketStatusMap);
-            lsSet('workTotalData1Cache', data);
+            setSharedCache('bracketStatus', 'workTotalData1Cache', data);
 
             // 4. 重新渲染支架总量
             var box = document.getElementById('bracketTotalArea');
@@ -2223,7 +2287,7 @@ function renderBracketTotalArea() {
     var box = document.getElementById('bracketTotalArea');
     if (!box) return;
 
-    var cachedData1 = lsGet('workTotalData1Cache', null);
+    var cachedData1 = getSharedCache('bracketStatus', 'workTotalData1Cache');
 
     if (cachedData1) {
         box.innerHTML = renderBracketTotalHTML(cachedData1);
@@ -2235,7 +2299,7 @@ function renderBracketTotalArea() {
     fetch(DATA1_URL + '?t=' + Date.now())
         .then(function(r) { return r.json(); })
         .then(function(data1) {
-            if (data1) lsSet('workTotalData1Cache', data1);
+            if (data1) setSharedCache('bracketStatus', 'workTotalData1Cache', data1);
             box.innerHTML = renderBracketTotalHTML(data1 || {});
         })
         .catch(function(err) {
@@ -2290,7 +2354,7 @@ function renderValveTotalArea() {
     if (!box) return;
 
     // 缓存
-    var cachedData2 = lsGet('workTotalData2Cache', null);
+    var cachedData2 = getSharedCache('valveData', 'workTotalData2Cache');
     var cachedData5 = lsGet('workTotalData5Cache', null);
 
     function buildData5Map(data5) {
@@ -2317,7 +2381,7 @@ function renderValveTotalArea() {
     ]).then(function(results) {
         var data2 = results[0] || cachedData2 || {};
         var data5 = results[1] || cachedData5 || { list: [] };
-        if (results[0]) lsSet('workTotalData2Cache', results[0]);
+        if (results[0]) setSharedCache('valveData', 'workTotalData2Cache', results[0]);
         if (results[1]) lsSet('workTotalData5Cache', results[1]);
         var d5Map = buildData5Map(data5);
         box.innerHTML = renderValveTotalHTML(data2, d5Map);
@@ -2348,10 +2412,9 @@ function refreshValveData() {
         var data2 = results[0] || {};
         var data5 = results[1] || { list: [] };
 
-        // 3. 写入缓存
+        // 3. 写入缓存（data2 只留一份，旧重复 key 会顺手清掉）
         valveDataMap = data2;
-        lsSet('valveData', data2);
-        lsSet('workTotalData2Cache', data2);
+        setSharedCache('valveData', 'workTotalData2Cache', data2);
         lsSet('workTotalData5Cache', data5);
 
         // 4. 重新渲染阀门总量
@@ -2752,8 +2815,9 @@ function mergeTailList(cloudList, localList) {
     return Object.keys(map).map(function (k) { return map[k]; });
 }
 function loadTailItemsFromServer() {
-    tailItemsCache = lsGet('tailItemsCache', {});
-    tailPendingMap = lsGet('tailPendingMap', {});
+    migrateTailStorage();
+    tailItemsCache = tailStoreGet('tailItemsCache', {});
+    tailPendingMap = tailStoreGet('tailPendingMap', {});
     fetch(TAIL_ITEMS_API + '&t=' + Date.now())
         .then(function (res) { return res.json(); })
         .then(function (data) {
@@ -2786,7 +2850,7 @@ function loadTailItemsFromServer() {
                     tailItemsCache[key] = merged;
                 });
                 // 本地有但云端这次没返回的分组，原样保留，绝不动
-                lsSet('tailItemsCache', tailItemsCache);
+                tailStoreSet('tailItemsCache', tailItemsCache);
                 refreshAllTailViews();
             }
         })
@@ -2871,14 +2935,14 @@ function saveTailFromDialog() {
     var now = new Date().toLocaleString();
     var item = { content: content, time: now, user: currentUser };
 
-    var onStoreFail = function () { showToast('⚠️ 本地空间已满，尾项未能保存！请清理图纸缓存或减少缓存后重试'); };
+    var onStoreFail = function () { showToast('⚠️ 本地存储写入失败，尾项未能保存，请重试'); };
     if (!tailItemsCache[key]) tailItemsCache[key] = [];
     tailItemsCache[key].push(item);
-    var okCache = lsSet('tailItemsCache', tailItemsCache, onStoreFail);
+    var okCache = tailStoreSet('tailItemsCache', tailItemsCache, onStoreFail);
 
     if (!tailPendingMap[key]) tailPendingMap[key] = [];
     tailPendingMap[key].push(item);
-    var okPending = lsSet('tailPendingMap', tailPendingMap, onStoreFail);
+    var okPending = tailStoreSet('tailPendingMap', tailPendingMap, onStoreFail);
 
     closeTailDialog();
     if (!(okCache && okPending)) return;   // 写入失败：不弹"成功"，不上传，避免误以为存住了
@@ -2904,7 +2968,7 @@ function uploadTailToCloud(subItem, lineNo, content, time, safeId, user) {
                         return !(t.content === content && t.time === time);
                     });
                     if (tailPendingMap[key].length === 0) delete tailPendingMap[key];
-                    lsSet('tailPendingMap', tailPendingMap);
+                    tailStoreSet('tailPendingMap', tailPendingMap);
                 }
                 // 立刻把云端 id/时间写回本地缓存，避免刷新间隙本地条目没 id 被当成脏数据
                 (tailItemsCache[key] || []).forEach(function (t) {
@@ -2914,7 +2978,7 @@ function uploadTailToCloud(subItem, lineNo, content, time, safeId, user) {
                         t._pending = false;
                     }
                 });
-                lsSet('tailItemsCache', tailItemsCache);
+                tailStoreSet('tailItemsCache', tailItemsCache);
                 if (safeId) refreshOneTail(subItem, lineNo, safeId);
             } else {
                 showToast('⚠️ 服务端未确认，尾项已留在本地待重试');
@@ -2953,7 +3017,7 @@ function refreshOneTail(subItem, lineNo, safeId) {
                 }
             });
             tailItemsCache[key] = merged;
-            lsSet('tailItemsCache', tailItemsCache);
+            tailStoreSet('tailItemsCache', tailItemsCache);
             renderTailList(key, safeId);
         })
         .catch(function () {});
@@ -2987,7 +3051,7 @@ function clearTailById(id) {
         var oldBy = item.clearedBy || '', oldAt = item.clearedAt || '';
         item.clearedBy = currentUser;
         item.clearedAt = new Date().toISOString();
-        lsSet('tailItemsCache', tailItemsCache);
+        tailStoreSet('tailItemsCache', tailItemsCache);
         refreshAllTailViews();
         showToast('✅ 已消除，正在同步…');
         if (!navigator.onLine) { showToast('已本地标记，联网后同步'); return; }
@@ -2999,12 +3063,12 @@ function clearTailById(id) {
         .then(function (res) {
             if (!res || !res.success) throw new Error('同步失败');
             item.clearedAt = res.clearedAt || item.clearedAt;
-            lsSet('tailItemsCache', tailItemsCache);
+            tailStoreSet('tailItemsCache', tailItemsCache);
             refreshAllTailViews();
         })
         .catch(function () {
             item.clearedBy = oldBy; item.clearedAt = oldAt;
-            lsSet('tailItemsCache', tailItemsCache);
+            tailStoreSet('tailItemsCache', tailItemsCache);
             refreshAllTailViews();
             showToast('消除同步失败，请重试');
         });
@@ -3024,7 +3088,7 @@ function undoClearTail(id) {
     if (!item) return;
     var oldBy = item.clearedBy || '', oldAt = item.clearedAt || '';
     item.clearedBy = ''; item.clearedAt = '';
-    lsSet('tailItemsCache', tailItemsCache);
+    tailStoreSet('tailItemsCache', tailItemsCache);
     refreshAllTailViews();
     if (!navigator.onLine) { showToast('已本地撤销，联网后同步'); return; }
     fetch(TAIL_UNDO_API, {
@@ -3037,7 +3101,7 @@ function undoClearTail(id) {
     })
     .catch(function () {
         item.clearedBy = oldBy; item.clearedAt = oldAt;
-        lsSet('tailItemsCache', tailItemsCache);
+        tailStoreSet('tailItemsCache', tailItemsCache);
         refreshAllTailViews();
         showToast('撤销同步失败，请重试');
     });
@@ -3167,13 +3231,13 @@ function showWelcomeValve() {
 //                    支架状态
 // ============================================================
 function loadBracketStatusFromJson() {
-    var cached = lsGet('bracketStatus', null);
+    var cached = getSharedCache('bracketStatus', 'workTotalData1Cache');
     if (cached) bracketStatusMap = cached;
     fetch(DATA1_URL + '?t=' + Date.now())
         .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
         .then(function(data) {
             bracketStatusMap = data || {};
-            lsSet('bracketStatus', bracketStatusMap);
+            setSharedCache('bracketStatus', 'workTotalData1Cache', bracketStatusMap);
         })
         .catch(function(err) {});
 }
@@ -3199,13 +3263,13 @@ function getStatusClass(status) {
 //                    阀门数据
 // ============================================================
 function loadValveDataFromJson() {
-    var cached = lsGet('valveData', null);
+    var cached = getSharedCache('valveData', 'workTotalData2Cache');
     if (cached) valveDataMap = cached;
     fetch(DATA2_URL + '?t=' + Date.now())
         .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
         .then(function(data) {
             valveDataMap = data || {};
-            lsSet('valveData', valveDataMap);
+            setSharedCache('valveData', 'workTotalData2Cache', valveDataMap);
         })
         .catch(function(err) {});
 }
@@ -3645,7 +3709,7 @@ function doPipelineSearch(q, subItem) {
     function mapNow() {
         if (bracketStatusMap && Object.keys(bracketStatusMap).length) return bracketStatusMap;
         try {
-            var c = lsGet('bracketStatus', null);
+            var c = getSharedCache('bracketStatus', 'workTotalData1Cache');
             if (c && Object.keys(c).length) { bracketStatusMap = c; return c; }
         } catch (e) {}
         return bracketStatusMap || {};
@@ -3836,7 +3900,7 @@ function doPipelineSearch(q, subItem) {
             .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
             .then(function (d) {
                 bracketStatusMap = d || {};
-                try { lsSet('bracketStatus', bracketStatusMap); } catch (e) {}
+                try { setSharedCache('bracketStatus', 'workTotalData1Cache', bracketStatusMap); } catch (e) {}
                 if (curItem) render(collect(curItem));
                 toast('✅ 支架状态已刷新');
             })
@@ -4037,7 +4101,7 @@ function doPipelineSearch(q, subItem) {
             .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
             .then(function (d) {
                 valveDataMap = d || {};
-                try { lsSet('valveData', valveDataMap); } catch (e) {}
+                try { setSharedCache('valveData', 'workTotalData2Cache', valveDataMap); } catch (e) {}
                 if (vCurItem) renderValves(collectValves(vCurItem));
                 toast('✅ 阀门数据已刷新');
             })
