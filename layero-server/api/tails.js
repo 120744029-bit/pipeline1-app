@@ -8,33 +8,59 @@ import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 const APP_TOKEN = 'pd-app-f174c8613578189b';
 const JWT_SECRET = 'fd68a9a239318fb25324d8c076512413e3de66a4fccb9374bf192a5d206beb12';
+const REVERIFY_TTL = 24 * 3600 * 1000;
+const TOKEN_TTL = 30 * 24 * 3600 * 1000;
+function _b64u(buf) { return Buffer.from(buf).toString('base64url'); }
+function _signToken(u) {
+  const now = Date.now();
+  const payload = { uid: u.id, username: u.username, name: u.name, role: u.role, iat: now, exp: now + TOKEN_TTL };
+  const h = _b64u(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const p = _b64u(JSON.stringify(payload));
+  const sig = crypto.createHmac('sha256', JWT_SECRET).update(h + '.' + p).digest('base64url');
+  return h + '.' + p + '.' + sig;
+}
 function _tok(req) {
   let t = (req.headers && req.headers.authorization) || '';
   t = t.replace(/^Bearer\s+/i, '');
   return t || (req.query && req.query._token) || '';
 }
-function _role(req) {
+function _payload(req) {
   const tok = _tok(req);
-  if (!tok) return '';
+  if (!tok) return null;
   const p = String(tok).split('.');
-  if (p.length !== 3) return '';
+  if (p.length !== 3) return null;
   const sig = crypto.createHmac('sha256', JWT_SECRET).update(p[0] + '.' + p[1]).digest('base64url');
   const a = Buffer.from(sig), b = Buffer.from(p[2]);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return '';
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
   try {
     const pl = JSON.parse(Buffer.from(p[1], 'base64url').toString());
-    if (!pl.exp || pl.exp < Date.now()) return '';
-    return pl.role || '';
-  } catch (e) { return ''; }
+    if (!pl.exp || pl.exp < Date.now()) return null;
+    return pl;
+  } catch (e) { return null; }
+}
+function _role(req) {
+  const pl = _payload(req);
+  return pl ? (pl.role || '') : '';
 }
 function _checkApp(req, res) {
   const t = (req.headers && req.headers['x-app-token']) || req.query.token || '';
   if (t !== APP_TOKEN) { res.status(401).json({ success: false, message: '未授权的应用' }); return false; }
   return true;
 }
-function _needAdmin(req, res) {
-  const r = _role(req);
-  if (r !== 'owner' && r !== 'admin') { res.status(403).json({ success: false, message: '需要管理员权限' }); return false; }
+async function _needAdmin(req, res, sql) {
+  const pl = _payload(req);
+  if (!pl || (pl.role !== 'owner' && pl.role !== 'admin')) {
+    res.status(403).json({ success: false, message: '需要管理员权限' }); return false;
+  }
+  const age = Date.now() - Number(pl.iat || 0);
+  if (age > REVERIFY_TTL) {
+    const rows = await sql`SELECT id, username, name, role, enabled FROM users WHERE id = ${pl.uid}`;
+    if (!rows.length || !rows[0].enabled || (rows[0].role !== 'owner' && rows[0].role !== 'admin')) {
+      res.status(401).json({ success: false, message: '账号已失效或权限已变更，请重新登录' }); return false;
+    }
+    const u = rows[0];
+    res.setHeader('X-New-Token', _signToken({ id: u.id, username: u.username, name: u.name, role: u.role }));
+  }
   return true;
 }
 
@@ -53,15 +79,16 @@ async function ensureClearCols(sql) {
 export async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-App-Token, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-App-Token, Authorization, X-New-Token');
+  res.setHeader('Access-Control-Expose-Headers', 'X-New-Token');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { action } = req.query;
   if (!_checkApp(req, res)) return;
-  if (['update', 'delete', 'undo-clear'].indexOf(action) !== -1 && !_needAdmin(req, res)) return;
 
   try {
     const sql = neon(process.env.DATABASE_URL);
+    if (['update', 'delete', 'undo-clear'].indexOf(action) !== -1 && !(await _needAdmin(req, res, sql))) return;
 
     if (action === 'init') {
       await ensureClearCols(sql);

@@ -23,6 +23,7 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Password, X-App-Token, Authorization');
+    res.setHeader('Access-Control-Expose-Headers', 'X-New-Token');
     if (req.method === 'OPTIONS') return res.status(200).end();
     next();
 });
@@ -39,8 +40,9 @@ function adapt(handler) {
 
         let responseData = null;
         let responseStatus = 200;
+        const respHeaders = {};
         const resObj = {
-            setHeader: () => {},
+            setHeader: (k, v) => { respHeaders[k] = v; },
             status: (code) => { responseStatus = code; return resObj; },
             json: (data) => { responseData = data; return resObj; },
             end: () => { return resObj; }
@@ -54,6 +56,9 @@ function adapt(handler) {
         }
 
         res.status(responseStatus);
+        Object.keys(respHeaders).forEach(function (k) {
+            if (k.toLowerCase() !== 'access-control-allow-origin') res.setHeader(k, respHeaders[k]);
+        });
         if (responseData !== null) {
             res.json(responseData);
         } else {

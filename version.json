@@ -1,6 +1,6 @@
 {
-    "version": "4.3.4",
-    "updateTime": "2026-11-25 21:22:00",
+    "version": "4.3.5",
+    "updateTime": "2026-11-26 11:58:00",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "修复登录报「未授权的应用」：APP 原生请求层补上接口凭据。"
+    "updateLog": "登录页改为全屏仿微信风格；权限每24小时自动核验（账号变更当天生效）。"
 }

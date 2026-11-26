@@ -9,12 +9,14 @@ import { neon } from '@neondatabase/serverless';
 const APP_TOKEN = process.env.APP_API_TOKEN || 'pd-app-f174c8613578189b';
 // JWT 签名密钥：公开仓库，务必在 EdgeOne/Layero 控制台配置 JWT_SECRET 覆盖兜底值
 const JWT_SECRET = process.env.JWT_SECRET || 'fd68a9a239318fb25324d8c076512413e3de66a4fccb9374bf192a5d206beb12';
-const TOKEN_TTL = 30 * 24 * 3600 * 1000; // 30 天
+const TOKEN_TTL = 30 * 24 * 3600 * 1000; // 30 天登录有效期
+const REVERIFY_TTL = 24 * 3600 * 1000;   // 每 24 小时查库验一次权限
 const SEED_HASH = 'scrypt$563081d870dfc16a95755e3401a93e9e$da9fd5f5672783788b2a4c7c0a25f063366b60c927b4c8d291bced639315c92f729e9af1c8f7b84732221626f4970c5f85a99ab194084e23f6a892ccf1503493';
 
 function b64u(buf) { return Buffer.from(buf).toString('base64url'); }
 function signToken(u) {
-  const payload = { uid: u.id, username: u.username, name: u.name, role: u.role, exp: Date.now() + TOKEN_TTL };
+  const now = Date.now();
+  const payload = { uid: u.id, username: u.username, name: u.name, role: u.role, iat: now, exp: now + TOKEN_TTL };
   const h = b64u(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const p = b64u(JSON.stringify(payload));
   const sig = crypto.createHmac('sha256', JWT_SECRET).update(h + '.' + p).digest('base64url');
@@ -39,6 +41,28 @@ function tokenFrom(req) {
   if (!t) t = (req.query && req.query._token) || '';
   return t;
 }
+// 管理操作验权：24h 内直接用 token 角色；超 24h 查库确认并续签新 token
+// required: 'any' 任意登录 / 'admin' 管理员或超管 / 'owner' 仅超管
+async function verifyManage(sql, req, res, me, required) {
+  if (!me) return { denied: true, status: 401, message: '登录已过期，请重新登录' };
+  const hasRole = (r) => required === 'any' || (required === 'owner' ? r === 'owner' : (r === 'owner' || r === 'admin'));
+  const age = Date.now() - Number(me.iat || 0);
+  if (age <= REVERIFY_TTL) {
+    if (!hasRole(me.role)) return { denied: true, status: 403, message: '需要管理员权限' };
+    return { me: me };
+  }
+  // 超过 24 小时：查库确认账号仍存在、启用，角色是否仍满足
+  const rows = await sql`SELECT id, username, name, role, enabled FROM users WHERE id = ${me.uid}`;
+  if (!rows.length || !rows[0].enabled) {
+    return { denied: true, status: 401, message: '账号已失效，请重新登录' };
+  }
+  const u = rows[0];
+  if (!hasRole(u.role)) return { denied: true, status: 403, message: '需要管理员权限' };
+  const fresh = { uid: u.id, username: u.username, name: u.name, role: u.role };
+  res.setHeader('X-New-Token', signToken(fresh));
+  return { me: fresh };
+}
+
 function hashPwd(pwd) {
   const salt = crypto.randomBytes(16).toString('hex');
   return 'scrypt$' + salt + '$' + crypto.scryptSync(pwd, salt, 64).toString('hex');
@@ -87,7 +111,8 @@ export async function onRequest(context) {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, X-App-Token, Authorization'
+        'Access-Control-Allow-Headers': 'Content-Type, X-App-Token, Authorization',
+        'Access-Control-Expose-Headers': 'X-New-Token'
       }
     });
   }
@@ -102,8 +127,9 @@ export async function onRequest(context) {
     headers: Object.fromEntries(request.headers.entries())
   };
   let _data = null, _status = 200;
+  const _headers = {};
   const res = {
-    setHeader: () => {},
+    setHeader: (k, v) => { _headers[k] = v; },
     status: (c) => { _status = c; return res; },
     json: (d) => { _data = d; return res; },
     end: () => res
@@ -111,7 +137,11 @@ export async function onRequest(context) {
   await handler(req, res);
   return new Response(_data !== null ? JSON.stringify(_data) : '', {
     status: _status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' }
+    headers: Object.assign({
+      'Content-Type': 'application/json; charset=utf-8',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Expose-Headers': 'X-New-Token'
+    }, _headers)
   });
 }
 
@@ -121,6 +151,7 @@ export async function onRequest(context) {
 export async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-App-Token, Authorization');
+  res.setHeader('Access-Control-Expose-Headers', 'X-New-Token');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   // 应用级凭据：所有动作都要带
@@ -151,7 +182,7 @@ export async function handler(req, res) {
     }
 
     // ---------- 以下动作需要登录 ----------
-    const me = verifyToken(tokenFrom(req));
+    let me = verifyToken(tokenFrom(req));
     if (!me) return res.status(401).json({ success: false, message: '登录已过期，请重新登录' });
 
     if (action === 'me') {
@@ -175,7 +206,9 @@ export async function handler(req, res) {
 
     // ---------- 账号管理：只有 owner ----------
     if (['list-users', 'add-user', 'disable-user', 'enable-user', 'reset-password', 'set-role', 'update-user', 'delete-user'].indexOf(action) !== -1) {
-      if (me.role !== 'owner') return res.status(403).json({ success: false, message: '只有超级管理员能管理账号' });
+      const v = await verifyManage(sql, req, res, me, 'owner');
+      if (v.denied) return res.status(v.status).json({ success: false, message: v.status === 403 ? '只有超级管理员能管理账号' : v.message });
+      me = v.me;
 
       if (action === 'list-users') {
         const rows = await sql`SELECT id, username, name, role, enabled, last_login FROM users ORDER BY id ASC`;

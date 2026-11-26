@@ -545,6 +545,20 @@
         }
         .dialog textarea:focus { border-color: var(--green-primary); }
 
+        /* ============ 全屏登录页（仿微信风格） ============ */
+        .login-screen { display: none; position: fixed; inset: 0; z-index: 10000; background: var(--bg-card); flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
+        .login-screen.active { display: flex; }
+        .login-screen .login-close { position: absolute; top: 18px; right: 18px; width: 36px; height: 36px; border: none; border-radius: 50%; background: var(--bg-hover); color: var(--text-secondary); font-size: 22px; line-height: 36px; text-align: center; cursor: pointer; }
+        .login-screen .login-brand { width: 64px; height: 64px; border-radius: 16px; background: var(--green-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 18px; }
+        .login-screen .login-title { font-size: calc(22px * var(--font-scale)); font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+        .login-screen .login-sub { font-size: calc(13px * var(--font-scale)); color: var(--text-secondary); margin-bottom: 30px; text-align: center; }
+        .login-screen .login-field { width: 100%; max-width: 340px; margin-bottom: 14px; }
+        .login-screen .login-field input { width: 100%; padding: 13px 14px; border: 1px solid var(--border-light); border-radius: 8px; font-size: calc(15px * var(--font-scale)); box-sizing: border-box; background: var(--bg-card); color: var(--text-primary); outline: none; }
+        .login-screen .login-field input:focus { border-color: var(--green-primary); }
+        .login-screen .login-err { color: #e64340; font-size: calc(13px * var(--font-scale)); min-height: 20px; max-width: 340px; width: 100%; margin-bottom: 6px; }
+        .login-screen .login-submit { width: 100%; max-width: 340px; padding: 14px; border: none; border-radius: 8px; background: var(--green-primary); color: #fff; font-size: calc(16px * var(--font-scale)); font-weight: 600; cursor: pointer; margin-top: 6px; }
+        .login-screen .login-guest { margin-top: 20px; background: none; border: none; color: var(--text-secondary); font-size: calc(13px * var(--font-scale)); cursor: pointer; text-decoration: underline; }
+
         /* ============ Toast ============ */
         .toast {
             position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
@@ -1244,6 +1258,14 @@ function installFetchPolyfill(retry) {
 
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4) {
+                    // 后端 24h 验权后续签的新 token：静默更新本地登录态
+                    try {
+                        var nt = xhr.getResponseHeader && xhr.getResponseHeader('X-New-Token');
+                        if (nt && typeof authStoreSet === 'function') {
+                            authToken = nt;
+                            authStoreSet('pd.auth.token', nt);
+                        }
+                    } catch (e) {}
                     // 401 且处于登录态：清掉登录态回到游客（与外层包装行为一致）
                     if (xhr.status === 401 && typeof authToken !== 'undefined' && authToken) {
                         authToken = ''; authUser = null;
@@ -1342,6 +1364,11 @@ function isOwner() { return !!authUser && authUser.role === 'owner'; }
             init.headers = h;
             // 401：登录态失效 → 退回游客
             return _fetch(input, init).then(function (r) {
+                // 24h 验权后续签的新 token：静默更新
+                try {
+                    var nt = r.headers && r.headers.get && r.headers.get('X-New-Token');
+                    if (nt) { authToken = nt; authStoreSet('pd.auth.token', nt); }
+                } catch (e) {}
                 if (r.status === 401 && authToken) {
                     authToken = ''; authUser = null;
                     authStoreSet('pd.auth.token', '');
@@ -1356,29 +1383,30 @@ function isOwner() { return !!authUser && authUser.role === 'owner'; }
     };
 })();
 
-// 登录弹窗（自绘，不用浏览器 prompt）
+// 全屏登录页（仿微信风格，自绘，不用浏览器 prompt）
 function showLoginDialog() {
     var mask = document.getElementById('loginMask');
-    if (mask) { mask.classList.add('active'); var u = document.getElementById('loginUser'); if (u) u.focus(); return; }
+    if (mask) { mask.classList.add('active'); var u = document.getElementById('loginUser'); if (u) setTimeout(function(){ u.focus(); }, 50); return; }
     mask = document.createElement('div');
     mask.id = 'loginMask';
-    mask.className = 'dialog-overlay active';
+    mask.className = 'login-screen active';
     mask.innerHTML =
-        '<div class="dialog" style="max-width:360px">' +
-        '<h3>🔐 账号登录</h3>' +
-        '<p>游客功能不变；登录后可用尾项修改/删除/撤销</p>' +
-        '<label>账号 <input type="text" id="loginUser" autocomplete="off" style="width:100%;margin:6px 0;padding:8px;box-sizing:border-box"></label>' +
-        '<label>密码 <input type="password" id="loginPass" style="width:100%;margin:6px 0;padding:8px;box-sizing:border-box"></label>' +
-        '<div id="loginErr" style="color:#dc2626;font-size:13px;min-height:18px;margin-top:4px"></div>' +
-        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">' +
-        '<button class="mini" onclick="closeLoginDialog()">取消</button>' +
-        '<button class="mini" style="background:var(--blue);color:#fff" onclick="doLogin()">登录</button>' +
-        '</div></div>';
+        '<button class="login-close" aria-label="关闭" onclick="closeLoginDialog()">×</button>' +
+        '<div class="login-brand">管</div>' +
+        '<div class="login-title">账号登录</div>' +
+        '<div class="login-sub">登录后可用尾项修改 / 删除 / 撤销<br>游客功能不变</div>' +
+        '<div class="login-field"><input type="text" id="loginUser" autocomplete="off" placeholder="账号"></div>' +
+        '<div class="login-field"><input type="password" id="loginPass" placeholder="密码" onkeydown="if(event.keyCode===13)doLogin()"></div>' +
+        '<div class="login-err" id="loginErr"></div>' +
+        '<button class="login-submit" onclick="doLogin()">登 录</button>' +
+        '<button class="login-guest" onclick="closeLoginDialog()">暂不登录，继续游客访问</button>';
     document.body.appendChild(mask);
+    setTimeout(function(){ var u = document.getElementById('loginUser'); if (u) u.focus(); }, 50);
 }
 function closeLoginDialog() {
     var mask = document.getElementById('loginMask');
     if (mask) mask.classList.remove('active');
+    var e = document.getElementById('loginErr'); if (e) e.textContent = '';
 }
 function doLogin() {
     var u = (document.getElementById('loginUser') || {}).value || '';
