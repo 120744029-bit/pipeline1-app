@@ -3,15 +3,15 @@
     {
       "area": "11",
       "total": 3876.5,
-      "welded": 3420.5,
-      "unwelded": 402.0,
+      "welded": 3436.25,
+      "unwelded": 386.25,
       "note": ""
     },
     {
       "area": "12",
       "total": 3526.75,
-      "welded": 3062.0,
-      "unwelded": 464.75,
+      "welded": 3070.0,
+      "unwelded": 456.75,
       "note": ""
     },
     {
@@ -24,8 +24,8 @@
     {
       "area": "15",
       "total": 4313.25,
-      "welded": 3518.25,
-      "unwelded": 571.0,
+      "welded": 3519.75,
+      "unwelded": 569.5,
       "note": "消防224寸"
     },
     {
@@ -38,8 +38,8 @@
     {
       "area": "20",
       "total": 16528.5,
-      "welded": 14807.75,
-      "unwelded": 920.5,
+      "welded": 14819.0,
+      "unwelded": 909.25,
       "note": "消防800寸"
     },
     {
@@ -59,7 +59,7 @@
   ],
   "summary": {
     "total": 36043.0,
-    "welded": 28383.0,
-    "unwelded": 6359.75
+    "welded": 28419.5,
+    "unwelded": 6323.25
   }
 }
