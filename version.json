@@ -1,7 +1,7 @@
 {
-    "version": "4.3.9",
-    "updateTime": "2026-11-27 12:45:20",
-    "dataUpdateTime": "2026-11-27 14:58:37",
+    "version": "4.4.0",
+    "updateTime": "2026-11-27 20:32:49",
+    "dataUpdateTime": "2026-11-27 20:32:49",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "快捷输入键盘改为手机26键布局（数字首排），新增退格删除键。"
+    "updateLog": "新增「报工作量」：焊口明细表、字段历史、管径壁厚/材料材质预设，填完可上传，后台可查。"
 }

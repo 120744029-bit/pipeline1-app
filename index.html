@@ -140,6 +140,73 @@
             width: 20px; height: 2px; background: var(--green-primary); border-radius: 2px;
         }
 
+        /* ============ 报工作量 ============ */
+        .wr-people { background: var(--bg-card); padding: 12px 16px; border-bottom: 1px solid var(--border-light); }
+        .wr-sec-title { font-size: calc(13px * var(--font-scale)); font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+        .wr-people-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .wr-field { min-width: 0; }
+        .wr-label { display: block; font-size: calc(11px * var(--font-scale)); color: var(--text-secondary); margin-bottom: 3px; white-space: nowrap; }
+        .wr-input {
+            width: 100%; box-sizing: border-box; font-size: calc(12px * var(--font-scale));
+            padding: 6px 5px; border: 1px solid var(--border-light); border-radius: 6px;
+            outline: none; background: var(--bg-input); color: var(--text-primary);
+        }
+        .wr-input:focus { border-color: var(--green-primary); }
+        .wr-input-wrap { position: relative; display: block; }
+        .wr-input-wrap .wr-input { padding-right: 16px; }
+        .wr-pick-btn {
+            position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+            color: var(--green-primary); font-size: calc(13px * var(--font-scale));
+            padding: 0 3px; cursor: pointer; line-height: 1;
+        }
+        .wr-tip { font-size: calc(11px * var(--font-scale)); color: var(--text-tertiary); margin-top: 7px; }
+        .wr-body { padding: 12px 16px; }
+        .wr-card { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+        .wr-card-head {
+            display: flex; align-items: center; padding: 7px 10px; background: var(--bg-hover);
+            font-size: calc(12px * var(--font-scale)); font-weight: 600; color: var(--text-primary);
+        }
+        .wr-card-del { margin-left: auto; color: var(--red-text); font-size: calc(11px * var(--font-scale)); cursor: pointer; }
+        .wr-card-inner { padding: 10px; }
+        .wr-row1 { display: grid; grid-template-columns: 32px 1fr; gap: 10px; margin-bottom: 10px; }
+        .wr-row7 { display: grid; grid-template-columns: 0.6fr 1.25fr 1fr 0.9fr 0.6fr 1fr 0.85fr; gap: 4px; }
+        .wr-row3 { display: grid; grid-template-columns: 1fr 0.85fr 1.3fr; gap: 8px 10px; margin-top: 10px; padding-top: 9px; border-top: 1px dashed var(--border-light); }
+        .wr-row3b { display: grid; grid-template-columns: 1fr 0.85fr 1.3fr; gap: 8px 10px; margin-top: 8px; }
+        .wr-row-note { margin-top: 10px; padding-top: 9px; border-top: 1px dashed var(--border-light); }
+        .wr-add {
+            border: 1px dashed var(--text-tertiary); border-radius: 10px; text-align: center;
+            padding: 10px; font-size: calc(13px * var(--font-scale)); color: var(--text-secondary); cursor: pointer;
+            background: var(--bg-card);
+        }
+        .wr-upload {
+            background: var(--green-primary); color: #fff; text-align: center; border: none;
+            border-radius: 10px; padding: 12px; font-size: calc(14px * var(--font-scale)); font-weight: 600;
+            width: 100%; margin-top: 12px; cursor: pointer;
+        }
+        .wr-upload:disabled { opacity: 0.5; }
+        .wr-picker-mask {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: none;
+            align-items: flex-end;
+        }
+        .wr-picker-mask.show { display: flex; }
+        .wr-picker {
+            background: var(--bg-card); width: 100%; max-height: 70vh; border-radius: 16px 16px 0 0;
+            display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom);
+        }
+        .wr-picker-head {
+            display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-light);
+            font-size: calc(14px * var(--font-scale)); font-weight: 600; color: var(--text-primary);
+        }
+        .wr-picker-close { margin-left: auto; color: var(--text-secondary); cursor: pointer; }
+        .wr-picker-list { overflow: auto; padding: 6px 0; }
+        .wr-picker-item {
+            padding: 11px 16px; font-size: calc(14px * var(--font-scale)); color: var(--text-primary);
+            border-bottom: 1px solid var(--border-inner); cursor: pointer;
+        }
+        .wr-picker-item:active { background: var(--bg-hover); }
+        .wr-picker-item .wr-cn { color: var(--text-secondary); font-size: calc(12px * var(--font-scale)); margin-left: 8px; }
+        .wr-picker-empty { padding: 20px; text-align: center; color: var(--text-tertiary); font-size: calc(13px * var(--font-scale)); }
+
         /* ============ 内容区 ============ */
         .content { padding: 8px 0; }
         .page-mode { display: none; }
@@ -714,6 +781,7 @@
         <div class="sub-tabs">
             <button class="active" id="subTabWork" onclick="switchSubTab('work')">工作量</button>
             <button id="subTabTotal" onclick="switchSubTab('total')">总量</button>
+            <button id="subTabReport" onclick="switchSubTab('report')">报工作量</button>
         </div>
 
         <!-- 子页 1：工作量 -->
@@ -745,6 +813,25 @@
         <div id="subPageTotal" style="display:none;">
             <div id="workTotalContent">
                 <div class="no-result"><span>⏳</span>正在加载总量...</div>
+            </div>
+        </div>
+
+        <!-- 子页 3：报工作量 -->
+        <div id="subPageReport" style="display:none;">
+            <div class="wr-people">
+                <div class="wr-sec-title">施工人员</div>
+                <div class="wr-people-grid">
+                    <div class="wr-field"><label class="wr-label">管工</label><input class="wr-input" data-person="fitter" placeholder="管工"></div>
+                    <div class="wr-field"><label class="wr-label">焊工</label><input class="wr-input" data-person="welder" placeholder="焊工"></div>
+                    <div class="wr-field"><label class="wr-label">普工</label><input class="wr-input" data-person="helper" placeholder="普工"></div>
+                </div>
+                <div class="wr-tip">上次输入的人名已记住，可直接修改</div>
+            </div>
+            <div class="wr-body">
+                <div class="wr-sec-title">焊口明细 <span id="wrCount" style="color:var(--text-tertiary);font-weight:400;">共 1 行</span></div>
+                <div id="wrRows"></div>
+                <div class="wr-add" onclick="wrAddRow()">＋ 加一行</div>
+                <button class="wr-upload" id="wrUpload" onclick="wrUpload()">上传报表</button>
             </div>
         </div>
     </div>
@@ -2000,9 +2087,14 @@ function switchSubTab(tab) {
     currentSubTab = tab;
     document.getElementById('subTabWork').classList.toggle('active', tab === 'work');
     document.getElementById('subTabTotal').classList.toggle('active', tab === 'total');
+    var tReport = document.getElementById('subTabReport');
+    if (tReport) tReport.classList.toggle('active', tab === 'report');
     document.getElementById('subPageWork').style.display = tab === 'work' ? 'block' : 'none';
     document.getElementById('subPageTotal').style.display = tab === 'total' ? 'block' : 'none';
+    var pReport = document.getElementById('subPageReport');
+    if (pReport) pReport.style.display = tab === 'report' ? 'block' : 'none';
     if (tab === 'total') initTotalPage();
+    if (tab === 'report') wrInit();
     restoreScrollTop(subTabScrollTop[tab] || 0);
 }
 
@@ -5093,10 +5185,220 @@ if (typeof plus !== 'undefined' && window.plus) {
     }, 3000);
 }
 
+// ============================================================
+//                    报工作量
+// ============================================================
+var WR_HIST_KEY = 'pd.weldReport.history.v1';
+var WR_PEOPLE_KEY = 'pd.weldReport.people.v1';
+var WR_FIELDS = ['序号', '管线号', '页码', '管段号', '焊口号', '管径', '壁厚', '焊接类型', '焊工号',
+    '材料名称1', '材质1', '炉批号1', '材料名称2', '材质2', '炉批号2', '备注'];
+var WR_NOHIST = { '管径': 1, '壁厚': 1, '序号': 1 };
+var wrHistory = null;
+var wrRows = [];
+var wrInited = false;
+var wrPickerCb = null;
+
+function wrLoadHistory() {
+    if (wrHistory) return wrHistory;
+    wrHistory = lsGet(WR_HIST_KEY, {}) || {};
+    return wrHistory;
+}
+function wrSaveHistory(field, val) {
+    val = String(val || '').trim();
+    if (!val || WR_NOHIST[field]) return;
+    var h = wrLoadHistory();
+    var arr = h[field] || [];
+    arr = arr.filter(function (x) { return x !== val; });
+    arr.unshift(val);
+    if (arr.length > 30) arr = arr.slice(0, 30);
+    h[field] = arr;
+    lsSet(WR_HIST_KEY, h);
+}
+function wrNewRow(seq) {
+    var r = {};
+    WR_FIELDS.forEach(function (f) { r[f] = ''; });
+    r['序号'] = String(seq || 1);
+    return r;
+}
+function wrInit() {
+    if (wrInited) return;
+    wrInited = true;
+    wrLoadHistory();
+    // 人员：上次填的自动带出
+    var people = lsGet(WR_PEOPLE_KEY, {}) || {};
+    document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) {
+        inp.value = people[inp.getAttribute('data-person')] || '';
+        inp.addEventListener('change', function () { wrSavePeople(); });
+    });
+    if (!wrRows.length) wrRows.push(wrNewRow(1));
+    wrRender();
+}
+function wrSavePeople() {
+    var p = {};
+    document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) {
+        p[inp.getAttribute('data-person')] = inp.value.trim();
+    });
+    lsSet(WR_PEOPLE_KEY, p);
+}
+function wrEsc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function wrFieldHtml(rowIdx, field, cls) {
+    var v = wrRows[rowIdx][field] || '';
+    var hasPreset = !!wrPresetsFor(field, rowIdx);
+    var btn = hasPreset ? '<span class="wr-pick-btn" onclick="wrOpenPicker(\'' + field + '\',' + rowIdx + ')">▾</span>' : '';
+    return '<div class="wr-field' + (cls ? ' ' + cls : '') + '">' +
+        '<label class="wr-label">' + field + '</label>' +
+        '<span class="wr-input-wrap"><input class="wr-input" data-row="' + rowIdx + '" data-field="' + field +
+        '" value="' + wrEsc(v) + '" onchange="wrOnChange(' + rowIdx + ',\'' + field + '\',this.value)" ' +
+        'onblur="wrOnBlur(\'' + field + '\',this.value)">' + btn + '</span></div>';
+}
+function wrRender() {
+    var box = document.getElementById('wrRows');
+    if (!box) return;
+    var html = '';
+    wrRows.forEach(function (row, i) {
+        html += '<div class="wr-card"><div class="wr-card-head">第 ' + (i + 1) + ' 行' +
+            '<span class="wr-card-del" onclick="wrDelRow(' + i + ')">删除</span></div><div class="wr-card-inner">';
+        html += '<div class="wr-row1">' + wrFieldHtml(i, '序号') + wrFieldHtml(i, '管线号') + '</div>';
+        html += '<div class="wr-row7">' + ['页码', '管段号', '焊口号', '管径', '壁厚', '焊接类型', '焊工号']
+            .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
+        html += '<div class="wr-row3">' + ['材料名称1', '材质1', '炉批号1']
+            .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
+        html += '<div class="wr-row3b">' + ['材料名称2', '材质2', '炉批号2']
+            .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
+        html += '<div class="wr-row-note">' + wrFieldHtml(i, '备注') + '</div>';
+        html += '</div></div>';
+    });
+    box.innerHTML = html;
+    var c = document.getElementById('wrCount');
+    if (c) c.textContent = '共 ' + wrRows.length + ' 行';
+}
+function wrOnChange(i, field, val) {
+    if (wrRows[i]) wrRows[i][field] = val;
+    if (field === '管径') {
+        // 管径变了 → 壁厚候选跟着变；当前壁厚不在新候选里就清空
+        var cands = wrWallCands(val);
+        var w = wrRows[i]['壁厚'];
+        if (cands && w && cands.indexOf(w) === -1) wrRows[i]['壁厚'] = '';
+        wrRender();
+    }
+}
+function wrOnBlur(field, val) { wrSaveHistory(field, val); }
+function wrAddRow() {
+    wrRows.push(wrNewRow(wrRows.length + 1));
+    wrRender();
+}
+function wrDelRow(i) {
+    if (wrRows.length <= 1) { showToast('至少保留一行'); return; }
+    wrRows.splice(i, 1);
+    wrRows.forEach(function (r, k) { r['序号'] = String(k + 1); });
+    wrRender();
+}
+function wrWallCands(od) {
+    var P = window.PIPE_PRESETS;
+    if (!P || !P.wall) return null;
+    return P.wall[String(od || '').trim()] || null;
+}
+// 返回 {title, items:[{v,cn}]} 或 null
+function wrPresetsFor(field, rowIdx) {
+    var P = window.PIPE_PRESETS;
+    if (!P) return null;
+    if (field === '管径') {
+        return { title: '选择外径', items: (P.ods || []).map(function (o) { return { v: o.od, cn: '' }; }) };
+    }
+    if (field === '壁厚') {
+        var od = wrRows[rowIdx] ? (wrRows[rowIdx]['管径'] || '') : '';
+        var cands = wrWallCands(od);
+        if (!cands || !cands.length) return null;
+        return { title: '外径 ' + od + ' 的标准壁厚', items: cands.map(function (v) { return { v: v, cn: '' }; }) };
+    }
+    if (field === '材料名称1' || field === '材料名称2') {
+        return { title: '选择' + field, items: (P.materials || []).map(function (m) { return { v: m[0], cn: m[1] }; }) };
+    }
+    if (field === '材质1' || field === '材质2') {
+        return { title: '选择' + field, items: (P.grades || []).map(function (g) { return { v: g, cn: '' }; }) };
+    }
+    var h = wrLoadHistory();
+    if (h[field] && h[field].length) {
+        return { title: field + ' · 历史输入', items: h[field].map(function (v) { return { v: v, cn: '' }; }) };
+    }
+    return null;
+}
+function wrOpenPicker(field, rowIdx) {
+    var p = wrPresetsFor(field, rowIdx);
+    if (!p || !p.items.length) return;
+    wrPickerCb = function (val) {
+        if (wrRows[rowIdx]) wrRows[rowIdx][field] = val;
+        wrRender();
+        if (field === '管径') {
+            var cands = wrWallCands(val);
+            var w = wrRows[rowIdx] && wrRows[rowIdx]['壁厚'];
+            if (cands && w && cands.indexOf(w) === -1 && wrRows[rowIdx]) wrRows[rowIdx]['壁厚'] = '';
+        }
+        wrRender();
+    };
+    document.getElementById('wrPickerTitle').textContent = p.title;
+    var list = document.getElementById('wrPickerList');
+    list.innerHTML = p.items.map(function (it) {
+        return '<div class="wr-picker-item" onclick="wrPick(\'' + wrEsc(it.v).replace(/'/g, "\\'") + '\')">' +
+            wrEsc(it.v) + (it.cn ? '<span class="wr-cn">' + wrEsc(it.cn) + '</span>' : '') + '</div>';
+    }).join('');
+    document.getElementById('wrPickerMask').classList.add('show');
+}
+function wrPick(val) {
+    if (wrPickerCb) wrPickerCb(val);
+    wrClosePicker();
+}
+function wrClosePicker() {
+    document.getElementById('wrPickerMask').classList.remove('show');
+    wrPickerCb = null;
+}
+function wrUpload() {
+    var btn = document.getElementById('wrUpload');
+    var rows = wrRows.filter(function (r) {
+        return WR_FIELDS.some(function (f) { return f !== '序号' && String(r[f] || '').trim(); });
+    });
+    if (!rows.length) { showToast('请先填写至少一行明细'); return; }
+    var people = {};
+    document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) {
+        people[inp.getAttribute('data-person')] = inp.value.trim();
+    });
+    if (!people.fitter && !people.welder && !people.helper) { showToast('请填写施工人员'); return; }
+    var d = new Date();
+    var stamp = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    var payload = {
+        report_date: stamp, fitter: people.fitter || '', welder: people.welder || '', helper: people.helper || '',
+        submitter: (typeof currentUser !== 'undefined' && currentUser) ? currentUser : '', rows: rows
+    };
+    btn.disabled = true; btn.textContent = '上传中…';
+    function done() { btn.disabled = false; btn.textContent = '上传报表'; }
+    fetch(API_BASE_URL + '/work?action=report-save', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); }).then(function (res) {
+        done();
+        if (res && res.success) {
+            showToast('✅ 已上传 ' + rows.length + ' 行，后台可查看');
+            wrRows = [wrNewRow(1)];
+            wrRender();
+        } else {
+            showToast('上传失败：' + ((res && (res.message || res.error)) || '未知错误'));
+        }
+    }).catch(function (e) { done(); showToast('上传失败：网络错误'); });
+}
+
 console.log('🚀 APP 启动完成');
 </script>
 <script src="drawing-mobile.js"></script>
 <script src="bracketFormData.js"></script>
 <script src="bracketForm.js"></script>
+<script src="pipeWall.js"></script>
+<div class="wr-picker-mask" id="wrPickerMask" onclick="if(event.target===this)wrClosePicker()">
+  <div class="wr-picker">
+    <div class="wr-picker-head"><span id="wrPickerTitle">选择</span><span class="wr-picker-close" onclick="wrClosePicker()">关闭</span></div>
+    <div class="wr-picker-list" id="wrPickerList"></div>
+  </div>
+</div>
 </body>
 </html>

@@ -349,6 +349,52 @@ export async function handler(req, res) {
       return res.status(200).json({ success: true, message: '列及其数据已删除' });
     }
 
+    if (action === 'report-save') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+      const { report_date, fitter, welder, helper, submitter, rows } = req.body || {};
+      if (!report_date || !Array.isArray(rows) || !rows.length) {
+        return res.status(400).json({ error: 'report_date and rows required' });
+      }
+      await sql`
+        CREATE TABLE IF NOT EXISTS weld_reports (
+          id SERIAL PRIMARY KEY,
+          report_date DATE NOT NULL,
+          fitter TEXT DEFAULT '',
+          welder TEXT DEFAULT '',
+          helper TEXT DEFAULT '',
+          submitter TEXT DEFAULT '',
+          rows JSONB DEFAULT '[]',
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+      await sql`CREATE INDEX IF NOT EXISTS idx_weld_reports_date ON weld_reports(report_date)`;
+      const r = await sql`
+        INSERT INTO weld_reports (report_date, fitter, welder, helper, submitter, rows)
+        VALUES (${report_date}, ${fitter || ''}, ${welder || ''}, ${helper || ''}, ${submitter || ''}, ${JSON.stringify(rows)}::jsonb)
+        RETURNING id, report_date, created_at
+      `;
+      return res.status(200).json({ success: true, item: r[0], saved: rows.length });
+    }
+
+    if (action === 'report-list') {
+      const { from, to, limit } = req.query;
+      const lim = Math.min(parseInt(limit || '200', 10) || 200, 1000);
+      let list;
+      if (from && to) {
+        list = await sql`
+          SELECT id, report_date, fitter, welder, helper, submitter, rows, created_at
+          FROM weld_reports WHERE report_date BETWEEN ${from} AND ${to}
+          ORDER BY created_at DESC LIMIT ${lim}
+        `;
+      } else {
+        list = await sql`
+          SELECT id, report_date, fitter, welder, helper, submitter, rows, created_at
+          FROM weld_reports ORDER BY created_at DESC LIMIT ${lim}
+        `;
+      }
+      return res.status(200).json({ success: true, data: list });
+    }
+
     return res.status(400).json({ error: 'Unknown action: ' + action });
 
   } catch (err) {
