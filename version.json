@@ -1,7 +1,7 @@
 {
-    "version": "4.3.8",
-    "updateTime": "2026-11-27 12:33:09",
+    "version": "4.3.9",
+    "updateTime": "2026-11-27 12:45:20",
     "dataUpdateTime": "2026-11-27 11:41:54",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "修复「关于」弹窗在慢网下点击卡顿、图纸索引未落盘误报、标题重复。"
+    "updateLog": "快捷输入键盘改为手机26键布局（数字首排），新增退格删除键。"
 }
