@@ -46,7 +46,7 @@ export async function handler(req, res) {
 
   const { action } = req.query;
   if (!_checkApp(req, res)) return;
-  if ([].indexOf(action) !== -1 && !_needAdmin(req, res)) return;
+  if (['report-clear', 'report-delete'].indexOf(action) !== -1 && !_needAdmin(req, res)) return;
 
   try {
     const sql = neon(process.env.DATABASE_URL);
@@ -393,6 +393,50 @@ export async function handler(req, res) {
         `;
       }
       return res.status(200).json({ success: true, data: list });
+    }
+
+
+    if (action === 'report-clear') {
+      // 清除指定日期的报表（后台静态库归档后使用），需要管理员权限
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+      const { date, confirm } = req.body || {};
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'valid date required' });
+      if (confirm !== 'CLEAR') return res.status(400).json({ error: 'confirm=CLEAR required' });
+      await sql`
+        CREATE TABLE IF NOT EXISTS weld_reports (
+          id SERIAL PRIMARY KEY,
+          report_date DATE NOT NULL,
+          fitter TEXT DEFAULT '',
+          welder TEXT DEFAULT '',
+          helper TEXT DEFAULT '',
+          submitter TEXT DEFAULT '',
+          rows JSONB DEFAULT '[]',
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+      const r = await sql`DELETE FROM weld_reports WHERE report_date = ${date} RETURNING id`;
+      return res.status(200).json({ success: true, deleted: r.length, date: date });
+    }
+
+
+    if (action === 'report-delete') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+      const { id, confirm } = req.body || {};
+      if (!id || confirm !== 'DELETE') return res.status(400).json({ error: 'id and confirm=DELETE required' });
+      await sql`
+        CREATE TABLE IF NOT EXISTS weld_reports (
+          id SERIAL PRIMARY KEY,
+          report_date DATE NOT NULL,
+          fitter TEXT DEFAULT '',
+          welder TEXT DEFAULT '',
+          helper TEXT DEFAULT '',
+          submitter TEXT DEFAULT '',
+          rows JSONB DEFAULT '[]',
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+      const r = await sql`DELETE FROM weld_reports WHERE id = ${id} RETURNING id`;
+      return res.status(200).json({ success: true, deleted: r.length, id: id });
     }
 
     return res.status(400).json({ error: 'Unknown action: ' + action });
