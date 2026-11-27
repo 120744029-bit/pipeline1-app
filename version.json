@@ -1,6 +1,6 @@
 {
-    "version": "4.3.5",
-    "updateTime": "2026-11-26 11:58:00",
+    "version": "4.3.6",
+    "updateTime": "2026-11-27 10:55:00",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "登录页改为全屏仿微信风格；权限每24小时自动核验（账号变更当天生效）。"
+    "updateLog": "新增39条特殊支架（SPS）图纸按钮，按完整支架号精确对应单页PDF。"
 }

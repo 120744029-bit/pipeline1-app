@@ -45,7 +45,14 @@
         var m = s.match(/^(Z[A-Z]*\d+)[A-Z]*$/);
         return m ? m[1] : s;
     }
+    // 特殊支架（SPS）：form/models 按型号归并会把 12 区 SPS-00001 和 20 区
+    // SPS-00001 串成一张图，所以单独用完整支架号建 sps 映射，优先走它。
+    function getSps(bracketId) {
+        return (DATA.sps && DATA.sps[bracketId]) || null;
+    }
     function getForm(bracketId) {
+        var sp = getSps(bracketId);
+        if (sp) return sp.form || '';
         return (DATA.form && DATA.form[bracketId]) || '';
     }
     function toast(msg) {
@@ -128,8 +135,11 @@
     function open(bracketId) {
         var form = getForm(bracketId);
         if (!form) { toast('该支架未登记形式'); return; }
-        var key = formKey(form);
-        var model = (DATA.models && DATA.models[key]) || null;
+        var sp = getSps(bracketId);
+        var key = sp ? bracketId : formKey(form);
+        var model = sp
+            ? { name: form, files: [{ file: sp.file || (bracketId + '.pdf'), page: 1 }] }
+            : ((DATA.models && DATA.models[key]) || null);
         var p = ensurePanel();
         p.classList.add('active');
         document.getElementById('bfTitle').textContent = '📐 ' + bracketId + ' · ' + form;
