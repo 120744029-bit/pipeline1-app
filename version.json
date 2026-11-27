@@ -1,7 +1,7 @@
 {
-    "version": "4.4.0",
-    "updateTime": "2026-11-27 20:32:49",
+    "version": "4.4.1",
+    "updateTime": "2026-11-27 21:08:39",
     "dataUpdateTime": "2026-11-27 20:32:49",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "新增「报工作量」：焊口明细表、字段历史、管径壁厚/材料材质预设，填完可上传，后台可查。"
+    "updateLog": "报工作量明细表排版优化：序号/管线号/页码/管段号同一行，焊口号/管径/壁厚/焊接类型/焊工号同一行，材料名称缩短。只改APP，桌面端不变。"
 }

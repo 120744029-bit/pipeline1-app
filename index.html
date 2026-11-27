@@ -168,10 +168,10 @@
         }
         .wr-card-del { margin-left: auto; color: var(--red-text); font-size: calc(11px * var(--font-scale)); cursor: pointer; }
         .wr-card-inner { padding: 10px; }
-        .wr-row1 { display: grid; grid-template-columns: 32px 1fr; gap: 10px; margin-bottom: 10px; }
-        .wr-row7 { display: grid; grid-template-columns: 0.6fr 1.25fr 1fr 0.9fr 0.6fr 1fr 0.85fr; gap: 4px; }
-        .wr-row3 { display: grid; grid-template-columns: 1fr 0.85fr 1.3fr; gap: 8px 10px; margin-top: 10px; padding-top: 9px; border-top: 1px dashed var(--border-light); }
-        .wr-row3b { display: grid; grid-template-columns: 1fr 0.85fr 1.3fr; gap: 8px 10px; margin-top: 8px; }
+        .wr-row1 { display: grid; grid-template-columns: 30px minmax(0,5.5fr) minmax(0,1.5fr) minmax(0,2fr); gap: 5px; margin-bottom: 10px; }
+        .wr-row7 { display: grid; grid-template-columns: minmax(0,0.85fr) minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr); gap: 5px; }
+        .wr-row3 { display: grid; grid-template-columns: minmax(0,0.6fr) minmax(0,0.85fr) minmax(0,1.3fr); gap: 8px 10px; margin-top: 10px; padding-top: 9px; border-top: 1px dashed var(--border-light); }
+        .wr-row3b { display: grid; grid-template-columns: minmax(0,0.6fr) minmax(0,0.85fr) minmax(0,1.3fr); gap: 8px 10px; margin-top: 8px; }
         .wr-row-note { margin-top: 10px; padding-top: 9px; border-top: 1px dashed var(--border-light); }
         .wr-add {
             border: 1px dashed var(--text-tertiary); border-radius: 10px; text-align: center;
@@ -5261,8 +5261,9 @@ function wrRender() {
     wrRows.forEach(function (row, i) {
         html += '<div class="wr-card"><div class="wr-card-head">第 ' + (i + 1) + ' 行' +
             '<span class="wr-card-del" onclick="wrDelRow(' + i + ')">删除</span></div><div class="wr-card-inner">';
-        html += '<div class="wr-row1">' + wrFieldHtml(i, '序号') + wrFieldHtml(i, '管线号') + '</div>';
-        html += '<div class="wr-row7">' + ['页码', '管段号', '焊口号', '管径', '壁厚', '焊接类型', '焊工号']
+        html += '<div class="wr-row1">' + ['序号', '管线号', '页码', '管段号']
+            .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
+        html += '<div class="wr-row7">' + ['焊口号', '管径', '壁厚', '焊接类型', '焊工号']
             .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
         html += '<div class="wr-row3">' + ['材料名称1', '材质1', '炉批号1']
             .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
