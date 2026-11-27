@@ -1,7 +1,7 @@
 {
-    "version": "4.3.7",
-    "updateTime": "2026-11-27 11:41:54",
+    "version": "4.3.8",
+    "updateTime": "2026-11-27 12:33:09",
     "dataUpdateTime": "2026-11-27 11:41:54",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "「关于」弹窗新增仓库更新时间、缓存大小、图纸索引用量显示。"
+    "updateLog": "修复「关于」弹窗在慢网下点击卡顿、图纸索引未落盘误报、标题重复。"
 }
