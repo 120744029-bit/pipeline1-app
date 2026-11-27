@@ -1,6 +1,7 @@
 {
-    "version": "4.3.6",
-    "updateTime": "2026-11-27 10:55:00",
+    "version": "4.3.7",
+    "updateTime": "2026-11-27 11:41:54",
+    "dataUpdateTime": "2026-11-27 11:41:54",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "新增39条特殊支架（SPS）图纸按钮，按完整支架号精确对应单页PDF。"
+    "updateLog": "「关于」弹窗新增仓库更新时间、缓存大小、图纸索引用量显示。"
 }

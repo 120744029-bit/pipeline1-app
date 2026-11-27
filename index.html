@@ -1877,8 +1877,66 @@ function showToast(msg, duration) {
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(function() { toast.classList.remove('show'); }, duration);
 }
+// version.json 的结果顺手缓存一份，showInfo 直接读，避免重复请求
+var repoMeta = null;
+function fmtCacheSize(chars) {
+    var kb = chars / 1024;
+    if (kb < 1024) return Math.round(kb) + ' KB';
+    return (kb / 1024).toFixed(2) + ' MB';
+}
 function showInfo() {
-    alert('数据版本：' + APP_VERSION + '\n缓存状态：' + (navigator.onLine ? '在线' : '离线'));
+    // 缓存大小：localStorage 全部 key+value 的字符数（图纸索引 LIMIT 也是按字符算，同口径）
+    var total = 0;
+    try {
+        for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (k) total += String(k).length + String(localStorage.getItem(k) || '').length;
+        }
+    } catch (e) {}
+
+    function finish(meta) {
+        var ver = (meta && meta.version) || currentVersion || APP_VERSION;
+        var when = (meta && (meta.dataUpdateTime || meta.updateTime)) || '';
+        var lines = ['管道管理工具', '数据版本：' + ver];
+        if (when) lines.push('仓库更新：' + when);
+        lines.push('缓存大小：' + fmtCacheSize(total));
+        // 图纸索引：只在 APP 里存在（桌面版没有 MobileDrawings，自动省略）
+        if (typeof MobileDrawings !== 'undefined' && MobileDrawings && MobileDrawings.status) {
+            try {
+                var st = MobileDrawings.status();
+                var idxLimit = 380 * 1024;
+                if (st.cacheOk) {
+                    var used = st.cacheBytes || 0;
+                    var pct = Math.min(100, Math.round(used / idxLimit * 100));
+                    var when2 = st.builtAt ? new Date(st.builtAt).toTimeString().slice(0, 5) : '';
+                    lines.push('图纸索引：' + fmtCacheSize(used) + ' / 380 KB（' + pct + '%）' + (when2 ? ' · ' + when2 + ' 扫描' : ''));
+                } else {
+                    lines.push('图纸索引：⚠️ 未落盘，每次启动重扫');
+                }
+            } catch (e) {}
+        }
+        lines.push('缓存状态：' + (navigator.onLine ? '在线' : '离线'));
+        alert(lines.join('\n'));
+    }
+
+    if (repoMeta) { finish(repoMeta); return; }
+    // 桌面版 checkHotUpdate 被禁用，这里现场拉一次；3 秒超时兜底
+    var done = false;
+    var timer = setTimeout(function () { if (!done) { done = true; finish(null); } }, 3000);
+    try {
+        fetch(UPDATE_URL + '?t=' + Date.now())
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (done) return;
+                done = true; clearTimeout(timer); repoMeta = d; finish(d);
+            })
+            .catch(function () {
+                if (done) return;
+                done = true; clearTimeout(timer); finish(null);
+            });
+    } catch (e) {
+        if (!done) { done = true; clearTimeout(timer); finish(null); }
+    }
 }
 
 // ============================================================
@@ -4777,6 +4835,7 @@ function checkRemoteVersion() {
     fetch(UPDATE_URL + '?' + Date.now())
         .then(function(r) { return r.json(); })
         .then(function(data) {
+            repoMeta = data;
             var remoteVersion = data.version;
             var wgtUrl = data.wgtUrl;
             var updateLog = data.updateLog || '更新了数据';
