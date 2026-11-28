@@ -425,6 +425,11 @@
         }
         .pd-kb-row button.wide { flex: 1.4; }
         .pd-kb-row button.shift { background: var(--bg-hover); }
+        .pd-kb-row.pd-kb-numrow { gap: 6px; }
+        .pd-kb-row.pd-kb-numrow > button { flex: 1; }
+        .pd-kb-num3 { flex: 3; display: flex; gap: 4px; }
+        .pd-kb-num3 button { flex: 1; }
+        .pd-kb-row button.pd-kb-abc { background: var(--bg-hover); font-weight: 600; }
         .pd-kb-row button.shift.act { background: var(--green-primary); color: #fff; border-color: var(--green-primary); }
         .pd-kb-row button:active { background: var(--green-primary); color: white; transform: scale(0.92); }
         .pd-kb-foot { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 0; }
@@ -3646,12 +3651,6 @@ var pdKbTarget = null;
 var pdKbLower = false;
 var pdKbNum = false;
 function pdKbRows() {
-    if (pdKbNum) {
-        return [
-            { cls: '', keys: ['1','2','3','4','5','6','7','8','9','0'] },
-            { cls: '', keys: ['.','/','+','-'] }
-        ];
-    }
     return [
         { cls: '', keys: ['1','2','3','4','5','6','7','8','9','0'] },
         { cls: '', keys: ['Q','W','E','R','T','Y','U','I','O','P'] },
@@ -3663,22 +3662,41 @@ function pdKbBuild() {
     var box = document.getElementById('pdKbKeys');
     if (!box) return;
     var html = '';
-    pdKbRows().forEach(function (row, ri) {
-        html += '<div class="pd-kb-row ' + row.cls + '">';
-        if (!pdKbNum && ri === 3) html += '<button type="button" class="shift' + (pdKbLower ? ' act' : '') + '" data-kb-shift="1">Shift</button>';
-        row.keys.forEach(function (k) {
-            var txt = /[A-Z]/.test(k) && pdKbLower ? k.toLowerCase() : k;
-            html += '<button type="button" data-kb-key="' + k + '">' + txt + '</button>';
+    if (pdKbNum) {
+        var L = ['.', '/', '+', '-'];
+        var D = [['1','2','3'], ['4','5','6'], ['7','8','9']];
+        for (var r = 0; r < 3; r++) {
+            html += '<div class="pd-kb-row pd-kb-numrow">' +
+                '<button type="button" data-kb-key="' + L[r] + '">' + L[r] + '</button>' +
+                '<div class="pd-kb-num3">' +
+                '<button type="button" data-kb-key="' + D[r][0] + '">' + D[r][0] + '</button>' +
+                '<button type="button" data-kb-key="' + D[r][1] + '">' + D[r][1] + '</button>' +
+                '<button type="button" data-kb-key="' + D[r][2] + '">' + D[r][2] + '</button>' +
+                '</div></div>';
+        }
+        html += '<div class="pd-kb-row pd-kb-numrow">' +
+            '<button type="button" data-kb-key="-">-</button>' +
+            '<button type="button" class="pd-kb-abc" data-kb-mode="1">ABC</button>' +
+            '<button type="button" class="wide" data-kb-back="1">退格</button>' +
+            '<button type="button" data-kb-key="0">0</button>' +
+            '</div>';
+    } else {
+        pdKbRows().forEach(function (row, ri) {
+            html += '<div class="pd-kb-row ' + row.cls + '">';
+            if (ri === 3) html += '<button type="button" class="shift' + (pdKbLower ? ' act' : '') + '" data-kb-shift="1">Shift</button>';
+            row.keys.forEach(function (k) {
+                var txt = /[A-Z]/.test(k) && pdKbLower ? k.toLowerCase() : k;
+                html += '<button type="button" data-kb-key="' + k + '">' + txt + '</button>';
+            });
+            if (ri === 3) html += '<button type="button" class="wide" data-kb-back="1">退格</button>';
+            html += '</div>';
         });
-        if (!pdKbNum && ri === 3) html += '<button type="button" class="wide" data-kb-back="1">退格</button>';
-        if (pdKbNum && ri === 1) html += '<button type="button" class="wide" data-kb-back="1">退格</button>';
-        html += '</div>';
-    });
+    }
     box.innerHTML = html;
     var mb = document.getElementById('pdKbModeBtn');
     if (mb) mb.textContent = pdKbNum ? '返回' : '123';
     var h = document.getElementById('pdKbHint');
-    if (h) h.textContent = pdKbNum ? '数字/符号 · 返回切回字母' : 'Shift 切大小写 · 退格删一字';
+    if (h) h.textContent = pdKbNum ? '数字 / 符号 · ABC 返回字母' : 'Shift 切大小写 · 退格删一字';
 }
 function pdKbFresh() {
     if (pdKbTarget && !document.contains(pdKbTarget)) {
@@ -3728,6 +3746,7 @@ function pdKbInit() {
         if (e.target === mask) { pdKbClose(); return; }
         var b = e.target.closest('button');
         if (!b) return;
+        if (b.getAttribute('data-kb-mode')) { pdKbNum = false; pdKbBuild(); return; }
         if (b.getAttribute('data-kb-shift')) { pdKbLower = !pdKbLower; pdKbBuild(); return; }
         var el = pdKbFresh();
         if (!el) return;
