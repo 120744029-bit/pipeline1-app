@@ -212,7 +212,7 @@
         }
         .wr-upload:disabled { opacity: 0.5; }
         .wr-picker-mask {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: none;
+            position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 10000; display: none;
             align-items: flex-end;
         }
         .wr-picker-mask.show { display: flex; }
@@ -408,34 +408,28 @@
         }
         .subitem-box select:focus { border-color: var(--green-primary); background: var(--bg-card); }
 
-        /* ============ 键盘面板 ============ */
-        .keyboard-panel {
-            background: var(--bg-card); padding: 12px; margin: 8px 0;
-            border-top: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light);
-            transition: background 0.2s, border-color 0.2s;
-        }
-        .keyboard-title {
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: calc(13px * var(--font-scale)); color: var(--text-secondary);
-            font-weight: 500; margin-bottom: 10px; padding: 0 4px;
-        }
-        .keyboard-title .clear-btn {
-            background: #ef4444; color: white; border: none; padding: 4px 12px;
-            border-radius: 4px; font-size: calc(12px * var(--font-scale)); cursor: pointer;
-        }
-        .keyboard-grid { display: flex; flex-direction: column; gap: 5px; }
-        .keyboard-grid .kb-row { display: flex; gap: 4px; }
-        .keyboard-grid .kb-row.indent1 { padding: 0 5%; }
-        .keyboard-grid .kb-row.indent2 { padding: 0 2%; }
-        .keyboard-grid button {
-            flex: 1; min-width: 0; padding: 10px 2px; border: 1px solid var(--border-light); border-radius: 4px;
+        /* ============ 统一快捷键盘浮层 ============ */
+        .pd-kb-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 10001; display: none; align-items: flex-end; }
+        .pd-kb-mask.show { display: flex; }
+        .pd-kb { width: 100%; background: var(--bg-card); border-radius: 16px 16px 0 0; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); }
+        .pd-kb-head { display: flex; align-items: center; padding: 0 4px 10px; font-size: calc(13px * var(--font-scale)); color: var(--text-primary); font-weight: 600; }
+        .pd-kb-head .pd-kb-close { margin-left: auto; color: var(--text-secondary); font-weight: 400; cursor: pointer; }
+        .pd-kb-row { display: flex; gap: 4px; margin-bottom: 5px; }
+        .pd-kb-row.indent1 { padding: 0 5%; }
+        .pd-kb-row.indent2 { padding: 0 2%; }
+        .pd-kb-row button {
+            flex: 1; min-width: 0; padding: 11px 2px; border: 1px solid var(--border-light); border-radius: 5px;
             background: var(--bg-card); font-size: calc(14px * var(--font-scale)); font-weight: 600;
             color: var(--text-primary); cursor: pointer; text-align: center;
-            transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.1s;
+            transition: background 0.2s, border-color 0.2s, color: 0.2s, transform 0.1s;
         }
-        .keyboard-grid button.kb-back { flex: 1.4; display: flex; align-items: center; justify-content: center; }
-        .keyboard-grid button.kb-back svg { width: 16px; height: 16px; }
-        .keyboard-grid button:active { background: var(--green-primary); color: white; transform: scale(0.92); }
+        .pd-kb-row button.wide { flex: 1.4; }
+        .pd-kb-row button.shift { background: var(--bg-hover); }
+        .pd-kb-row button.shift.act { background: var(--green-primary); color: #fff; border-color: var(--green-primary); }
+        .pd-kb-row button:active { background: var(--green-primary); color: white; transform: scale(0.92); }
+        .pd-kb-foot { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 0; }
+        .pd-kb-foot .pd-kb-hint { font-size: calc(11px * var(--font-scale)); color: var(--text-tertiary); }
+        .pd-kb-foot .pd-kb-done { padding: 7px 22px; background: var(--green-primary); color: #fff; border: none; border-radius: 6px; font-size: calc(13px * var(--font-scale)); cursor: pointer; }
 
         /* ============ 快捷按钮组 ============ */
         .quick { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; padding: 0 16px; }
@@ -787,7 +781,6 @@
         /* ============ 响应式 ============ */
         @media (max-width: 400px) {
             .label { width: 80px; font-size: calc(13px * var(--font-scale)); }
-            .keyboard-grid button { padding: 9px 0; }
         }
     </style>
 </head>
@@ -877,7 +870,7 @@
                     <div class="wr-add" onclick="wrAddRow('valve')">＋ 阀门</div>
                 </div>
                 <div class="wr-total-note">
-                    <label class="wr-label">总备注</label>
+                    <label class="wr-label">总备注 <span class="wr-pick-btn" style="position:static;transform:none;margin-left:6px;" onclick="wrOpenNoteHist('total')">▾历史</span></label>
                     <textarea id="wrTotalNote" class="wr-textarea" rows="2" placeholder="整张报表的备注"></textarea>
                 </div>
                 <button class="wr-upload" id="wrUpload" onclick="wrUpload()">上传报表</button>
@@ -895,7 +888,7 @@
             </select>
         </div>
         <div class="search-box" id="pipelineSearch">
-            <input type="text" id="pipelineInput" placeholder="输入管线号或点下方按键">
+            <input type="text" id="pipelineInput" placeholder="点击输入管线号" data-kb="1" readonly>
             <button id="pipelineBtn">查询</button>
         </div>
 
@@ -904,20 +897,13 @@
             <button onclick="refreshPipelineData()" id="pipelineRefreshBtn" style="width:100%;padding:12px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:15px;font-weight:600;cursor:pointer;">🔄 刷新管线数据</button>
         </div>
         <!-- 👆 新增结束 -->
-        <div class="keyboard-panel">
-            <div class="keyboard-title">
-                <span>⌨️ 快捷输入</span>
-                <button type="button" onclick="clearPipelineInput()" class="clear-btn">清空</button>
-            </div>
-            <div class="keyboard-grid" id="keyboardGrid"></div>
-        </div>
         <div id="resultAreaPipeline"></div>
     </div>
 
     <!-- ==================== 页面 3：支架 ==================== -->
     <div id="pageBracket" class="page-mode">
         <div class="search-box" id="bracketSearch">
-            <input type="text" id="bracketInput" placeholder="输入支架号，如 12-SUP-30194">
+            <input type="text" id="bracketInput" placeholder="点击输入支架号" data-kb="1" readonly>
             <button id="bracketBtn">查支架</button>
         </div>
         <div class="quick" id="bracketQuick">
@@ -941,7 +927,7 @@
     <!-- ==================== 页面 4：阀门 ==================== -->
     <div id="pageValve" class="page-mode">
         <div class="search-box" id="valveSearch">
-            <input type="text" id="valveInput" placeholder="输入阀门位号，如 565-GV-0026">
+            <input type="text" id="valveInput" placeholder="点击输入阀门位号" data-kb="1" readonly>
             <button id="valveBtn">查阀门</button>
         </div>
         <div class="quick" id="valveQuick">
@@ -1166,6 +1152,7 @@
             <button onclick="changeNoteUser()" style="margin-left:8px;padding:3px 10px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:4px;font-size:12px;cursor:pointer;">修改</button>
         </p>
         <textarea id="noteDialogInput" rows="4" placeholder="请输入支架位置信息..." style="min-height: 100px;"></textarea>
+        <div style="text-align:right;margin-top:4px;"><span class="wr-pick-btn" style="position:static;transform:none;" onclick="wrOpenNoteHist('bracket')">历史 ▾</span></div>
         <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
             <button onclick="closeNoteDialog()" style="padding:8px 18px;background:var(--bg-hover);border:none;border-radius:4px;font-size:14px;cursor:pointer;color:var(--text-primary);">取消</button>
             <button onclick="deleteNoteFromDialog()" style="padding:8px 18px;background:#ef4444;color:white;border:none;border-radius:4px;font-size:14px;cursor:pointer;">🗑️ 删除</button>
@@ -1184,11 +1171,11 @@
             <button onclick="changeValveUser()" style="margin-left:8px;padding:3px 10px;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:4px;font-size:12px;cursor:pointer;">修改</button>
         </p>
         <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">焊口号1</label>
-        <input type="text" id="valveWeld1" class="dialog-input" placeholder="如 S02">
+        <input type="text" id="valveWeld1" class="dialog-input" placeholder="如 S02" data-kb="1" readonly>
         <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">焊口号2</label>
-        <input type="text" id="valveWeld2" class="dialog-input" placeholder="如 S03">
+        <input type="text" id="valveWeld2" class="dialog-input" placeholder="如 S03" data-kb="1" readonly>
         <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">阀门序列号</label>
-        <input type="text" id="valveSerial" class="dialog-input" placeholder="如 B24040030-6-77">
+        <input type="text" id="valveSerial" class="dialog-input" placeholder="如 B24040030-6-77" data-kb="1" readonly>
         <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;">
             <button onclick="closeValveDialog()" style="padding:8px 18px;background:var(--bg-hover);border:none;border-radius:4px;font-size:14px;cursor:pointer;color:var(--text-primary);">取消</button>
             <button onclick="saveValveFromDialog()" style="padding:8px 18px;background:var(--green-primary);color:white;border:none;border-radius:4px;font-size:14px;cursor:pointer;">确认上传</button>
@@ -3647,48 +3634,91 @@ function fallbackCopy(text) {
 // ============================================================
 //                    键盘
 // ============================================================
-function buildKeyboard() {
-    var grid = document.getElementById('keyboardGrid');
-    if (!grid) return;
-    // 手机 26 键（QWERTY）布局：数字在最上排；后两排按缩进居中，和手机输入法一致
-    var rows = [
+// ============================================================
+//                    统一快捷键盘（浮层）
+// ============================================================
+var pdKbTarget = null;
+var pdKbLower = false;
+function pdKbRows() {
+    return [
         { cls: '', keys: ['1','2','3','4','5','6','7','8','9','0'] },
         { cls: '', keys: ['Q','W','E','R','T','Y','U','I','O','P'] },
-        { cls: 'indent1', keys: ['A','S','D','F','G','H','J','K','L'] },
-        { cls: 'indent2', keys: ['Z','X','C','V','B','N','M','-'] }
+        { cls: 'indent1', keys: ['A','S','D','F','G','H','J','K','L','-'] },
+        { cls: 'indent2', keys: ['Z','X','C','V','B','N','M','.','/'] }
     ];
-    var backSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5H9L3 12l6 7h11a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1Z"/><line x1="17" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="17" y2="15"/></svg>';
+}
+function pdKbBuild() {
+    var box = document.getElementById('pdKbKeys');
+    if (!box) return;
     var html = '';
-    rows.forEach(function(row) {
-        html += '<div class="kb-row ' + row.cls + '">';
-        row.keys.forEach(function(ch) {
-            html += '<button type="button" data-key="' + ch + '">' + ch + '</button>';
+    pdKbRows().forEach(function (row, ri) {
+        html += '<div class="pd-kb-row ' + row.cls + '">';
+        if (ri === 3) html += '<button type="button" class="shift' + (pdKbLower ? ' act' : '') + '" data-kb-shift="1">Shift</button>';
+        row.keys.forEach(function (k) {
+            var txt = /[A-Z]/.test(k) && pdKbLower ? k.toLowerCase() : k;
+            html += '<button type="button" data-kb-key="' + k + '">' + txt + '</button>';
         });
-        if (row === rows[3]) {
-            html += '<button type="button" class="kb-back" data-back="1" aria-label="退格">' + backSvg + '</button>';
-        }
+        if (ri === 3) html += '<button type="button" class="wide" data-kb-back="1">退格</button>';
         html += '</div>';
     });
-    grid.innerHTML = html;
-
-    grid.addEventListener('click', function(e) {
-        var back = e.target.closest('button[data-back]');
-        if (back) { deleteLastChar(); return; }
-        var btn = e.target.closest('button[data-key]');
-        if (!btn) return;
-        appendToInput(btn.dataset.key);
+    box.innerHTML = html;
+}
+function pdKbFresh() {
+    if (pdKbTarget && !document.contains(pdKbTarget)) {
+        var r = pdKbTarget.getAttribute('data-row'), f = pdKbTarget.getAttribute('data-field');
+        if (r != null && f) {
+            pdKbTarget = document.querySelector('#wrRows input[data-row="' + r + '"][data-field="' + f + '"]') || pdKbTarget;
+        }
+    }
+    return pdKbTarget;
+}
+function pdKbOpen(el, label) {
+    if (!el) return;
+    pdKbTarget = el;
+    pdKbLower = false;
+    pdKbBuild();
+    var t = document.getElementById('pdKbTitle');
+    if (t) t.textContent = (label || '快捷输入') + ' · 快捷输入';
+    document.getElementById('pdKbMask').classList.add('show');
+    try { el.scrollIntoView({ block: 'center' }); } catch (e) {}
+    el.blur();
+}
+function pdKbClose() {
+    document.getElementById('pdKbMask').classList.remove('show');
+    pdKbTarget = null;
+}
+function pdKbFire() {
+    if (pdKbTarget) pdKbTarget.dispatchEvent(new Event('change', { bubbles: true }));
+}
+function pdKbInit() {
+    pdKbBuild();
+    var mask = document.getElementById('pdKbMask');
+    if (!mask) return;
+    mask.addEventListener('click', function (e) {
+        if (e.target === mask) { pdKbClose(); return; }
+        var b = e.target.closest('button');
+        if (!b) return;
+        if (b.getAttribute('data-kb-shift')) { pdKbLower = !pdKbLower; pdKbBuild(); return; }
+        var el = pdKbFresh();
+        if (!el) return;
+        if (b.getAttribute('data-kb-back')) {
+            el.value = el.value.slice(0, -1);
+            pdKbFire();
+            return;
+        }
+        var k = b.getAttribute('data-kb-key');
+        if (k) {
+            var ch = /[A-Z]/.test(k) && pdKbLower ? k.toLowerCase() : k;
+            el.value += ch;
+            el.scrollLeft = el.scrollWidth;
+            pdKbFire();
+        }
     });
-}
-function appendToInput(ch) {
-    var input = document.getElementById('pipelineInput');
-    input.value += ch;
-    input.scrollLeft = input.scrollWidth;
-}
-function deleteLastChar() {
-    var input = document.getElementById('pipelineInput');
-    if (!input || !input.value) return;
-    input.value = input.value.slice(0, -1);
-    input.scrollLeft = input.scrollWidth;
+    document.addEventListener('click', function (e) {
+        var el = e.target.closest('[data-kb]');
+        if (!el) return;
+        pdKbOpen(el, el.getAttribute('data-kb-label') || el.getAttribute('placeholder') || '快捷输入');
+    });
 }
 
 // ============================================================
@@ -4076,6 +4106,7 @@ function saveNoteFromDialog() {
     if (!currentUser) { showToast('请先在顶部设置姓名'); promptUserName(); return; }
 
     var data = noteDialogData;
+    wrSaveNoteHist('bracket', note);
     saveBracketNote(data.bracketId, data.pipeNo, note, function() {
         var displaySpan = document.getElementById(data.noteDisplayId);
         if (displaySpan) {
@@ -5125,7 +5156,7 @@ function startApp() {
     if (authUser && authUser.name) { currentUser = authUser.name; }
     updateUserBadge();
     updateNetworkStatus();
-    buildKeyboard();
+    pdKbInit();
     checkBackendHealth();
     console.log('  ✅ 设置完成，当前用户：' + (currentUser || '（未设置）'));
 
@@ -5243,11 +5274,39 @@ var WR_PEOPLE_KEY = 'pd.weldReport.people.v1';
 var WR_CAT_KEY = 'pd.weldReport.cat.v1';       // 施工分类记住上次选择
 var WR_TOTALNOTE_KEY = 'pd.weldReport.totalNote.v1';
 var WR_LASTHASH_KEY = 'pd.weldReport.lastHash.v1'; // 当天已上传内容指纹，用于查重/按钮文案
+var WR_TOTAL_HIST_KEY = 'pd.weldReport.totalNoteHist.v1';
+var WR_BRACKET_NOTE_HIST_KEY = 'pd.bracketNote.hist.v1';
+function wrSaveNoteHist(kind, val) {
+    val = String(val || '').trim();
+    if (!val) return;
+    var key = kind === 'total' ? WR_TOTAL_HIST_KEY : WR_BRACKET_NOTE_HIST_KEY;
+    var arr = lsGet(key, []) || [];
+    arr = arr.filter(function (x) { return x !== val; });
+    arr.unshift(val);
+    if (arr.length > 30) arr = arr.slice(0, 30);
+    lsSet(key, arr);
+}
+function wrOpenNoteHist(kind) {
+    var key = kind === 'total' ? WR_TOTAL_HIST_KEY : WR_BRACKET_NOTE_HIST_KEY;
+    var arr = lsGet(key, []) || [];
+    if (!arr.length) { showToast('暂无历史记录'); return; }
+    wrPickerCb = function (val) {
+        var el = document.getElementById(kind === 'total' ? 'wrTotalNote' : 'noteDialogInput');
+        if (el) el.value = val;
+        if (kind === 'total') wrRenderSummary();
+    };
+    document.getElementById('wrPickerTitle').textContent = (kind === 'total' ? '总备注' : '支架备注') + ' · 历史';
+    var list = document.getElementById('wrPickerList');
+    list.innerHTML = arr.map(function (v) {
+        return '<div class="wr-picker-item" onclick="wrPick(\'' + wrEsc(v).replace(/'/g, "\\'") + '\')">' + wrEsc(v) + '</div>';
+    }).join('');
+    document.getElementById('wrPickerMask').classList.add('show');
+}
 var WR_FIELDS_WELD = ['管线号', '页码', '管段号', '焊口号', '管径', '壁厚', '焊接类型', '焊工号',
     '材料名称1', '材质1', '炉批号1', '材料名称2', '材质2', '炉批号2', '施工分类', '备注'];
 var WR_FIELDS_BRACKET = ['施工分类', '管线号', '支架号', '焊工号', '重量kg'];
 var WR_FIELDS_VALVE = ['管线号', '阀门位号'];
-var WR_HIST_FIELDS = { '备注': 1 };   // 只有备注记历史（施工分类单独记住上次）
+var WR_HIST_FIELDS = { '备注': 1, '焊接类型': 1 };   // 备注、焊接类型记历史
 var WR_CAT_WELD = ['管道安装', '管道预制'];
 var WR_CAT_BRACKET = ['支架安装', '支架预制'];
 var WR_NOTE_PRESETS = ['丢失重焊', '增加口', '图纸变更', '碰头无焊口'];
@@ -5381,7 +5440,7 @@ function wrInit() {
         inp.addEventListener('change', wrSavePeople);
     });
     var tn = document.getElementById('wrTotalNote');
-    if (tn) tn.value = lsGet(WR_TOTALNOTE_KEY, '');
+    if (tn) tn.value = '';
     var dEl = document.getElementById('wrDate');
     if (dEl) dEl.value = wrToday();
     wrLoadedDate = wrToday();
@@ -5413,14 +5472,16 @@ function wrEsc(s) {
 function wrFieldHtml(rowIdx, field, cls) {
     var row = wrRows[rowIdx];
     var v = row[field] || '';
-    var ro = wrReadonly ? ' readonly' : '';
+    var useKb = !wrReadonly && field !== '备注' && field !== '焊接类型';
+    var ro = (wrReadonly || useKb) ? ' readonly' : '';
+    var kbAttr = useKb ? ' data-kb="1"' : '';
     var hasPreset = !!wrPresetsFor(field, rowIdx);
     var btn = (hasPreset && !wrReadonly) ? '<span class="wr-pick-btn" onclick="wrOpenPicker(\'' + field + '\',' + rowIdx + ')">▾</span>' : '';
     return '<div class="wr-field' + (cls ? ' ' + cls : '') + '">' +
         '<label class="wr-label">' + field + '</label>' +
         '<span class="wr-input-wrap"><input class="wr-input" data-row="' + rowIdx + '" data-field="' + field +
         '" value="' + wrEsc(v) + '" onchange="wrOnChange(' + rowIdx + ',\'' + field + '\',this.value)" ' +
-        'onblur="wrOnBlur(\'' + field + '\',this.value)"' + ro + '>' + btn + '</span></div>';
+        'onblur="wrOnBlur(\'' + field + '\',this.value)"' + ro + kbAttr + '>' + btn + '</span></div>';
 }
 // 施工分类：只能选，记住上次；用 input readonly + picker
 function wrCatHtml(rowIdx) {
@@ -5582,6 +5643,14 @@ function wrPresetsFor(field, rowIdx) {
         });
         return { title: '备注（预设 + 历史）', items: items };
     }
+    if (field === '焊接类型') {
+        var items = [{ v: '全氩', cn: '' }, { v: '氩电', cn: '' }];
+        var h = wrLoadHistory();
+        (h['焊接类型'] || []).forEach(function (v) {
+            if (!items.some(function (x) { return x.v === v; })) items.push({ v: v, cn: '' });
+        });
+        return { title: '焊接类型（预设 + 历史）', items: items };
+    }
     if (!P) return null;
     if (field === '管径') {
         return { title: '选择外径', items: (P.ods || []).map(function (o) { return { v: o.od, cn: '' }; }) };
@@ -5684,7 +5753,7 @@ function wrUpload() {
         btn.disabled = false;
         if (res && res.success) {
             lsSet(key, hash);          // 记住指纹：按钮变「修改并上传」+ 查重
-            lsSet(WR_TOTALNOTE_KEY, p.totalNote);
+            lsSet(WR_TOTALNOTE_KEY, p.totalNote); wrSaveNoteHist('total', p.totalNote);
             wrSetUploadBtn();
             showToast('✅ 已' + (res.updated ? '更新' : '上传') + ' ' + p.rows.length + ' 行，后台可查看');
         } else {
@@ -5781,7 +5850,7 @@ function wrFillFromRecord(rec, readonly, noData) {
     wrSetPersonNames('welder', wArr);
     wrSetPersonNames('helper', hArr);
     var tn = document.getElementById('wrTotalNote');
-    if (tn) tn.value = rec ? (rec.totalNote || '') : (lsGet(WR_TOTALNOTE_KEY, ''));
+    if (tn) tn.value = rec ? (rec.totalNote || '') : '';
     wrRender();
 }
 
@@ -5791,6 +5860,13 @@ console.log('🚀 APP 启动完成');
 <script src="bracketFormData.js"></script>
 <script src="bracketForm.js"></script>
 <script src="pipeWall.js"></script>
+<div class="pd-kb-mask" id="pdKbMask">
+  <div class="pd-kb">
+    <div class="pd-kb-head"><span id="pdKbTitle">快捷输入</span><span class="pd-kb-close" onclick="pdKbClose()">收起</span></div>
+    <div id="pdKbKeys"></div>
+    <div class="pd-kb-foot"><span class="pd-kb-hint">Shift 切大小写 · 退格删一字</span><button type="button" class="pd-kb-done" onclick="pdKbClose()">完成</button></div>
+  </div>
+</div>
 <div class="wr-picker-mask" id="wrPickerMask" onclick="if(event.target===this)wrClosePicker()">
   <div class="wr-picker">
     <div class="wr-picker-head"><span id="wrPickerTitle">选择</span><span class="wr-picker-close" onclick="wrClosePicker()">关闭</span></div>

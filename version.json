@@ -1,7 +1,7 @@
 {
-    "version": "4.4.5",
-    "updateTime": "2026-11-28 10:56:00",
+    "version": "4.4.6",
+    "updateTime": "2026-11-28 13:12:00",
     "dataUpdateTime": "2026-11-27 20:32:49",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "报工作量：修复添加的焊工/普工无法删除行，两种人员各自独立增删。"
+    "updateLog": "报工作量等输入统一弹出自带键盘（默认大写/Shift切小写/含 - . /），焊接类型字段历史，总备注与支架备注历史不自动填入。"
 }
