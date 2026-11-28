@@ -146,14 +146,22 @@
         .wr-people-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
         .wr-date-wrap { display: flex; align-items: center; gap: 4px; font-size: calc(11px * var(--font-scale)); color: var(--text-secondary); }
         .wr-date { border: 1px solid var(--green-primary); border-radius: 6px; padding: 3px 6px; font-size: calc(11px * var(--font-scale)); color: var(--text-primary); background: var(--bg-input); }
-        .wr-people-grid { display: grid; grid-template-columns: minmax(0,1.7fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); gap: 6px; }
+        .wr-people-grid { display: grid; grid-template-columns: minmax(0,2.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); gap: 6px; }
         .wr-field { min-width: 0; }
-        .wr-label { display: block; font-size: calc(11px * var(--font-scale)); color: var(--text-secondary); margin-bottom: 3px; white-space: nowrap; }
+        .wr-label { display: block; font-size: calc(11px * var(--font-scale)); color: var(--text-secondary); height: 16px; line-height: 16px; margin-bottom: 3px; white-space: nowrap; }
         .wr-input {
-            width: 100%; box-sizing: border-box; font-size: calc(12px * var(--font-scale));
+            width: 100%; height: 34px; box-sizing: border-box; font-size: calc(12px * var(--font-scale));
             padding: 6px 5px; border: 1px solid var(--border-light); border-radius: 6px;
             outline: none; background: var(--bg-input); color: var(--text-primary);
         }
+        .wr-add-people { margin-top: 6px; display: flex; gap: 6px; }
+        .wr-add-person {
+            flex: 1; text-align: center; padding: 5px 2px; font-size: calc(11px * var(--font-scale));
+            color: var(--green-primary); border: 1px dashed var(--green-primary); border-radius: 6px;
+            cursor: pointer; background: var(--bg-card);
+        }
+        .wr-extra-row { margin-top: 6px; }
+        .wr-extra-del { float: right; color: var(--text-tertiary); cursor: pointer; font-size: calc(11px * var(--font-scale)); }
         .wr-input:focus { border-color: var(--green-primary); }
         .wr-input-wrap { position: relative; display: block; }
         .wr-input-wrap .wr-input { padding-right: 16px; }
@@ -164,10 +172,10 @@
         }
         .wr-tip { font-size: calc(11px * var(--font-scale)); color: var(--text-tertiary); margin-top: 7px; }
         .wr-summary { margin-top: 11px; padding: 9px 10px; border: 1px solid var(--green-primary); border-radius: 10px; background: var(--bg-hover); }
-        .wr-summary-title { font-size: calc(12px * var(--font-scale)); font-weight: 600; color: var(--text-primary); margin-bottom: 7px; }
-        .wr-summary-tags { display: flex; flex-wrap: wrap; gap: 5px; }
-        .wr-summary-tag { font-size: calc(11px * var(--font-scale)); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: 12px; padding: 2px 7px; white-space: nowrap; background: var(--bg-card); }
-        .wr-summary-note { font-size: calc(11px * var(--font-scale)); color: var(--text-secondary); margin-top: 7px; }
+        .wr-summary-title { font-size: calc(13px * var(--font-scale)); font-weight: 600; color: var(--text-primary); margin-bottom: 7px; }
+        .wr-summary-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+        .wr-summary-tag { font-size: calc(13px * var(--font-scale)); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: 12px; padding: 3px 9px; white-space: nowrap; background: var(--bg-card); }
+        .wr-summary-note { font-size: calc(12px * var(--font-scale)); color: var(--text-secondary); margin-top: 7px; }
         .wr-body { padding: 12px 16px; }
         .wr-card { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
         .wr-card-head {
@@ -850,6 +858,11 @@
                     <div class="wr-field"><label class="wr-label">管工</label><input class="wr-input" data-person="fitter" placeholder="管工" readonly></div>
                     <div class="wr-field"><label class="wr-label">焊工</label><input class="wr-input" data-person="welder" placeholder="焊工"></div>
                     <div class="wr-field"><label class="wr-label">普工</label><input class="wr-input" data-person="helper" placeholder="普工"></div>
+                </div>
+                <div id="wrExtraPeople"></div>
+                <div class="wr-add-people">
+                    <div class="wr-add-person" id="wrAddWelder" onclick="wrAddPerson('welder')">＋ 加焊工</div>
+                    <div class="wr-add-person" id="wrAddHelper" onclick="wrAddPerson('helper')">＋ 加普工</div>
                 </div>
                 <div class="wr-tip" id="wrPeopleTip">管工取登录账号，不可修改</div>
                 <div class="wr-summary" id="wrSummary"></div>
@@ -5282,6 +5295,63 @@ function wrNewRow(type, seq) {
 function wrLoginName() {
     return (typeof authUser !== 'undefined' && authUser && authUser.name) ? authUser.name : '';
 }
+function wrSplitNames(v) {
+    return String(v || '').split(/[、,，;；\s]+/).filter(function (x) { return x; });
+}
+function wrPersonInputs(kind) {
+    return Array.prototype.slice.call(document.querySelectorAll('#subPageReport [data-person^="' + kind + '"]'));
+}
+function wrGetPersonArr(kind, noEmpty) {
+    var arr = wrPersonInputs(kind).map(function (inp) { return inp.value.trim(); });
+    if (noEmpty) arr = arr.filter(function (x) { return x; });
+    return arr;
+}
+// welders/helpers 为完整数组（含第 1 位），从下标 1 起渲染额外行
+function wrRenderExtra(welders, helpers) {
+    var box = document.getElementById('wrExtraPeople');
+    if (!box) return;
+    var n = Math.max(welders.length, helpers.length);
+    var html = '';
+    for (var i = 1; i < n; i++) {
+        html += '<div class="wr-people-grid wr-extra-row"><div></div><div></div>' +
+            '<div class="wr-field"><label class="wr-label">焊工' + (i + 1) +
+            '<span class="wr-extra-del" onclick="wrDelPerson(\'welder\',' + i + ')">×</span></label>' +
+            '<input class="wr-input" data-person="welder' + (i + 1) + '" value="' + wrEsc(welders[i] || '') + '" placeholder="焊工" onchange="wrSavePeople()"' + (wrReadonly ? ' readonly' : '') + '></div>' +
+            '<div class="wr-field"><label class="wr-label">普工' + (i + 1) +
+            '<span class="wr-extra-del" onclick="wrDelPerson(\'helper\',' + i + ')">×</span></label>' +
+            '<input class="wr-input" data-person="helper' + (i + 1) + '" value="' + wrEsc(helpers[i] || '') + '" placeholder="普工" onchange="wrSavePeople()"' + (wrReadonly ? ' readonly' : '') + '></div>' +
+            '</div>';
+    }
+    box.innerHTML = html;
+}
+function wrAddPerson(kind) {
+    if (wrReadonly) return;
+    var w = wrGetPersonArr('welder'), h = wrGetPersonArr('helper');
+    var arr = kind === 'welder' ? w : h;
+    if (arr.length >= 4) { showToast('最多 4 位'); return; }
+    arr.push('');
+    wrRenderExtra(kind === 'welder' ? arr : w, kind === 'helper' ? arr : h);
+    var inps = wrPersonInputs(kind);
+    var last = inps[inps.length - 1];
+    if (last) last.focus();
+    wrSavePeople();
+}
+function wrDelPerson(kind, idx) {
+    if (wrReadonly) return;
+    var w = wrGetPersonArr('welder'), h = wrGetPersonArr('helper');
+    var arr = kind === 'welder' ? w : h;
+    arr.splice(idx, 1);
+    wrRenderExtra(kind === 'welder' ? arr : w, kind === 'helper' ? arr : h);
+    wrSavePeople();
+}
+function wrSetPersonNames(kind, names) {
+    // names=完整数组（含第1位），写入第1位固定输入框 + 重建额外行
+    var base = document.querySelector('#subPageReport [data-person="' + kind + '"]');
+    if (base) base.value = names[0] || '';
+    var w = kind === 'welder' ? names : wrGetPersonArr('welder');
+    var h = kind === 'helper' ? names : wrGetPersonArr('helper');
+    wrRenderExtra(w, h);
+}
 function wrInit() {
     // 需要登录普通账号（含 owner/admin/user）
     if (typeof authUser === 'undefined' || !authUser) {
@@ -5296,7 +5366,12 @@ function wrInit() {
     document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) {
         var key = inp.getAttribute('data-person');
         if (key === 'fitter') { inp.value = wrLoginName(); return; }   // 管工=登录人名，不可改
-        inp.value = people[key] || '';
+        if (key === 'welder' || key === 'helper') {
+            var arr = Array.isArray(people[key]) ? people[key] : wrSplitNames(people[key]);
+            wrSetPersonNames(key, arr.length ? arr : ['']);
+        } else {
+            inp.value = people[key] || '';
+        }
         inp.addEventListener('change', wrSavePeople);
     });
     var tn = document.getElementById('wrTotalNote');
@@ -5316,8 +5391,12 @@ function wrSavePeople() {
     var p = {};
     document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) {
         var key = inp.getAttribute('data-person');
-        if (key !== 'fitter') p[key] = inp.value.trim();
+        if (key === 'fitter') return;
+        p[key] = inp.value.trim();
     });
+    var w = wrGetPersonArr('welder'), h = wrGetPersonArr('helper');
+    if (w.length) p.welder = w;
+    if (h.length) p.helper = h;
     lsSet(WR_PEOPLE_KEY, p);
     wrRenderSummary();
 }
@@ -5384,6 +5463,7 @@ function wrRender() {
     if (c) c.textContent = '共 ' + wrRows.length + ' 行';
     // 只读态：隐藏加行、隐藏上传、锁定人员与总备注
     var add3 = document.getElementById('wrAdd3'); if (add3) add3.style.display = wrReadonly ? 'none' : '';
+    var addPeople = document.querySelector('#subPageReport .wr-add-people'); if (addPeople) addPeople.style.display = wrReadonly ? 'none' : '';
     var tip = document.getElementById('wrReadonlyTip'); if (tip) tip.style.display = wrReadonly ? '' : 'none';
     document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) {
         if (inp.getAttribute('data-person') !== 'fitter') inp.readOnly = wrReadonly;
@@ -5433,7 +5513,7 @@ function wrInch(od) {
 function wrNum(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
 function wrFmt(n) { return (Math.round(n * 100) / 100).toString(); }
 function wrCalcSummary() {
-    var s = { '管道安装':0, '管道预制':0, '支架安装':0, '支架预制':0, '重量kg':0, '阀门':0, '小寸':0, '丢失重焊':0 };
+    var s = { '管道安装':0, '管道预制':0, '支架安装':0, '支架预制':0, '安装重量':0, '预制重量':0, '重量kg':0, '阀门':0, '小寸':0, '丢失重焊':0 };
     wrRows.forEach(function (r) {
         var t = r.type || 'weld';
         if (t === 'weld') {
@@ -5443,8 +5523,10 @@ function wrCalcSummary() {
             if (wrNum(r['管径']) < 60.3 && wrNum(r['管径']) > 0) s['小寸'] += inch;
             if (String(r['备注'] || '').indexOf('丢失重焊') !== -1) s['丢失重焊'] += inch;
         } else if (t === 'bracket') {
-            if (r['施工分类'] === '支架预制') s['支架预制'] += 1; else s['支架安装'] += 1;
-            s['重量kg'] += wrNum(r['重量kg']);
+            var kg = wrNum(r['重量kg']);
+            if (r['施工分类'] === '支架预制') { s['支架预制'] += 1; s['预制重量'] += kg; }
+            else { s['支架安装'] += 1; s['安装重量'] += kg; }
+            s['重量kg'] += kg;
         } else if (t === 'valve') {
             s['阀门'] += 1;
         }
@@ -5460,7 +5542,8 @@ function wrRenderSummary() {
     if (s['管道预制']) tags.push('管道预制 ' + wrFmt(s['管道预制']) + '寸');
     if (s['支架安装']) tags.push('支架安装 ' + s['支架安装'] + '个');
     if (s['支架预制']) tags.push('支架预制 ' + s['支架预制'] + '个');
-    if (s['重量kg']) tags.push('重量 ' + wrFmt(s['重量kg']) + 'kg');
+    if (s['安装重量']) tags.push('安装重量 ' + wrFmt(s['安装重量']) + 'kg');
+    if (s['预制重量']) tags.push('预制重量 ' + wrFmt(s['预制重量']) + 'kg');
     if (s['阀门']) tags.push('安装阀门 ' + s['阀门'] + '个');
     if (s['小寸']) tags.push('包含2寸以下 ' + wrFmt(s['小寸']) + '寸');
     if (s['丢失重焊']) tags.push('包含丢失重焊 ' + wrFmt(s['丢失重焊']) + '寸');
@@ -5553,12 +5636,15 @@ function wrPayload() {
     });
     var people = {};
     document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) {
-        people[inp.getAttribute('data-person')] = inp.value.trim();
+        var k = inp.getAttribute('data-person');
+        if (k !== 'fitter' && k !== 'welder' && k !== 'helper') people[k] = inp.value.trim();
     });
+    people.fitter = wrLoginName();
     var tn = document.getElementById('wrTotalNote');
     return {
         report_date: wrLoadedDate || wrToday(),
-        area: people.area || '', fitter: people.fitter || '', welder: people.welder || '', helper: people.helper || '',
+        area: people.area || '', fitter: people.fitter || '',
+        welder: wrGetPersonArr('welder', true).join('、'), helper: wrGetPersonArr('helper', true).join('、'),
         submitter: wrLoginName(), totalNote: tn ? tn.value.trim() : '', rows: rows,
         summary: wrCalcSummary()
     };
@@ -5658,6 +5744,7 @@ function wrFillFromRecord(rec, readonly, noData) {
         var add3 = document.getElementById('wrAdd3'); if (add3) add3.style.display = 'none';
         var up = document.getElementById('wrUpload'); if (up) up.style.display = 'none';
         document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) { inp.value = ''; });
+        wrRenderExtra([''], ['']);
         var tn0 = document.getElementById('wrTotalNote'); if (tn0) tn0.value = '';
         wrRenderSummary();
         return;
@@ -5672,11 +5759,21 @@ function wrFillFromRecord(rec, readonly, noData) {
     } else {
         wrRows = [wrNewRow('weld', 1)];
     }
+    var stored = lsGet(WR_PEOPLE_KEY, {}) || {};
     document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) {
         var k = inp.getAttribute('data-person');
         if (k === 'fitter') inp.value = rec && rec.fitter ? rec.fitter : wrLoginName();
-        else inp.value = rec ? (rec[k] || '') : (lsGet(WR_PEOPLE_KEY, {})[k] || '');
+        else if (k === 'welder' || k === 'helper') return;   // 由数组统一处理
+        else inp.value = rec ? (rec[k] || '') : (stored[k] || '');
     });
+    var wArr = rec ? (Array.isArray(rec.welder) ? rec.welder : wrSplitNames(rec.welder))
+                   : (Array.isArray(stored.welder) ? stored.welder : wrSplitNames(stored.welder));
+    var hArr = rec ? (Array.isArray(rec.helper) ? rec.helper : wrSplitNames(rec.helper))
+                   : (Array.isArray(stored.helper) ? stored.helper : wrSplitNames(stored.helper));
+    if (!wArr.length) wArr = [''];
+    if (!hArr.length) hArr = [''];
+    wrSetPersonNames('welder', wArr);
+    wrSetPersonNames('helper', hArr);
     var tn = document.getElementById('wrTotalNote');
     if (tn) tn.value = rec ? (rec.totalNote || '') : (lsGet(WR_TOTALNOTE_KEY, ''));
     wrRender();

@@ -1,7 +1,7 @@
 {
-    "version": "4.4.3",
-    "updateTime": "2026-11-28 09:40:00",
+    "version": "4.4.4",
+    "updateTime": "2026-11-28 10:20:00",
     "dataUpdateTime": "2026-11-27 20:32:49",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "报工作量修正：施工人员区对齐；历史日期按提交人精确查询，无报表明确提示，管理员可按姓名查看他人报表；汇总随报表上传保存，桌面后台可查看。"
+    "updateLog": "报工作量：施工人员区对齐加长、焊工/普工可加多人、汇总字体加大、安装/预制重量分开统计。"
 }
