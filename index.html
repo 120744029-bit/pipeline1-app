@@ -143,7 +143,10 @@
         /* ============ 报工作量 ============ */
         .wr-people { background: var(--bg-card); padding: 12px 16px; border-bottom: 1px solid var(--border-light); }
         .wr-sec-title { font-size: calc(13px * var(--font-scale)); font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
-        .wr-people-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .wr-people-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
+        .wr-date-wrap { display: flex; align-items: center; gap: 4px; font-size: calc(11px * var(--font-scale)); color: var(--text-secondary); }
+        .wr-date { border: 1px solid var(--green-primary); border-radius: 6px; padding: 3px 6px; font-size: calc(11px * var(--font-scale)); color: var(--text-primary); background: var(--bg-input); }
+        .wr-people-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
         .wr-field { min-width: 0; }
         .wr-label { display: block; font-size: calc(11px * var(--font-scale)); color: var(--text-secondary); margin-bottom: 3px; white-space: nowrap; }
         .wr-input {
@@ -160,6 +163,11 @@
             padding: 0 3px; cursor: pointer; line-height: 1;
         }
         .wr-tip { font-size: calc(11px * var(--font-scale)); color: var(--text-tertiary); margin-top: 7px; }
+        .wr-summary { margin-top: 11px; padding: 9px 10px; border: 1px solid var(--green-primary); border-radius: 10px; background: var(--bg-hover); }
+        .wr-summary-title { font-size: calc(12px * var(--font-scale)); font-weight: 600; color: var(--text-primary); margin-bottom: 7px; }
+        .wr-summary-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+        .wr-summary-tag { font-size: calc(11px * var(--font-scale)); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: 12px; padding: 2px 7px; white-space: nowrap; background: var(--bg-card); }
+        .wr-summary-note { font-size: calc(11px * var(--font-scale)); color: var(--text-secondary); margin-top: 7px; }
         .wr-body { padding: 12px 16px; }
         .wr-card { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
         .wr-card-head {
@@ -168,16 +176,27 @@
         }
         .wr-card-del { margin-left: auto; color: var(--red-text); font-size: calc(11px * var(--font-scale)); cursor: pointer; }
         .wr-card-inner { padding: 10px; }
-        .wr-row1 { display: grid; grid-template-columns: 30px minmax(0,5.5fr) minmax(0,1.5fr) minmax(0,2fr); gap: 5px; margin-bottom: 10px; }
+        .wr-seq { display: inline-block; background: var(--bg-hover); color: var(--text-secondary); border-radius: 4px; padding: 1px 6px; font-size: calc(11px * var(--font-scale)); font-weight: 400; }
+        .wr-row1 { display: grid; grid-template-columns: minmax(0,7fr) minmax(0,1.2fr) minmax(0,2fr); gap: 5px; margin-bottom: 10px; }
         .wr-row7 { display: grid; grid-template-columns: minmax(0,0.85fr) minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr); gap: 5px; }
         .wr-row3 { display: grid; grid-template-columns: minmax(0,0.6fr) minmax(0,0.85fr) minmax(0,1.3fr); gap: 8px 10px; margin-top: 10px; padding-top: 9px; border-top: 1px dashed var(--border-light); }
         .wr-row3b { display: grid; grid-template-columns: minmax(0,0.6fr) minmax(0,0.85fr) minmax(0,1.3fr); gap: 8px 10px; margin-top: 8px; }
-        .wr-row-note { margin-top: 10px; padding-top: 9px; border-top: 1px dashed var(--border-light); }
+        .wr-row-cat { display: grid; grid-template-columns: 96px minmax(0,1fr); gap: 5px; margin-top: 10px; padding-top: 9px; border-top: 1px dashed var(--border-light); }
+        .wr-row-br1 { display: grid; grid-template-columns: 96px minmax(0,1fr); gap: 5px; }
+        .wr-row-br2 { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,0.9fr) minmax(0,0.9fr); gap: 5px; margin-top: 9px; }
+        .wr-row-vl { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,1fr); gap: 5px; }
+        .wr-preset-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+        .wr-preset-tag { font-size: calc(11px * var(--font-scale)); color: var(--green-primary); border: 1px solid var(--green-primary); border-radius: 12px; padding: 2px 7px; cursor: pointer; white-space: nowrap; }
+        .wr-add3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
         .wr-add {
-            border: 1px dashed var(--text-tertiary); border-radius: 10px; text-align: center;
-            padding: 10px; font-size: calc(13px * var(--font-scale)); color: var(--text-secondary); cursor: pointer;
+            border: 1px dashed var(--text-tertiary); border-radius: 8px; text-align: center;
+            padding: 9px 2px; font-size: calc(11px * var(--font-scale)); color: var(--text-secondary); cursor: pointer;
             background: var(--bg-card);
         }
+        .wr-total-note { margin-bottom: 12px; }
+        .wr-textarea { width: 100%; box-sizing: border-box; font-size: calc(12px * var(--font-scale)); padding: 7px 8px; border: 1px solid var(--border-light); border-radius: 6px; outline: none; background: var(--bg-input); color: var(--text-primary); resize: vertical; }
+        .wr-textarea:focus { border-color: var(--green-primary); }
+        .wr-readonly-tip { font-size: calc(11px * var(--font-scale)); color: var(--text-tertiary); text-align: center; margin-top: 8px; }
         .wr-upload {
             background: var(--green-primary); color: #fff; text-align: center; border: none;
             border-radius: 10px; padding: 12px; font-size: calc(14px * var(--font-scale)); font-weight: 600;
@@ -819,19 +838,33 @@
         <!-- 子页 3：报工作量 -->
         <div id="subPageReport" style="display:none;">
             <div class="wr-people">
-                <div class="wr-sec-title">施工人员</div>
+                <div class="wr-people-head">
+                    <div class="wr-sec-title" style="margin-bottom:0;">施工人员</div>
+                    <label class="wr-date-wrap">日期<input type="date" id="wrDate" class="wr-date" onchange="wrOnDateChange()"></label>
+                </div>
                 <div class="wr-people-grid">
-                    <div class="wr-field"><label class="wr-label">管工</label><input class="wr-input" data-person="fitter" placeholder="管工"></div>
+                    <div class="wr-field"><label class="wr-label">施工区域<span style="color:var(--red-text);">*</span></label><input class="wr-input" data-person="area" placeholder="必填"></div>
+                    <div class="wr-field"><label class="wr-label">管工</label><input class="wr-input" data-person="fitter" placeholder="管工" readonly></div>
                     <div class="wr-field"><label class="wr-label">焊工</label><input class="wr-input" data-person="welder" placeholder="焊工"></div>
                     <div class="wr-field"><label class="wr-label">普工</label><input class="wr-input" data-person="helper" placeholder="普工"></div>
                 </div>
-                <div class="wr-tip">上次输入的人名已记住，可直接修改</div>
+                <div class="wr-tip" id="wrPeopleTip">管工取登录账号，不可修改</div>
+                <div class="wr-summary" id="wrSummary"></div>
             </div>
             <div class="wr-body">
                 <div class="wr-sec-title">焊口明细 <span id="wrCount" style="color:var(--text-tertiary);font-weight:400;">共 1 行</span></div>
                 <div id="wrRows"></div>
-                <div class="wr-add" onclick="wrAddRow()">＋ 加一行</div>
+                <div class="wr-add3" id="wrAdd3">
+                    <div class="wr-add" onclick="wrAddRow('weld')">＋ 焊口</div>
+                    <div class="wr-add" onclick="wrAddRow('bracket')">＋ 支架</div>
+                    <div class="wr-add" onclick="wrAddRow('valve')">＋ 阀门</div>
+                </div>
+                <div class="wr-total-note">
+                    <label class="wr-label">总备注</label>
+                    <textarea id="wrTotalNote" class="wr-textarea" rows="2" placeholder="整张报表的备注"></textarea>
+                </div>
                 <button class="wr-upload" id="wrUpload" onclick="wrUpload()">上传报表</button>
+                <div class="wr-readonly-tip" id="wrReadonlyTip" style="display:none;">历史报表只读，不可修改。切换回今天可继续填报。</div>
             </div>
         </div>
     </div>
@@ -5190,13 +5223,27 @@ if (typeof plus !== 'undefined' && window.plus) {
 // ============================================================
 var WR_HIST_KEY = 'pd.weldReport.history.v1';
 var WR_PEOPLE_KEY = 'pd.weldReport.people.v1';
-var WR_FIELDS = ['序号', '管线号', '页码', '管段号', '焊口号', '管径', '壁厚', '焊接类型', '焊工号',
-    '材料名称1', '材质1', '炉批号1', '材料名称2', '材质2', '炉批号2', '备注'];
-var WR_NOHIST = { '管径': 1, '壁厚': 1, '序号': 1 };
+var WR_CAT_KEY = 'pd.weldReport.cat.v1';       // 施工分类记住上次选择
+var WR_TOTALNOTE_KEY = 'pd.weldReport.totalNote.v1';
+var WR_LASTHASH_KEY = 'pd.weldReport.lastHash.v1'; // 当天已上传内容指纹，用于查重/按钮文案
+var WR_FIELDS_WELD = ['管线号', '页码', '管段号', '焊口号', '管径', '壁厚', '焊接类型', '焊工号',
+    '材料名称1', '材质1', '炉批号1', '材料名称2', '材质2', '炉批号2', '施工分类', '备注'];
+var WR_FIELDS_BRACKET = ['施工分类', '管线号', '支架号', '焊工号', '重量kg'];
+var WR_FIELDS_VALVE = ['管线号', '阀门位号'];
+var WR_HIST_FIELDS = { '备注': 1 };   // 只有备注记历史（施工分类单独记住上次）
+var WR_CAT_WELD = ['管道安装', '管道预制'];
+var WR_CAT_BRACKET = ['支架安装', '支架预制'];
+var WR_NOTE_PRESETS = ['丢失重焊', '增加口', '图纸变更', '碰头无焊口'];
+// 外径(mm) -> 英寸
+var WR_OD_INCH = {'21.3':0.5,'26.7':0.75,'33.4':1,'42.2':1.25,'48.3':1.5,'60.3':2,'73':2.5,'88.9':3,
+    '101.6':3.5,'114.3':4,'141.3':5,'168.3':6,'219.1':8,'273':10,'323.8':12,'355.6':14,'406.4':16,
+    '457.2':18,'508':20,'559':22,'609.6':24,'660':26,'711.2':28,'762':30,'813':32,'864':34,'914':36,'965':38,'1016':40};
 var wrHistory = null;
 var wrRows = [];
 var wrInited = false;
 var wrPickerCb = null;
+var wrReadonly = false;   // 历史日期只读
+var wrLoadedDate = '';    // 当前查看日期
 
 function wrLoadHistory() {
     if (wrHistory) return wrHistory;
@@ -5205,7 +5252,7 @@ function wrLoadHistory() {
 }
 function wrSaveHistory(field, val) {
     val = String(val || '').trim();
-    if (!val || WR_NOHIST[field]) return;
+    if (!val || !WR_HIST_FIELDS[field]) return;
     var h = wrLoadHistory();
     var arr = h[field] || [];
     arr = arr.filter(function (x) { return x !== val; });
@@ -5214,88 +5261,209 @@ function wrSaveHistory(field, val) {
     h[field] = arr;
     lsSet(WR_HIST_KEY, h);
 }
-function wrNewRow(seq) {
-    var r = {};
-    WR_FIELDS.forEach(function (f) { r[f] = ''; });
-    r['序号'] = String(seq || 1);
+function wrToday() {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+function wrFieldsOf(type) {
+    return type === 'bracket' ? WR_FIELDS_BRACKET : type === 'valve' ? WR_FIELDS_VALVE : WR_FIELDS_WELD;
+}
+function wrNewRow(type, seq) {
+    type = type || 'weld';
+    var r = { type: type, 序号: String(seq || 1) };
+    wrFieldsOf(type).forEach(function (f) { r[f] = ''; });
+    if (type === 'weld') r['施工分类'] = lsGet(WR_CAT_KEY, WR_CAT_WELD[0]) || WR_CAT_WELD[0];
+    if (type === 'bracket') r['施工分类'] = WR_CAT_BRACKET[0];
     return r;
 }
+function wrLoginName() {
+    return (typeof authUser !== 'undefined' && authUser && authUser.name) ? authUser.name : '';
+}
 function wrInit() {
-    if (wrInited) return;
+    // 需要登录普通账号（含 owner/admin/user）
+    if (typeof authUser === 'undefined' || !authUser) {
+        if (typeof showLoginDialog === 'function') showLoginDialog();
+        showToast('报工作量需要登录账号');
+        return;
+    }
+    if (wrInited) { wrSyncDate(); return; }
     wrInited = true;
     wrLoadHistory();
-    // 人员：上次填的自动带出
     var people = lsGet(WR_PEOPLE_KEY, {}) || {};
     document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) {
-        inp.value = people[inp.getAttribute('data-person')] || '';
-        inp.addEventListener('change', function () { wrSavePeople(); });
+        var key = inp.getAttribute('data-person');
+        if (key === 'fitter') { inp.value = wrLoginName(); return; }   // 管工=登录人名，不可改
+        inp.value = people[key] || '';
+        inp.addEventListener('change', wrSavePeople);
     });
-    if (!wrRows.length) wrRows.push(wrNewRow(1));
+    var tn = document.getElementById('wrTotalNote');
+    if (tn) tn.value = lsGet(WR_TOTALNOTE_KEY, '');
+    var dEl = document.getElementById('wrDate');
+    if (dEl) dEl.value = wrToday();
+    wrLoadedDate = wrToday();
+    if (!wrRows.length) wrRows.push(wrNewRow('weld', 1));
     wrRender();
+    wrLoadDay(wrToday());   // 拉取当天已上传报表（若有则回填、按钮变修改并上传）
+}
+function wrSyncDate() {
+    var dEl = document.getElementById('wrDate');
+    if (dEl && !dEl.value) dEl.value = wrToday();
 }
 function wrSavePeople() {
     var p = {};
     document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) {
-        p[inp.getAttribute('data-person')] = inp.value.trim();
+        var key = inp.getAttribute('data-person');
+        if (key !== 'fitter') p[key] = inp.value.trim();
     });
     lsSet(WR_PEOPLE_KEY, p);
+    wrRenderSummary();
 }
 function wrEsc(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 function wrFieldHtml(rowIdx, field, cls) {
-    var v = wrRows[rowIdx][field] || '';
+    var row = wrRows[rowIdx];
+    var v = row[field] || '';
+    var ro = wrReadonly ? ' readonly' : '';
     var hasPreset = !!wrPresetsFor(field, rowIdx);
-    var btn = hasPreset ? '<span class="wr-pick-btn" onclick="wrOpenPicker(\'' + field + '\',' + rowIdx + ')">▾</span>' : '';
+    var btn = (hasPreset && !wrReadonly) ? '<span class="wr-pick-btn" onclick="wrOpenPicker(\'' + field + '\',' + rowIdx + ')">▾</span>' : '';
     return '<div class="wr-field' + (cls ? ' ' + cls : '') + '">' +
         '<label class="wr-label">' + field + '</label>' +
         '<span class="wr-input-wrap"><input class="wr-input" data-row="' + rowIdx + '" data-field="' + field +
         '" value="' + wrEsc(v) + '" onchange="wrOnChange(' + rowIdx + ',\'' + field + '\',this.value)" ' +
-        'onblur="wrOnBlur(\'' + field + '\',this.value)">' + btn + '</span></div>';
+        'onblur="wrOnBlur(\'' + field + '\',this.value)"' + ro + '>' + btn + '</span></div>';
+}
+// 施工分类：只能选，记住上次；用 input readonly + picker
+function wrCatHtml(rowIdx) {
+    var row = wrRows[rowIdx];
+    var v = row['施工分类'] || '';
+    var btn = wrReadonly ? '' : '<span class="wr-pick-btn" onclick="wrOpenPicker(\'施工分类\',' + rowIdx + ')">▾</span>';
+    return '<div class="wr-field"><label class="wr-label">施工分类</label>' +
+        '<span class="wr-input-wrap"><input class="wr-input" value="' + wrEsc(v) + '" readonly>' + btn + '</span></div>';
 }
 function wrRender() {
     var box = document.getElementById('wrRows');
     if (!box) return;
     var html = '';
     wrRows.forEach(function (row, i) {
-        html += '<div class="wr-card"><div class="wr-card-head">第 ' + (i + 1) + ' 行' +
-            '<span class="wr-card-del" onclick="wrDelRow(' + i + ')">删除</span></div><div class="wr-card-inner">';
-        html += '<div class="wr-row1">' + ['序号', '管线号', '页码', '管段号']
-            .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
-        html += '<div class="wr-row7">' + ['焊口号', '管径', '壁厚', '焊接类型', '焊工号']
-            .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
-        html += '<div class="wr-row3">' + ['材料名称1', '材质1', '炉批号1']
-            .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
-        html += '<div class="wr-row3b">' + ['材料名称2', '材质2', '炉批号2']
-            .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
-        html += '<div class="wr-row-note">' + wrFieldHtml(i, '备注') + '</div>';
+        var typeLabel = row.type === 'bracket' ? '支架' : row.type === 'valve' ? '阀门' : '焊口';
+        var del = wrReadonly ? '' : '<span class="wr-card-del" onclick="wrDelRow(' + i + ')">删除</span>';
+        html += '<div class="wr-card"><div class="wr-card-head"><span class="wr-seq">序号 ' + (i + 1) + '</span>' +
+            '<span style="margin-left:6px;">第 ' + (i + 1) + ' 行 · ' + typeLabel + '</span>' + del + '</div><div class="wr-card-inner">';
+        if (row.type === 'bracket') {
+            html += '<div class="wr-row-br1">' + wrCatHtml(i) + wrFieldHtml(i, '管线号') + '</div>';
+            html += '<div class="wr-row-br2">' + ['支架号', '焊工号', '重量kg']
+                .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
+        } else if (row.type === 'valve') {
+            html += '<div class="wr-row-vl">' + ['管线号', '阀门位号']
+                .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
+        } else {
+            html += '<div class="wr-row1">' + ['管线号', '页码', '管段号']
+                .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
+            html += '<div class="wr-row7">' + ['焊口号', '管径', '壁厚', '焊接类型', '焊工号']
+                .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
+            html += '<div class="wr-row3">' + ['材料名称1', '材质1', '炉批号1']
+                .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
+            html += '<div class="wr-row3b">' + ['材料名称2', '材质2', '炉批号2']
+                .map(function (f) { return wrFieldHtml(i, f); }).join('') + '</div>';
+            html += '<div class="wr-row-cat">' + wrCatHtml(i) + wrFieldHtml(i, '备注') + '</div>';
+            if (!wrReadonly) {
+                html += '<div class="wr-preset-tags">' + WR_NOTE_PRESETS.map(function (p) {
+                    return '<span class="wr-preset-tag" onclick="wrSetNote(' + i + ',\'' + p + '\')">' + p + '</span>';
+                }).join('') + '</div>';
+            }
+        }
         html += '</div></div>';
     });
     box.innerHTML = html;
     var c = document.getElementById('wrCount');
     if (c) c.textContent = '共 ' + wrRows.length + ' 行';
+    // 只读态：隐藏加行、隐藏上传、锁定人员与总备注
+    var add3 = document.getElementById('wrAdd3'); if (add3) add3.style.display = wrReadonly ? 'none' : '';
+    var tip = document.getElementById('wrReadonlyTip'); if (tip) tip.style.display = wrReadonly ? '' : 'none';
+    document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) {
+        if (inp.getAttribute('data-person') !== 'fitter') inp.readOnly = wrReadonly;
+    });
+    var tn = document.getElementById('wrTotalNote'); if (tn) tn.readOnly = wrReadonly;
+    var up = document.getElementById('wrUpload'); if (up) up.style.display = wrReadonly ? 'none' : '';
+    wrRenderSummary();
+}
+function wrSetNote(i, val) {
+    if (wrReadonly || !wrRows[i]) return;
+    wrRows[i]['备注'] = val;
+    wrSaveHistory('备注', val);
+    wrRender();
 }
 function wrOnChange(i, field, val) {
-    if (wrRows[i]) wrRows[i][field] = val;
+    if (wrReadonly || !wrRows[i]) return;
+    wrRows[i][field] = val;
     if (field === '管径') {
-        // 管径变了 → 壁厚候选跟着变；当前壁厚不在新候选里就清空
         var cands = wrWallCands(val);
         var w = wrRows[i]['壁厚'];
         if (cands && w && cands.indexOf(w) === -1) wrRows[i]['壁厚'] = '';
         wrRender();
     }
+    wrRenderSummary();
 }
-function wrOnBlur(field, val) { wrSaveHistory(field, val); }
-function wrAddRow() {
-    wrRows.push(wrNewRow(wrRows.length + 1));
+function wrOnBlur(field, val) { if (!wrReadonly) wrSaveHistory(field, val); }
+function wrAddRow(type) {
+    if (wrReadonly) return;
+    wrRows.push(wrNewRow(type || 'weld', wrRows.length + 1));
     wrRender();
 }
 function wrDelRow(i) {
+    if (wrReadonly) return;
     if (wrRows.length <= 1) { showToast('至少保留一行'); return; }
     wrRows.splice(i, 1);
     wrRows.forEach(function (r, k) { r['序号'] = String(k + 1); });
     wrRender();
+}
+// ============ 当天汇总 ============
+function wrInch(od) {
+    var k = String(od || '').trim();
+    var v = WR_OD_INCH[k];
+    if (v != null) return v;
+    var n = parseFloat(k);
+    return isNaN(n) ? 0 : n;   // 非标外径按 mm 当英寸兜底（极少）
+}
+function wrNum(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+function wrFmt(n) { return (Math.round(n * 100) / 100).toString(); }
+function wrRenderSummary() {
+    var box = document.getElementById('wrSummary');
+    if (!box) return;
+    var s = { '管道安装':0, '管道预制':0, '支架安装':0, '支架预制':0, '重量kg':0, '阀门':0, '小寸':0, '丢失重焊':0 };
+    wrRows.forEach(function (r) {
+        var t = r.type || 'weld';
+        if (t === 'weld') {
+            var cat = r['施工分类'] === '管道预制' ? '管道预制' : '管道安装';
+            var inch = wrInch(r['管径']);
+            s[cat] += inch;
+            if (wrNum(r['管径']) < 60.3 && wrNum(r['管径']) > 0) s['小寸'] += inch;
+            if (String(r['备注'] || '').indexOf('丢失重焊') !== -1) s['丢失重焊'] += inch;
+        } else if (t === 'bracket') {
+            if (r['施工分类'] === '支架预制') s['支架预制'] += 1; else s['支架安装'] += 1;
+            s['重量kg'] += wrNum(r['重量kg']);
+        } else if (t === 'valve') {
+            s['阀门'] += 1;
+        }
+    });
+    var tags = [];
+    if (s['管道安装']) tags.push('管道安装 ' + wrFmt(s['管道安装']) + '寸');
+    if (s['管道预制']) tags.push('管道预制 ' + wrFmt(s['管道预制']) + '寸');
+    if (s['支架安装']) tags.push('支架安装 ' + s['支架安装'] + '个');
+    if (s['支架预制']) tags.push('支架预制 ' + s['支架预制'] + '个');
+    if (s['重量kg']) tags.push('重量 ' + wrFmt(s['重量kg']) + 'kg');
+    if (s['阀门']) tags.push('安装阀门 ' + s['阀门'] + '个');
+    if (s['小寸']) tags.push('包含2寸以下 ' + wrFmt(s['小寸']) + '寸');
+    if (s['丢失重焊']) tags.push('包含丢失重焊 ' + wrFmt(s['丢失重焊']) + '寸');
+    var tn = document.getElementById('wrTotalNote');
+    var note = tn ? tn.value.trim() : '';
+    var html = '<div class="wr-summary-title">当天汇总</div><div class="wr-summary-tags">';
+    html += tags.length ? tags.map(function (x) { return '<span class="wr-summary-tag">' + wrEsc(x) + '</span>'; }).join('') : '<span class="wr-summary-tag">暂无数据</span>';
+    html += '</div>';
+    if (note) html += '<div class="wr-summary-note">总备注：' + wrEsc(note) + '</div>';
+    box.innerHTML = html;
 }
 function wrWallCands(od) {
     var P = window.PIPE_PRESETS;
@@ -5305,6 +5473,19 @@ function wrWallCands(od) {
 // 返回 {title, items:[{v,cn}]} 或 null
 function wrPresetsFor(field, rowIdx) {
     var P = window.PIPE_PRESETS;
+    if (field === '施工分类') {
+        var row = wrRows[rowIdx];
+        var cats = (row && row.type === 'bracket') ? WR_CAT_BRACKET : WR_CAT_WELD;
+        return { title: '选择施工分类', items: cats.map(function (v) { return { v: v, cn: '' }; }) };
+    }
+    if (field === '备注') {
+        var h = wrLoadHistory();
+        var items = WR_NOTE_PRESETS.map(function (v) { return { v: v, cn: '' }; });
+        (h['备注'] || []).forEach(function (v) {
+            if (!items.some(function (x) { return x.v === v; })) items.push({ v: v, cn: '' });
+        });
+        return { title: '备注（预设 + 历史）', items: items };
+    }
     if (!P) return null;
     if (field === '管径') {
         return { title: '选择外径', items: (P.ods || []).map(function (o) { return { v: o.od, cn: '' }; }) };
@@ -5332,7 +5513,10 @@ function wrOpenPicker(field, rowIdx) {
     if (!p || !p.items.length) return;
     wrPickerCb = function (val) {
         if (wrRows[rowIdx]) wrRows[rowIdx][field] = val;
-        wrRender();
+        if (field === '施工分类') {
+            lsSet(WR_CAT_KEY, val);   // 记住上次选择（同类默认带出）
+        }
+        if (field === '备注') wrSaveHistory('备注', val);
         if (field === '管径') {
             var cands = wrWallCands(val);
             var w = wrRows[rowIdx] && wrRows[rowIdx]['壁厚'];
@@ -5356,37 +5540,110 @@ function wrClosePicker() {
     document.getElementById('wrPickerMask').classList.remove('show');
     wrPickerCb = null;
 }
-function wrUpload() {
-    var btn = document.getElementById('wrUpload');
+function wrPayload() {
     var rows = wrRows.filter(function (r) {
-        return WR_FIELDS.some(function (f) { return f !== '序号' && String(r[f] || '').trim(); });
+        return wrFieldsOf(r.type || 'weld').some(function (f) { return String(r[f] || '').trim(); });
     });
-    if (!rows.length) { showToast('请先填写至少一行明细'); return; }
     var people = {};
     document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) {
         people[inp.getAttribute('data-person')] = inp.value.trim();
     });
-    if (!people.fitter && !people.welder && !people.helper) { showToast('请填写施工人员'); return; }
-    var d = new Date();
-    var stamp = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
-    var payload = {
-        report_date: stamp, fitter: people.fitter || '', welder: people.welder || '', helper: people.helper || '',
-        submitter: (typeof currentUser !== 'undefined' && currentUser) ? currentUser : '', rows: rows
+    var tn = document.getElementById('wrTotalNote');
+    return {
+        report_date: wrLoadedDate || wrToday(),
+        area: people.area || '', fitter: people.fitter || '', welder: people.welder || '', helper: people.helper || '',
+        submitter: wrLoginName(), totalNote: tn ? tn.value.trim() : '', rows: rows
     };
+}
+function wrHash(o) {
+    var s = JSON.stringify(o), h = 0;
+    for (var i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
+    return String(h);
+}
+function wrSetUploadBtn() {
+    var btn = document.getElementById('wrUpload');
+    if (!btn || wrReadonly) return;
+    var key = WR_LASTHASH_KEY + '.' + (wrLoadedDate || wrToday());
+    var had = !!lsGet(key, '');
+    btn.textContent = had ? '修改并上传' : '上传报表';
+}
+function wrUpload() {
+    if (wrReadonly) { showToast('历史报表只读，不可修改'); return; }
+    if (!authUser) { showToast('报工作量需要登录账号'); if (typeof showLoginDialog === 'function') showLoginDialog(); return; }
+    var btn = document.getElementById('wrUpload');
+    var p = wrPayload();
+    if (!p.area) { showToast('请填写施工区域'); return; }
+    if (!p.rows.length) { showToast('请先填写至少一行明细'); return; }
+    var key = WR_LASTHASH_KEY + '.' + p.report_date;
+    var hash = wrHash(p);
+    if (lsGet(key, '') === hash) { showToast('内容未变化，无需重复上传'); return; }
     btn.disabled = true; btn.textContent = '上传中…';
-    function done() { btn.disabled = false; btn.textContent = '上传报表'; }
     fetch(API_BASE_URL + '/work?action=report-save', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p)
     }).then(function (r) { return r.json(); }).then(function (res) {
-        done();
+        btn.disabled = false;
         if (res && res.success) {
-            showToast('✅ 已上传 ' + rows.length + ' 行，后台可查看');
-            wrRows = [wrNewRow(1)];
-            wrRender();
+            lsSet(key, hash);          // 记住指纹：按钮变「修改并上传」+ 查重
+            lsSet(WR_TOTALNOTE_KEY, p.totalNote);
+            wrSetUploadBtn();
+            showToast('✅ 已' + (res.updated ? '更新' : '上传') + ' ' + p.rows.length + ' 行，后台可查看');
         } else {
+            wrSetUploadBtn();
             showToast('上传失败：' + ((res && (res.message || res.error)) || '未知错误'));
         }
-    }).catch(function (e) { done(); showToast('上传失败：网络错误'); });
+    }).catch(function (e) { btn.disabled = false; wrSetUploadBtn(); showToast('上传失败：网络错误'); });
+}
+// ============ 日期切换 / 历史报表只读 ============
+function wrOnDateChange() {
+    var dEl = document.getElementById('wrDate');
+    var date = dEl ? dEl.value : '';
+    if (!date) return;
+    wrLoadDay(date);
+}
+function wrLoadDay(date) {
+    wrLoadedDate = date;
+    wrReadonly = (date !== wrToday());
+    var tip = document.getElementById('wrPeopleTip');
+    if (tip) tip.textContent = wrReadonly ? '历史报表只读查看' : '管工取登录账号，不可修改';
+    if (wrReadonly) {
+        // 历史：从静态库拉当天报表显示（只读）
+        fetch(BASE + '/weldReports.json').then(function (r) { return r.json(); }).then(function (db) {
+            var day = (db && db.days && db.days[date]) || [];
+            var rec = day.filter(function (x) { return x.submitter === wrLoginName(); })[0] || day[0];
+            wrFillFromRecord(rec, true);
+        }).catch(function () { wrFillFromRecord(null, true); });
+    } else {
+        // 今天：从动态库拉本人当天报表回填（可改、覆盖）
+        fetch(API_BASE_URL + '/work?action=report-list&from=' + date + '&to=' + date).then(function (r) { return r.json(); })
+            .then(function (res) {
+                var list = (res && res.data) || [];
+                var rec = list.filter(function (x) { return x.submitter === wrLoginName(); })[0];
+                if (rec) wrFillFromRecord(rec, false);
+                else { wrRows = [wrNewRow('weld', 1)]; wrRender(); }
+                wrSetUploadBtn();
+            }).catch(function () { wrSetUploadBtn(); });
+    }
+}
+function wrFillFromRecord(rec, readonly) {
+    wrReadonly = readonly;
+    if (rec && Array.isArray(rec.rows) && rec.rows.length) {
+        wrRows = rec.rows.map(function (r, i) {
+            var o = JSON.parse(JSON.stringify(r));
+            o.type = o.type || 'weld';
+            o['序号'] = String(i + 1);
+            return o;
+        });
+    } else {
+        wrRows = [wrNewRow('weld', 1)];
+    }
+    document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) {
+        var k = inp.getAttribute('data-person');
+        if (k === 'fitter') inp.value = rec && rec.fitter ? rec.fitter : wrLoginName();
+        else inp.value = rec ? (rec[k] || '') : (lsGet(WR_PEOPLE_KEY, {})[k] || '');
+    });
+    var tn = document.getElementById('wrTotalNote');
+    if (tn) tn.value = rec ? (rec.totalNote || '') : (lsGet(WR_TOTALNOTE_KEY, ''));
+    wrRender();
 }
 
 console.log('🚀 APP 启动完成');
