@@ -757,26 +757,25 @@
             color: var(--text-primary); min-width: 44px; text-align: center;
         }
 
-        /* 底部设置按钮 */
+        /* 顶栏设置按钮（在线徽章旁） */
         .settings-float-btn {
-            position: fixed;
-            bottom: calc(80px + env(safe-area-inset-bottom));
-            right: 16px;
-            width: 48px; height: 48px;
+            width: 34px; height: 34px;
             border-radius: 50%;
             background: var(--green-primary);
             color: white;
             border: none;
             cursor: pointer;
-            box-shadow: 0 4px 16px rgba(7, 193, 96, 0.4);
+            box-shadow: 0 2px 8px rgba(7, 193, 96, 0.4);
             display: flex;
             align-items: center;
             justify-content: center;
+            flex: 0 0 auto;
+            margin-left: 8px;
             z-index: 199;
             transition: transform 0.2s, background 0.2s;
         }
         .settings-float-btn:active { transform: scale(0.92); }
-        .settings-float-btn svg { width: 24px; height: 24px; fill: none; stroke: white; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .settings-float-btn svg { width: 18px; height: 18px; fill: none; stroke: white; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
         /* ============ 响应式 ============ */
         @media (max-width: 400px) {
@@ -790,6 +789,12 @@
     <!-- 顶部导航栏 -->
     <div class="navbar">
         <span class="status-badge online" id="statusBadge">✅ 在线</span>
+        <button class="settings-float-btn" id="settingsFloatBtn" onclick="openSettings()" aria-label="设置">
+            <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+        </button>
         <span class="status-badge" id="userBadge" onclick="authUser ? authMenu() : promptUserName()" style="left:auto;right:60px;background:var(--bg-hover);color:var(--text-primary);display:none;cursor:pointer;">👤</span>
         <h1 id="mainTitle">工作量</h1>
         <button class="right-btn" onclick="showInfo()">⋯</button>
@@ -1115,13 +1120,7 @@
         </button>
     </div>
 
-    <!-- 设置悬浮按钮 -->
-    <button class="settings-float-btn" id="settingsFloatBtn" onclick="openSettings()" aria-label="设置">
-        <svg viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-    </button>
+    <!-- 设置按钮已移到顶栏（在线徽章旁） -->
 
     <!-- 版本信息 -->
     <div style="text-align:center;padding:20px 16px 10px;font-size:12px;color:var(--text-secondary);">
