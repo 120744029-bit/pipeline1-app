@@ -353,7 +353,7 @@ export async function handler(req, res) {
       if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
       const role = _role(req);
       if (!role) return res.status(403).json({ success: false, message: '报工作量需要登录账号' });
-      const { report_date, area, fitter, welder, helper, submitter, totalNote, rows } = req.body || {};
+      const { report_date, area, fitter, welder, helper, submitter, totalNote, rows, summary } = req.body || {};
       if (!report_date || !Array.isArray(rows) || !rows.length) {
         return res.status(400).json({ error: 'report_date and rows required' });
       }
@@ -372,6 +372,7 @@ export async function handler(req, res) {
       await sql`ALTER TABLE weld_reports ADD COLUMN IF NOT EXISTS area TEXT DEFAULT ''`;
       await sql`ALTER TABLE weld_reports ADD COLUMN IF NOT EXISTS total_note TEXT DEFAULT ''`;
       await sql`ALTER TABLE weld_reports ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`;
+      await sql`ALTER TABLE weld_reports ADD COLUMN IF NOT EXISTS summary JSONB DEFAULT '{}'::jsonb`;
       await sql`CREATE INDEX IF NOT EXISTS idx_weld_reports_date ON weld_reports(report_date)`;
       const old = submitter
         ? await sql`SELECT id FROM weld_reports WHERE report_date = ${report_date} AND submitter = ${submitter} ORDER BY id DESC LIMIT 1`
@@ -381,15 +382,15 @@ export async function handler(req, res) {
         r = await sql`
           UPDATE weld_reports SET area = ${area || ''}, fitter = ${fitter || ''}, welder = ${welder || ''},
             helper = ${helper || ''}, total_note = ${totalNote || ''}, rows = ${JSON.stringify(rows)}::jsonb,
-            updated_at = NOW()
+            summary = ${JSON.stringify(summary || {})}::jsonb, updated_at = NOW()
           WHERE id = ${old[0].id} RETURNING id, report_date, updated_at
         `;
         return res.status(200).json({ success: true, updated: true, item: r[0], saved: rows.length });
       }
       r = await sql`
-        INSERT INTO weld_reports (report_date, area, fitter, welder, helper, submitter, total_note, rows)
+        INSERT INTO weld_reports (report_date, area, fitter, welder, helper, submitter, total_note, rows, summary)
         VALUES (${report_date}, ${area || ''}, ${fitter || ''}, ${welder || ''}, ${helper || ''},
-                ${submitter || ''}, ${totalNote || ''}, ${JSON.stringify(rows)}::jsonb)
+                ${submitter || ''}, ${totalNote || ''}, ${JSON.stringify(rows)}::jsonb, ${JSON.stringify(summary || {})}::jsonb)
         RETURNING id, report_date, created_at
       `;
       return res.status(200).json({ success: true, updated: false, item: r[0], saved: rows.length });
@@ -401,13 +402,13 @@ export async function handler(req, res) {
       let list;
       if (from && to) {
         list = await sql`
-          SELECT id, report_date, area, fitter, welder, helper, submitter, total_note, rows, created_at, updated_at
+          SELECT id, report_date, area, fitter, welder, helper, submitter, total_note, rows, summary, created_at, updated_at
           FROM weld_reports WHERE report_date BETWEEN ${from} AND ${to}
           ORDER BY created_at DESC LIMIT ${lim}
         `;
       } else {
         list = await sql`
-          SELECT id, report_date, area, fitter, welder, helper, submitter, total_note, rows, created_at, updated_at
+          SELECT id, report_date, area, fitter, welder, helper, submitter, total_note, rows, summary, created_at, updated_at
           FROM weld_reports ORDER BY created_at DESC LIMIT ${lim}
         `;
       }

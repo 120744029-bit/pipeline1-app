@@ -146,7 +146,7 @@
         .wr-people-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
         .wr-date-wrap { display: flex; align-items: center; gap: 4px; font-size: calc(11px * var(--font-scale)); color: var(--text-secondary); }
         .wr-date { border: 1px solid var(--green-primary); border-radius: 6px; padding: 3px 6px; font-size: calc(11px * var(--font-scale)); color: var(--text-primary); background: var(--bg-input); }
-        .wr-people-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .wr-people-grid { display: grid; grid-template-columns: minmax(0,1.7fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); gap: 6px; }
         .wr-field { min-width: 0; }
         .wr-label { display: block; font-size: calc(11px * var(--font-scale)); color: var(--text-secondary); margin-bottom: 3px; white-space: nowrap; }
         .wr-input {
@@ -840,7 +840,10 @@
             <div class="wr-people">
                 <div class="wr-people-head">
                     <div class="wr-sec-title" style="margin-bottom:0;">施工人员</div>
-                    <label class="wr-date-wrap">日期<input type="date" id="wrDate" class="wr-date" onchange="wrOnDateChange()"></label>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <select id="wrViewName" class="wr-date" style="display:none;max-width:110px;" onchange="wrOnDateChange()"></select>
+                        <label class="wr-date-wrap">日期<input type="date" id="wrDate" class="wr-date" onchange="wrOnDateChange()"></label>
+                    </div>
                 </div>
                 <div class="wr-people-grid">
                     <div class="wr-field"><label class="wr-label">施工区域<span style="color:var(--red-text);">*</span></label><input class="wr-input" data-person="area" placeholder="必填"></div>
@@ -5429,9 +5432,7 @@ function wrInch(od) {
 }
 function wrNum(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
 function wrFmt(n) { return (Math.round(n * 100) / 100).toString(); }
-function wrRenderSummary() {
-    var box = document.getElementById('wrSummary');
-    if (!box) return;
+function wrCalcSummary() {
     var s = { '管道安装':0, '管道预制':0, '支架安装':0, '支架预制':0, '重量kg':0, '阀门':0, '小寸':0, '丢失重焊':0 };
     wrRows.forEach(function (r) {
         var t = r.type || 'weld';
@@ -5448,6 +5449,12 @@ function wrRenderSummary() {
             s['阀门'] += 1;
         }
     });
+    return s;
+}
+function wrRenderSummary() {
+    var box = document.getElementById('wrSummary');
+    if (!box) return;
+    var s = wrCalcSummary();
     var tags = [];
     if (s['管道安装']) tags.push('管道安装 ' + wrFmt(s['管道安装']) + '寸');
     if (s['管道预制']) tags.push('管道预制 ' + wrFmt(s['管道预制']) + '寸');
@@ -5552,7 +5559,8 @@ function wrPayload() {
     return {
         report_date: wrLoadedDate || wrToday(),
         area: people.area || '', fitter: people.fitter || '', welder: people.welder || '', helper: people.helper || '',
-        submitter: wrLoginName(), totalNote: tn ? tn.value.trim() : '', rows: rows
+        submitter: wrLoginName(), totalNote: tn ? tn.value.trim() : '', rows: rows,
+        summary: wrCalcSummary()
     };
 }
 function wrHash(o) {
@@ -5600,32 +5608,60 @@ function wrOnDateChange() {
     if (!date) return;
     wrLoadDay(date);
 }
+function wrViewName() {
+    var sel = document.getElementById('wrViewName');
+    return sel && sel.value ? sel.value : wrLoginName();
+}
 function wrLoadDay(date) {
     wrLoadedDate = date;
     wrReadonly = (date !== wrToday());
     var tip = document.getElementById('wrPeopleTip');
     if (tip) tip.textContent = wrReadonly ? '历史报表只读查看' : '管工取登录账号，不可修改';
-    if (wrReadonly) {
-        // 历史：从静态库拉当天报表显示（只读）
-        fetch(BASE + '/weldReports.json').then(function (r) { return r.json(); }).then(function (db) {
-            var day = (db && db.days && db.days[date]) || [];
-            var rec = day.filter(function (x) { return x.submitter === wrLoginName(); })[0] || day[0];
-            wrFillFromRecord(rec, true);
-        }).catch(function () { wrFillFromRecord(null, true); });
-    } else {
-        // 今天：从动态库拉本人当天报表回填（可改、覆盖）
-        fetch(API_BASE_URL + '/work?action=report-list&from=' + date + '&to=' + date).then(function (r) { return r.json(); })
-            .then(function (res) {
-                var list = (res && res.data) || [];
-                var rec = list.filter(function (x) { return x.submitter === wrLoginName(); })[0];
-                if (rec) wrFillFromRecord(rec, false);
-                else { wrRows = [wrNewRow('weld', 1)]; wrRender(); }
-                wrSetUploadBtn();
-            }).catch(function () { wrSetUploadBtn(); });
-    }
+    var isHist = wrReadonly;
+    var url = isHist
+        ? BASE + '/weldReports.json'
+        : API_BASE_URL + '/work?action=report-list&from=' + date + '&to=' + date;
+    fetch(url).then(function (r) { return r.json(); }).then(function (res) {
+        var day = isHist ? (((res || {}).days || {})[date] || []) : ((res && res.data) || []);
+        if (!Array.isArray(day)) day = [];
+        // 管理员：姓名下拉列出当天所有提交人，可切看；普通账号：只看自己
+        var admin = (typeof isAdmin === 'function') && isAdmin();
+        var sel = document.getElementById('wrViewName');
+        var names = [];
+        day.forEach(function (x) { var n = x.submitter || ''; if (n && names.indexOf(n) === -1) names.push(n); });
+        if (sel) {
+            sel.style.display = (admin && names.length) ? '' : 'none';
+            var prev = sel.value;
+            sel.innerHTML = names.map(function (n) {
+                return '<option value="' + wrEsc(n) + '">' + wrEsc(n) + '</option>';
+            }).join('');
+            if (names.indexOf(prev) !== -1) sel.value = prev;
+            else if (names.indexOf(wrLoginName()) !== -1) sel.value = wrLoginName();
+        }
+        var who = (admin && sel && sel.value) ? sel.value : wrLoginName();
+        var rec = day.filter(function (x) { return (x.submitter || '') === who; })[0] || null;
+        if (rec) wrFillFromRecord(rec, isHist);
+        else if (isHist) wrFillFromRecord(null, true, true);   // 历史日期该人名无报表
+        else { wrFillFromRecord(null, false); wrSetUploadBtn(); }  // 今天无报表→空白可填
+    }).catch(function () {
+        wrFillFromRecord(null, isHist, true);
+        if (!isHist) wrSetUploadBtn();
+    });
 }
-function wrFillFromRecord(rec, readonly) {
+function wrFillFromRecord(rec, readonly, noData) {
     wrReadonly = readonly;
+    var box = document.getElementById('wrRows');
+    if (noData) {
+        wrRows = [];
+        if (box) box.innerHTML = '<div class="wr-picker-empty">该日期' + (readonly ? '' : '你的') + '暂无报表</div>';
+        var c = document.getElementById('wrCount'); if (c) c.textContent = '共 0 行';
+        var add3 = document.getElementById('wrAdd3'); if (add3) add3.style.display = 'none';
+        var up = document.getElementById('wrUpload'); if (up) up.style.display = 'none';
+        document.querySelectorAll('#subPageReport [data-person]').forEach(function (inp) { inp.value = ''; });
+        var tn0 = document.getElementById('wrTotalNote'); if (tn0) tn0.value = '';
+        wrRenderSummary();
+        return;
+    }
     if (rec && Array.isArray(rec.rows) && rec.rows.length) {
         wrRows = rec.rows.map(function (r, i) {
             var o = JSON.parse(JSON.stringify(r));
