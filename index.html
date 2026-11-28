@@ -819,6 +819,7 @@
             <button class="active" id="subTabWork" onclick="switchSubTab('work')">工作量</button>
             <button id="subTabTotal" onclick="switchSubTab('total')">总量</button>
             <button id="subTabReport" onclick="switchSubTab('report')">报工作量</button>
+            <button id="subTabView" onclick="switchSubTab('view')" style="display:none;">查看报表</button>
         </div>
 
         <!-- 子页 1：工作量 -->
@@ -859,7 +860,6 @@
                 <div class="wr-people-head">
                     <div class="wr-sec-title" style="margin-bottom:0;">施工人员</div>
                     <div style="display:flex;align-items:center;gap:6px;">
-                        <select id="wrViewName" class="wr-date" style="display:none;max-width:110px;" onchange="wrOnDateChange()"></select>
                         <label class="wr-date-wrap">日期<input type="date" id="wrDate" class="wr-date" onchange="wrOnDateChange()"></label>
                     </div>
                 </div>
@@ -894,6 +894,9 @@
                 <div class="wr-readonly-tip" id="wrReadonlyTip" style="display:none;">历史报表只读，不可修改。切换回今天可继续填报。</div>
             </div>
         </div>
+
+        <!-- 子页 4：查看报表（仅管理员） -->
+        <div id="subPageView" style="display:none;"></div>
     </div>
 
     <!-- ==================== 页面 2：管线 ==================== -->
@@ -1283,6 +1286,7 @@
 
 <!-- 独立热更新哨兵：先于业务脚本加载，业务代码崩溃也能把新版本拉下来 -->
 <script src="update-guard.js"></script>
+<script src="xlsx.full.min.js"></script>
 
 <script>
 // ============================================================
@@ -1458,6 +1462,8 @@ function installFetchPolyfill(retry) {
 // ============================================================
 var APP_VERSION = '4.0.0';
 var currentVersion = APP_VERSION;
+// 网页版（浏览器）= 无 plus：不弹自带键盘、不检查热更新
+var IS_APP = (typeof plus !== 'undefined');
 
 // ============================================================
 //  账号鉴权（游客 / 普通 / 管理员 / 超级管理员）
@@ -1987,6 +1993,8 @@ function updateUserBadge() {
         el.title = '游客 · 点击设置姓名 / 登录';
     }
     el.style.display = '';
+    var tv = document.getElementById('subTabView');   // 查看报表页签：仅管理员及以上
+    if (tv) tv.style.display = isAdmin() ? '' : 'none';
 }
 function promptUserName() {
     var name = prompt('请输入你的姓名（用于记录录入人）', currentUser || '');
@@ -2137,10 +2145,21 @@ function switchSubTab(tab) {
     document.getElementById('subTabTotal').classList.toggle('active', tab === 'total');
     var tReport = document.getElementById('subTabReport');
     if (tReport) tReport.classList.toggle('active', tab === 'report');
+    var tView = document.getElementById('subTabView');
+    if (tView) {
+        tView.style.display = isAdmin() ? '' : 'none';   // 仅管理员及以上可见
+        tView.classList.toggle('active', tab === 'view');
+    }
     document.getElementById('subPageWork').style.display = tab === 'work' ? 'block' : 'none';
     document.getElementById('subPageTotal').style.display = tab === 'total' ? 'block' : 'none';
     var pReport = document.getElementById('subPageReport');
     if (pReport) pReport.style.display = tab === 'report' ? 'block' : 'none';
+    var pView = document.getElementById('subPageView');
+    if (pView) pView.style.display = tab === 'view' ? 'block' : 'none';
+    if (tab === 'view') {
+        if (!isAdmin()) { switchSubTab('work'); return; }
+        wrViewInit();
+    }
     if (tab === 'total') initTotalPage();
     if (tab === 'report') wrInit();
     restoreScrollTop(subTabScrollTop[tab] || 0);
@@ -3747,10 +3766,10 @@ function pdKbInit() {
         if (e.target === mask) { pdKbClose(); return; }
         var b = e.target.closest('button');
         if (!b) return;
-        if (b.getAttribute('data-kb-clear')) { el.value = ''; pdKbFire(); return; }
         if (b.getAttribute('data-kb-shift')) { pdKbLower = !pdKbLower; pdKbBuild(); return; }
         var el = pdKbFresh();
         if (!el) return;
+        if (b.getAttribute('data-kb-clear')) { el.value = ''; pdKbFire(); return; }
         if (b.getAttribute('data-kb-back')) {
             el.value = el.value.slice(0, -1);
             pdKbFire();
@@ -3765,10 +3784,15 @@ function pdKbInit() {
         }
     });
     document.addEventListener('click', function (e) {
+        if (!IS_APP) return;   // 网页版不弹自带键盘
         var el = e.target.closest('[data-kb]');
         if (!el) return;
         pdKbOpen(el, el.getAttribute('data-kb-label') || el.getAttribute('placeholder') || '快捷输入');
     });
+    if (!IS_APP) {
+        // 网页版：静态 HTML 里写死的 readonly 输入框恢复可输入（系统键盘直接打字）
+        document.querySelectorAll('[data-kb]').forEach(function (inp) { inp.removeAttribute('readonly'); });
+    }
 }
 
 // ============================================================
@@ -5053,8 +5077,9 @@ function checkHotUpdate() {
             checkRemoteVersion();
         });
     } else {
+        // 网页版：跳过热更新检查，不弹更新提示
         currentVersionEl.textContent = APP_VERSION;
-        checkRemoteVersion();
+        console.log('🌐 网页版：跳过热更新检查');
     }
 }
 
@@ -5522,7 +5547,7 @@ function wrEsc(s) {
 function wrFieldHtml(rowIdx, field, cls) {
     var row = wrRows[rowIdx];
     var v = row[field] || '';
-    var useKb = !wrReadonly && field !== '备注' && field !== '焊接类型';
+    var useKb = IS_APP && !wrReadonly && field !== '备注' && field !== '焊接类型';
     var ro = (wrReadonly || useKb) ? ' readonly' : '';
     var kbAttr = useKb ? ' data-kb="1"' : '';
     var hasPreset = !!wrPresetsFor(field, rowIdx);
@@ -5820,8 +5845,7 @@ function wrOnDateChange() {
     wrLoadDay(date);
 }
 function wrViewName() {
-    var sel = document.getElementById('wrViewName');
-    return sel && sel.value ? sel.value : wrLoginName();
+    return wrLoginName();
 }
 function wrLoadDay(date) {
     wrLoadedDate = date;
@@ -5829,38 +5853,225 @@ function wrLoadDay(date) {
     var tip = document.getElementById('wrPeopleTip');
     if (tip) tip.textContent = wrReadonly ? '历史报表只读查看' : '管工取登录账号，不可修改';
     var isHist = wrReadonly;
+    var who = wrLoginName();
     var url = isHist
         ? BASE + '/weldReports.json'
         : API_BASE_URL + '/work?action=report-list&from=' + date + '&to=' + date;
     fetch(url).then(function (r) { return r.json(); }).then(function (res) {
         var day = isHist ? (((res || {}).days || {})[date] || []) : ((res && res.data) || []);
         if (!Array.isArray(day)) day = [];
-        // 管理员：姓名下拉列出当天所有提交人，可切看；普通账号：只看自己
-        var admin = (typeof isAdmin === 'function') && isAdmin();
-        var sel = document.getElementById('wrViewName');
-        var names = [];
-        day.forEach(function (x) { var n = x.submitter || ''; if (n && names.indexOf(n) === -1) names.push(n); });
-        if (sel) {
-            sel.style.display = (admin && names.length) ? '' : 'none';
-            var prev = sel.value;
-            sel.innerHTML = names.map(function (n) {
-                return '<option value="' + wrEsc(n) + '">' + wrEsc(n) + '</option>';
-            }).join('');
-            if (names.indexOf(prev) !== -1) sel.value = prev;
-            else if (names.indexOf(wrLoginName()) !== -1) sel.value = wrLoginName();
-        }
-        var who = (admin && sel && sel.value) ? sel.value : wrLoginName();
         var rec = day.filter(function (x) { return (x.submitter || '') === who; })[0] || null;
         if (rec) wrFillFromRecord(rec, isHist);
-        else if (isHist) wrFillFromRecord(null, true, true);   // 历史日期该人名无报表
+        else if (isHist) wrFillFromRecord(null, true, true);   // 历史日期本人无报表
         else { wrFillFromRecord(null, false); wrSetUploadBtn(); }  // 今天无报表→空白可填
     }).catch(function () {
         wrFillFromRecord(null, isHist, true);
         if (!isHist) wrSetUploadBtn();
     });
 }
-function wrFillFromRecord(rec, readonly, noData) {
-    wrReadonly = readonly;
+// ============================================================
+//                查看报表（管理员，只读 + 导出）
+// ============================================================
+var WR_VIEW_COLS = {
+    weld: ['序号', '管线号', '页码', '管段号', '焊口号', '管径', '壁厚', '焊接类型', '焊工号',
+        '材料名称1', '材质1', '炉批号1', '材料名称2', '材质2', '炉批号2', '施工分类', '备注'],
+    bracket: ['序号', '施工分类', '管线号', '支架号', '焊工号', '重量kg'],
+    valve: ['序号', '管线号', '阀门位号']
+};
+var WR_VIEW_LABEL = { weld: '焊口', bracket: '支架', valve: '阀门' };
+var wrViewData = [];
+var wrViewDate = '';
+var wrViewOpen = '';
+function wrViewInit() {
+    var box = document.getElementById('subPageView');
+    if (!box) return;
+    if (!box.getAttribute('data-built')) {
+        box.setAttribute('data-built', '1');
+        box.innerHTML =
+            '<div class="wr-people"><div class="wr-people-head">' +
+            '<div class="wr-sec-title" style="margin-bottom:0;">查看报表（只读）</div>' +
+            '<div style="display:flex;align-items:center;gap:6px;">' +
+            '<label class="wr-date-wrap">日期<input type="date" id="wvDate" class="wr-date" onchange="wrViewLoad()"></label>' +
+            '</div></div>' +
+            '<div style="display:flex;gap:8px;margin:10px 0;">' +
+            '<button class="mini" style="padding:7px 14px;border:1px solid var(--border-light);border-radius:6px;background:var(--bg-card);color:var(--text-primary);font-size:13px;" onclick="wrViewToday()">今天</button>' +
+            '<button class="mini" style="padding:7px 14px;border:1px solid var(--border-light);border-radius:6px;background:var(--bg-card);color:var(--text-primary);font-size:13px;" onclick="wrViewLoad()">🔄 刷新</button>' +
+            '<button class="mini" style="padding:7px 14px;border:none;border-radius:6px;background:var(--green-primary);color:#fff;font-size:13px;font-weight:600;" onclick="wrViewExport()">📤 导出表格</button>' +
+            '</div>' +
+            '<div id="wvList"><div class="wr-picker-empty">正在加载…</div></div></div>';
+    }
+    var d = document.getElementById('wvDate');
+    if (d && !d.value) d.value = wrToday();
+    wrViewLoad();
+}
+function wrViewToday() {
+    var d = document.getElementById('wvDate');
+    if (d) d.value = wrToday();
+    wrViewLoad();
+}
+function wrViewLoad() {
+    var dEl = document.getElementById('wvDate');
+    var date = (dEl && dEl.value) || wrToday();
+    wrViewDate = date;
+    wrViewOpen = '';
+    var list = document.getElementById('wvList');
+    if (list) list.innerHTML = '<div class="wr-picker-empty">正在加载…</div>';
+    var isHist = date !== wrToday();
+    var url = isHist ? BASE + '/weldReports.json' : API_BASE_URL + '/work?action=report-list&from=' + date + '&to=' + date;
+    fetch(url).then(function (r) { return r.json(); }).then(function (res) {
+        var day = isHist ? (((res || {}).days || {})[date] || []) : ((res && res.data) || []);
+        wrViewData = Array.isArray(day) ? day : [];
+        wrViewRender();
+    }).catch(function () {
+        wrViewData = [];
+        wrViewRender();
+        showToast('加载失败，请检查网络');
+    });
+}
+function wrViewSummary(s) {
+    if (!s || typeof s !== 'object') return '当天汇总：—';
+    var keys = [['管道安装', '寸'], ['管道预制', '寸'], ['支架安装', '个'], ['支架预制', '个'],
+        ['安装重量', 'kg'], ['预制重量', 'kg'], ['重量kg', 'kg'], ['阀门', '个'], ['小寸', '寸'], ['丢失重焊', '寸']];
+    var parts = [];
+    keys.forEach(function (kv) {
+        var v = Number(s[kv[0]]) || 0;
+        if (v) parts.push(kv[0] + ' ' + (Math.round(v * 100) / 100) + kv[1]);
+    });
+    return '当天汇总：' + (parts.length ? parts.join(' · ') : '—');
+}
+function wrViewToggle(key) {
+    wrViewOpen = (wrViewOpen === key) ? '' : key;
+    wrViewRender();
+}
+function wrViewDetailHtml(rows) {
+    var html = '';
+    ['weld', 'bracket', 'valve'].forEach(function (t) {
+        var rs = rows.filter(function (x) { return (x.type || 'weld') === t; });
+        if (!rs.length) return;
+        var cols = WR_VIEW_COLS[t];
+        html += '<div style="font-size:12px;font-weight:600;margin:8px 0 4px;color:var(--text-primary);">' + WR_VIEW_LABEL[t] + '（' + rs.length + ' 行）</div>';
+        html += '<table style="border-collapse:collapse;font-size:12px;white-space:nowrap;"><thead><tr>';
+        cols.forEach(function (c) {
+            html += '<th style="border:1px solid var(--border-light);padding:4px 8px;background:var(--bg-hover);font-weight:600;">' + c + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+        rs.forEach(function (row, i) {
+            html += '<tr>';
+            cols.forEach(function (c) {
+                var v = (c === '序号') ? (i + 1) : (row[c] == null ? '' : row[c]);
+                html += '<td style="border:1px solid var(--border-light);padding:4px 8px;">' + wrEsc(v) + '</td>';
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+    });
+    return html || '<div class="wr-picker-empty">无明细</div>';
+}
+function wrViewRender() {
+    var list = document.getElementById('wvList');
+    if (!list) return;
+    if (!wrViewData.length) {
+        list.innerHTML = '<div class="wr-picker-empty">' + wrViewDate + ' 暂无报表</div>';
+        return;
+    }
+    var html = '';
+    wrViewData.forEach(function (r, i) {
+        var rows = Array.isArray(r.rows) ? r.rows : [];
+        var key = r.submitter || ('#' + i);
+        var open = wrViewOpen === key;
+        html += '<div class="wr-card" style="margin-bottom:10px;">' +
+            '<div class="wr-card-head" style="cursor:pointer;" onclick="wrViewToggle(\'' + wrEsc(key).replace(/'/g, '') + '\')">' +
+            '<span class="wr-seq">' + wrEsc(r.submitter || '（无姓名）') + '</span>' +
+            '<span style="margin-left:6px;color:var(--text-secondary);font-size:12px;">' +
+            (rows.length ? rows.length + ' 行' : '无明细') + (r.area ? ' · ' + wrEsc(r.area) : '') + '</span>' +
+            '<span style="margin-left:auto;font-size:12px;color:var(--text-tertiary);">' + (open ? '收起 ▴' : '明细 ▾') + '</span></div>';
+        if (r.updated_at) {
+            html += '<div style="font-size:11px;color:var(--text-tertiary);padding:0 12px;">提交：' +
+                wrEsc(String(r.updated_at).replace('T', ' ').slice(0, 16)) + '</div>';
+        }
+        html += '<div style="padding:6px 12px 2px;font-size:12px;color:var(--text-secondary);">' + wrViewSummary(r.summary) + '</div>';
+        if (r.total_note) html += '<div style="padding:0 12px 6px;font-size:12px;">总备注：' + wrEsc(r.total_note) + '</div>';
+        if (open) html += '<div style="overflow-x:auto;padding:0 8px 10px;">' + wrViewDetailHtml(rows) + '</div>';
+        html += '</div>';
+    });
+    list.innerHTML = html;
+}
+function wrViewExport() {
+    if (typeof XLSX === 'undefined') { showToast('❌ xlsx 库未加载'); return; }
+    var types = [
+        { t: 'weld', name: '焊口', cols: WR_VIEW_COLS.weld },
+        { t: 'bracket', name: '支架', cols: WR_VIEW_COLS.bracket },
+        { t: 'valve', name: '阀门', cols: WR_VIEW_COLS.valve }
+    ];
+    var peopleCols = ['管工', '焊工', '普工'];
+    var any = false;
+    var sheets = types.map(function (cfg) {
+        var headers = cfg.cols.concat(peopleCols);
+        var rows = [];
+        var seq = 0;
+        wrViewData.forEach(function (r) {
+            var rs = Array.isArray(r.rows) ? r.rows : [];
+            rs.forEach(function (row) {
+                if ((row.type || 'weld') !== cfg.t) return;
+                any = true;
+                seq++;
+                rows.push(headers.map(function (c) {
+                    if (c === '序号') return String(seq);
+                    if (c === '管工') return r.fitter == null ? '' : String(r.fitter);
+                    if (c === '焊工') return r.welder == null ? '' : String(r.welder);
+                    if (c === '普工') return r.helper == null ? '' : String(r.helper);
+                    return row[c] == null ? '' : String(row[c]);
+                }));
+            });
+        });
+        return { name: cfg.name, headers: headers, rows: rows };
+    });
+    if (!any) { showToast(wrViewDate + ' 没有可导出的明细'); return; }
+    var wb = XLSX.utils.book_new();
+    var total = 0;
+    sheets.forEach(function (sh) {
+        var aoa = [sh.headers];
+        sh.rows.forEach(function (r) {
+            aoa.push(sh.headers.map(function (_, i) { return { v: (r[i] == null ? '' : String(r[i])), t: 's' }; }));
+        });
+        var ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = sh.headers.map(function (_, i) {
+            var w = String(sh.headers[i]).length * 1.2 + 4;
+            sh.rows.forEach(function (r) {
+                var v = r[i] == null ? '' : String(r[i]);
+                var len = 0;
+                for (var k = 0; k < v.length; k++) len += v.charCodeAt(k) > 127 ? 2 : 1;
+                if (len + 2 > w) w = len + 2;
+            });
+            return { wch: Math.min(Math.max(Math.round(w), 6), 60) };
+        });
+        XLSX.utils.book_append_sheet(wb, ws, sh.name);
+        total += sh.rows.length;
+    });
+    var filename = '工作量报表_' + wrViewDate + '.xlsx';
+    var data = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    if (typeof plus !== 'undefined') {
+        try {
+            var blob = new Blob([data], { type: 'application/octet-stream' });
+            plus.io.resolveLocalFileSystemURL('/storage/emulated/0/Download/', function (dir) {
+                dir.getFile(filename, { create: true }, function (fe) {
+                    fe.createWriter(function (w) {
+                        w.onwrite = function () { showToast('✅ 已导出到 Download/' + filename); };
+                        w.onerror = function () { showToast('❌ 写入失败'); };
+                        w.write(blob);
+                    }, function () { showToast('❌ 打开文件失败'); });
+                }, function () { showToast('❌ 创建文件失败'); });
+            }, function () { showToast('❌ 打开 Download 目录失败'); });
+        } catch (e) {
+            showToast('❌ 导出失败：' + (e && e.message));
+        }
+    } else {
+        XLSX.writeFile(wb, filename);
+        showToast('✅ 已导出 ' + total + ' 条');
+    }
+}
+
+function wrFillFromRecord(rec, readonly, noData) {    wrReadonly = readonly;
     var box = document.getElementById('wrRows');
     if (noData) {
         wrRows = [];

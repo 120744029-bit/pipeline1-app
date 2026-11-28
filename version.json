@@ -1,8 +1,8 @@
 {
-  "version": "4.4.10",
+  "version": "4.4.11",
   "updateTime": "2026-11-28 14:09:00",
   "dataUpdateTime": "2026-11-27 20:32:49",
   "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-  "updateLog": "键盘底排：清空（原ABC）一键清输入、0 与退格换位；按键字体加粗加大。",
+  "updateLog": "新增管理员「查看报表」页签（只读+导出3个sheet表格）；报工作量去掉管理员切换他人下拉，人人只看自己；键盘清空键修复；网页版自动识别：不弹自带键盘、不弹更新。",
   "updatedAt": "2026-11-28 14:09"
 }
