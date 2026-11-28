@@ -859,7 +859,8 @@
                     <div class="wr-field"><label class="wr-label">焊工</label><input class="wr-input" data-person="welder" placeholder="焊工"></div>
                     <div class="wr-field"><label class="wr-label">普工</label><input class="wr-input" data-person="helper" placeholder="普工"></div>
                 </div>
-                <div id="wrExtraPeople"></div>
+                <div id="wrExtraWelder"></div>
+                <div id="wrExtraHelper"></div>
                 <div class="wr-add-people">
                     <div class="wr-add-person" id="wrAddWelder" onclick="wrAddPerson('welder')">＋ 加焊工</div>
                     <div class="wr-add-person" id="wrAddHelper" onclick="wrAddPerson('helper')">＋ 加普工</div>
@@ -5306,23 +5307,28 @@ function wrGetPersonArr(kind, noEmpty) {
     if (noEmpty) arr = arr.filter(function (x) { return x; });
     return arr;
 }
-// welders/helpers 为完整数组（含第 1 位），从下标 1 起渲染额外行
+// 焊工/普工各自独立渲染额外行（互不牵连，删哪边只影响哪边）
+function wrExtraRowHtml(kind, i, val) {
+    var name = kind === 'welder' ? '焊工' : '普工';
+    var field = '<div class="wr-field"><label class="wr-label">' + name + (i + 1) +
+        '<span class="wr-extra-del" onclick="wrDelPerson(\'' + kind + '\',' + i + ')">×</span></label>' +
+        '<input class="wr-input" data-person="' + kind + (i + 1) + '" value="' + wrEsc(val) +
+        '" placeholder="' + name + '" onchange="wrSavePeople()"' + (wrReadonly ? ' readonly' : '') + '></div>';
+    var e = '<div></div>';
+    // 4 列：施工区域/管工占位，焊工在第3列、普工在第4列
+    return '<div class="wr-people-grid wr-extra-row">' + e + e +
+        (kind === 'welder' ? field : e) + (kind === 'helper' ? field : e) + '</div>';
+}
+// welders/helpers 为完整数组（含第 1 位），从下标 1 起各自渲染
 function wrRenderExtra(welders, helpers) {
-    var box = document.getElementById('wrExtraPeople');
-    if (!box) return;
-    var n = Math.max(welders.length, helpers.length);
-    var html = '';
-    for (var i = 1; i < n; i++) {
-        html += '<div class="wr-people-grid wr-extra-row"><div></div><div></div>' +
-            '<div class="wr-field"><label class="wr-label">焊工' + (i + 1) +
-            '<span class="wr-extra-del" onclick="wrDelPerson(\'welder\',' + i + ')">×</span></label>' +
-            '<input class="wr-input" data-person="welder' + (i + 1) + '" value="' + wrEsc(welders[i] || '') + '" placeholder="焊工" onchange="wrSavePeople()"' + (wrReadonly ? ' readonly' : '') + '></div>' +
-            '<div class="wr-field"><label class="wr-label">普工' + (i + 1) +
-            '<span class="wr-extra-del" onclick="wrDelPerson(\'helper\',' + i + ')">×</span></label>' +
-            '<input class="wr-input" data-person="helper' + (i + 1) + '" value="' + wrEsc(helpers[i] || '') + '" placeholder="普工" onchange="wrSavePeople()"' + (wrReadonly ? ' readonly' : '') + '></div>' +
-            '</div>';
-    }
-    box.innerHTML = html;
+    var bw = document.getElementById('wrExtraWelder');
+    var bh = document.getElementById('wrExtraHelper');
+    if (!bw || !bh) return;
+    var hw = '', hh = '';
+    for (var i = 1; i < (welders || []).length; i++) hw += wrExtraRowHtml('welder', i, welders[i]);
+    for (var j = 1; j < (helpers || []).length; j++) hh += wrExtraRowHtml('helper', j, helpers[j]);
+    bw.innerHTML = hw;
+    bh.innerHTML = hh;
 }
 function wrAddPerson(kind) {
     if (wrReadonly) return;

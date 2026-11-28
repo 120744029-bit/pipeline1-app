@@ -1,7 +1,7 @@
 {
-    "version": "4.4.4",
-    "updateTime": "2026-11-28 10:20:00",
+    "version": "4.4.5",
+    "updateTime": "2026-11-28 10:56:00",
     "dataUpdateTime": "2026-11-27 20:32:49",
     "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-    "updateLog": "报工作量：施工人员区对齐加长、焊工/普工可加多人、汇总字体加大、安装/预制重量分开统计。"
+    "updateLog": "报工作量：修复添加的焊工/普工无法删除行，两种人员各自独立增删。"
 }
