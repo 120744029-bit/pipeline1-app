@@ -418,8 +418,8 @@
         .pd-kb-row.indent1 { padding: 0 5%; }
         .pd-kb-row.indent2 { padding: 0 2%; }
         .pd-kb-row button {
-            flex: 1; min-width: 0; padding: 11px 2px; border: 1px solid var(--border-light); border-radius: 5px;
-            background: var(--bg-card); font-size: calc(14px * var(--font-scale)); font-weight: 600;
+            flex: 1; min-width: 0; padding: 12px 2px; border: 1px solid var(--border-light); border-radius: 5px;
+            background: var(--bg-card); font-size: calc(16px * var(--font-scale)); font-weight: 700;
             color: var(--text-primary); cursor: pointer; text-align: center;
             transition: background 0.2s, border-color 0.2s, color: 0.2s, transform 0.1s;
         }
@@ -429,7 +429,8 @@
         .pd-kb-row.pd-kb-numrow > button { flex: 1; }
         .pd-kb-num3 { flex: 3; display: flex; gap: 4px; }
         .pd-kb-num3 button { flex: 1; }
-        .pd-kb-row button.pd-kb-abc { background: var(--bg-hover); font-weight: 600; }
+        .pd-kb-row button.pd-kb-clr { background: var(--bg-hover); font-weight: 700; }
+        .pd-kb-row.pd-kb-numrow button { font-size: calc(19px * var(--font-scale)); padding: 14px 2px; }
         .pd-kb-row button.shift.act { background: var(--green-primary); color: #fff; border-color: var(--green-primary); }
         .pd-kb-row button:active { background: var(--green-primary); color: white; transform: scale(0.92); }
         .pd-kb-foot { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 0; }
@@ -3676,9 +3677,9 @@ function pdKbBuild() {
         }
         html += '<div class="pd-kb-row pd-kb-numrow">' +
             '<button type="button" data-kb-key="-">-</button>' +
-            '<button type="button" class="pd-kb-abc" data-kb-mode="1">ABC</button>' +
-            '<button type="button" class="wide" data-kb-back="1">退格</button>' +
+            '<button type="button" class="pd-kb-clr" data-kb-clear="1">清空</button>' +
             '<button type="button" data-kb-key="0">0</button>' +
+            '<button type="button" class="wide" data-kb-back="1">退格</button>' +
             '</div>';
     } else {
         pdKbRows().forEach(function (row, ri) {
@@ -3696,7 +3697,7 @@ function pdKbBuild() {
     var mb = document.getElementById('pdKbModeBtn');
     if (mb) mb.textContent = pdKbNum ? '返回' : '123';
     var h = document.getElementById('pdKbHint');
-    if (h) h.textContent = pdKbNum ? '数字 / 符号 · ABC 返回字母' : 'Shift 切大小写 · 退格删一字';
+    if (h) h.textContent = pdKbNum ? '数字 / 符号 · 清空一键清输入' : 'Shift 切大小写 · 退格删一字';
 }
 function pdKbFresh() {
     if (pdKbTarget && !document.contains(pdKbTarget)) {
@@ -3746,7 +3747,7 @@ function pdKbInit() {
         if (e.target === mask) { pdKbClose(); return; }
         var b = e.target.closest('button');
         if (!b) return;
-        if (b.getAttribute('data-kb-mode')) { pdKbNum = false; pdKbBuild(); return; }
+        if (b.getAttribute('data-kb-clear')) { el.value = ''; pdKbFire(); return; }
         if (b.getAttribute('data-kb-shift')) { pdKbLower = !pdKbLower; pdKbBuild(); return; }
         var el = pdKbFresh();
         if (!el) return;

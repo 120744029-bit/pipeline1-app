@@ -1,8 +1,8 @@
 {
-  "version": "4.4.9",
+  "version": "4.4.10",
   "updateTime": "2026-11-28 14:09:00",
   "dataUpdateTime": "2026-11-27 20:32:49",
   "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-  "updateLog": "数字键盘改为拨号盘布局：左列 . / + - 竖排，1~9 三行，底排 ABC/退格/0，ABC 或返回切回字母。",
+  "updateLog": "键盘底排：清空（原ABC）一键清输入、0 与退格换位；按键字体加粗加大。",
   "updatedAt": "2026-11-28 14:09"
 }
