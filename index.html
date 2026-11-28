@@ -430,6 +430,10 @@
         .pd-kb-foot { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 0; }
         .pd-kb-foot .pd-kb-hint { font-size: calc(11px * var(--font-scale)); color: var(--text-tertiary); }
         .pd-kb-foot .pd-kb-done { padding: 7px 22px; background: var(--green-primary); color: #fff; border: none; border-radius: 6px; font-size: calc(13px * var(--font-scale)); cursor: pointer; }
+        .pd-kb-foot { gap: 8px; }
+        .pd-kb-foot .pd-kb-mode { padding: 7px 14px; background: var(--bg-hover); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: 6px; font-size: calc(13px * var(--font-scale)); cursor: pointer; font-weight: 600; }
+        .pd-kb-foot .pd-kb-mode:active { background: var(--green-primary); color: #fff; border-color: var(--green-primary); }
+        .pd-kb-row button.kb-sym { flex: 1; }
 
         /* ============ 快捷按钮组 ============ */
         .quick { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; padding: 0 16px; }
@@ -788,13 +792,15 @@
 
     <!-- 顶部导航栏 -->
     <div class="navbar">
-        <span class="status-badge online" id="statusBadge">✅ 在线</span>
-        <button class="settings-float-btn" id="settingsFloatBtn" onclick="openSettings()" aria-label="设置">
+        <div style="position:absolute;left:16px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:8px;z-index:101;">
+            <span class="status-badge online" id="statusBadge" style="position:static;transform:none;">✅ 在线</span>
+            <button class="settings-float-btn" id="settingsFloatBtn" onclick="openSettings()" aria-label="设置">
             <svg viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
-        </button>
+            </button>
+        </div>
         <span class="status-badge" id="userBadge" onclick="authUser ? authMenu() : promptUserName()" style="left:auto;right:60px;background:var(--bg-hover);color:var(--text-primary);display:none;cursor:pointer;">👤</span>
         <h1 id="mainTitle">工作量</h1>
         <button class="right-btn" onclick="showInfo()">⋯</button>
@@ -3638,7 +3644,14 @@ function fallbackCopy(text) {
 // ============================================================
 var pdKbTarget = null;
 var pdKbLower = false;
+var pdKbNum = false;
 function pdKbRows() {
+    if (pdKbNum) {
+        return [
+            { cls: '', keys: ['1','2','3','4','5','6','7','8','9','0'] },
+            { cls: '', keys: ['.','/','+','-'] }
+        ];
+    }
     return [
         { cls: '', keys: ['1','2','3','4','5','6','7','8','9','0'] },
         { cls: '', keys: ['Q','W','E','R','T','Y','U','I','O','P'] },
@@ -3652,15 +3665,20 @@ function pdKbBuild() {
     var html = '';
     pdKbRows().forEach(function (row, ri) {
         html += '<div class="pd-kb-row ' + row.cls + '">';
-        if (ri === 3) html += '<button type="button" class="shift' + (pdKbLower ? ' act' : '') + '" data-kb-shift="1">Shift</button>';
+        if (!pdKbNum && ri === 3) html += '<button type="button" class="shift' + (pdKbLower ? ' act' : '') + '" data-kb-shift="1">Shift</button>';
         row.keys.forEach(function (k) {
             var txt = /[A-Z]/.test(k) && pdKbLower ? k.toLowerCase() : k;
             html += '<button type="button" data-kb-key="' + k + '">' + txt + '</button>';
         });
-        if (ri === 3) html += '<button type="button" class="wide" data-kb-back="1">退格</button>';
+        if (!pdKbNum && ri === 3) html += '<button type="button" class="wide" data-kb-back="1">退格</button>';
+        if (pdKbNum && ri === 1) html += '<button type="button" class="wide" data-kb-back="1">退格</button>';
         html += '</div>';
     });
     box.innerHTML = html;
+    var mb = document.getElementById('pdKbModeBtn');
+    if (mb) mb.textContent = pdKbNum ? '返回' : '123';
+    var h = document.getElementById('pdKbHint');
+    if (h) h.textContent = pdKbNum ? '数字/符号 · 返回切回字母' : 'Shift 切大小写 · 退格删一字';
 }
 function pdKbFresh() {
     if (pdKbTarget && !document.contains(pdKbTarget)) {
@@ -3675,6 +3693,7 @@ function pdKbOpen(el, label) {
     if (!el) return;
     pdKbTarget = el;
     pdKbLower = false;
+    pdKbNum = false;
     pdKbBuild();
     var t = document.getElementById('pdKbTitle');
     if (t) t.textContent = (label || '快捷输入') + ' · 快捷输入';
@@ -3685,6 +3704,18 @@ function pdKbOpen(el, label) {
 function pdKbClose() {
     document.getElementById('pdKbMask').classList.remove('show');
     pdKbTarget = null;
+}
+function pdKbToggleNum() {
+    pdKbNum = !pdKbNum;
+    pdKbBuild();
+}
+function pdKbDone() {
+    var el = pdKbTarget;
+    pdKbClose();
+    if (!el) return;
+    var map = { pipelineInput: 'pipelineBtn', bracketInput: 'bracketBtn', valveInput: 'valveBtn' };
+    var btn = map[el.id] ? document.getElementById(map[el.id]) : null;
+    if (btn) btn.click();
 }
 function pdKbFire() {
     if (pdKbTarget) pdKbTarget.dispatchEvent(new Event('change', { bubbles: true }));
@@ -5863,7 +5894,7 @@ console.log('🚀 APP 启动完成');
   <div class="pd-kb">
     <div class="pd-kb-head"><span id="pdKbTitle">快捷输入</span><span class="pd-kb-close" onclick="pdKbClose()">收起</span></div>
     <div id="pdKbKeys"></div>
-    <div class="pd-kb-foot"><span class="pd-kb-hint">Shift 切大小写 · 退格删一字</span><button type="button" class="pd-kb-done" onclick="pdKbClose()">完成</button></div>
+    <div class="pd-kb-foot"><span class="pd-kb-hint" id="pdKbHint">Shift 切大小写 · 退格删一字</span><button type="button" class="pd-kb-mode" id="pdKbModeBtn" onclick="pdKbToggleNum()">123</button><button type="button" class="pd-kb-done" onclick="pdKbDone()">完成</button></div>
   </div>
 </div>
 <div class="wr-picker-mask" id="wrPickerMask" onclick="if(event.target===this)wrClosePicker()">

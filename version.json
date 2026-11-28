@@ -1,8 +1,8 @@
 {
-  "version": "4.4.7",
+  "version": "4.4.8",
   "updateTime": "2026-11-28 14:09:00",
   "dataUpdateTime": "2026-11-27 20:32:49",
   "wgtUrl": "https://pipeline1-app-sjb7zjvz.edgeone.dev/update.wgt",
-  "updateLog": "设置按钮移到顶栏在线徽章旁（原底部悬浮球取消）。",
+  "updateLog": "搜索框键盘点完成直接查询；完成旁加 123 切数字键盘（含 . / + -），数字键盘返回切回字母；设置按钮与在线徽章不再重叠。",
   "updatedAt": "2026-11-28 14:09"
 }
